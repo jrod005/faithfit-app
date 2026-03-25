@@ -619,6 +619,15 @@ function updateNutritionBars() {
 
 // --- Coaching System is now in coach.js ---
 
+// --- Gender ---
+let selectedGender = 'male';
+
+function setGender(gender) {
+    selectedGender = gender;
+    document.getElementById('gender-male').classList.toggle('active', gender === 'male');
+    document.getElementById('gender-female').classList.toggle('active', gender === 'female');
+}
+
 // --- Profile ---
 function saveProfile() {
     const metric = isMetric();
@@ -653,6 +662,7 @@ function saveProfile() {
 
     const profile = {
         name: document.getElementById('profile-name').value.trim(),
+        gender: selectedGender,
         age: parseInt(document.getElementById('profile-age').value) || 0,
         heightFeet: feet,
         heightInches: inches,
@@ -673,6 +683,7 @@ function saveProfile() {
 function loadProfile() {
     const profile = DB.get('profile', {});
     if (profile.name) document.getElementById('profile-name').value = profile.name;
+    if (profile.gender) setGender(profile.gender);
     if (profile.age) document.getElementById('profile-age').value = profile.age;
     if (profile.heightFeet) document.getElementById('profile-height-feet').value = profile.heightFeet;
     if (profile.heightInches !== undefined && profile.heightInches !== null) document.getElementById('profile-height-inches').value = profile.heightInches;
@@ -713,10 +724,11 @@ function calculateCalories() {
         return;
     }
 
-    // Mifflin-St Jeor
+    // Mifflin-St Jeor (gender-adjusted)
     const weightKg = currentWeight * 0.453592;
     const heightCm = heightInches * 2.54;
-    let bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5; // Male default
+    const genderOffset = selectedGender === 'female' ? -161 : 5;
+    let bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + genderOffset;
 
     const activityMultipliers = {
         sedentary: 1.2,
@@ -844,6 +856,201 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+// --- PWA Install ---
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const btn = document.getElementById('install-btn');
+    if (btn) btn.style.display = 'inline-flex';
+});
+
+function installApp() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(result => {
+            if (result.outcome === 'accepted') {
+                document.getElementById('install-btn').style.display = 'none';
+            }
+            deferredPrompt = null;
+        });
+    } else {
+        alert('To install FaithFit:\n\n• iOS: Tap the Share button, then "Add to Home Screen"\n• Android Chrome: Tap the menu (⋮), then "Install app"\n• Desktop: Look for the install icon in the address bar');
+    }
+}
+
+window.addEventListener('appinstalled', () => {
+    document.getElementById('install-btn').style.display = 'none';
+    deferredPrompt = null;
+});
+
+// --- Service Worker Registration ---
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+}
+
+// --- Sharing ---
+function shareProgress() {
+    const profile = DB.get('profile', {});
+    const workouts = DB.get('workouts', []);
+    const meals = DB.get('meals', []).filter(m => m.date === today());
+    const weights = DB.get('weights', []);
+    const todayWorkouts = workouts.filter(w => w.date === today());
+
+    // Calculate streak
+    const dates = [...new Set(workouts.map(w => w.date))].sort().reverse();
+    let streak = 0;
+    if (dates.includes(today())) {
+        streak = 1;
+        const checkDate = new Date();
+        for (let i = 1; i < 365; i++) {
+            checkDate.setDate(checkDate.getDate() - 1);
+            if (dates.includes(checkDate.toISOString().split('T')[0])) streak++;
+            else break;
+        }
+    }
+
+    const totalCalories = meals.reduce((sum, m) => sum + m.calories, 0);
+    const currentWeight = weights.length > 0 ? `${lbsToDisplay(weights[weights.length - 1].weight)} ${wu()}` : 'Not tracked';
+    const name = profile.name || 'A FaithFit user';
+
+    const verse = getDailyVerse();
+
+    let text = `💪 ${name}'s FaithFit Progress\n`;
+    text += `📅 ${today()}\n\n`;
+    text += `🏋️ Workouts today: ${todayWorkouts.length}\n`;
+    text += `🔥 Current streak: ${streak} day${streak !== 1 ? 's' : ''}\n`;
+    text += `🍽️ Calories today: ${totalCalories}\n`;
+    text += `⚖️ Weight: ${currentWeight}\n`;
+
+    if (todayWorkouts.length > 0) {
+        text += `\nToday's exercises:\n`;
+        todayWorkouts.forEach(w => {
+            const bestSet = w.sets.reduce((best, s) => s.weight > best.weight ? s : best, w.sets[0]);
+            text += `  • ${w.name}: ${lbsToDisplay(bestSet.weight)}${wu()} x ${bestSet.reps}\n`;
+        });
+    }
+
+    text += `\n✨ "${verse.text}" — ${verse.ref}\n`;
+    text += `\n📲 Track your fitness journey with FaithFit!`;
+
+    const shareData = {
+        title: 'My FaithFit Progress',
+        text: text
+    };
+
+    if (navigator.share) {
+        navigator.share(shareData).catch(() => {});
+    } else {
+        copyToClipboard(text, 'Progress copied to clipboard! Paste it anywhere to share.');
+    }
+}
+
+function copyToClipboard(text, message) {
+    navigator.clipboard.writeText(text).then(() => {
+        showToast(message || 'Copied to clipboard!');
+    }).catch(() => {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showToast(message || 'Copied to clipboard!');
+    });
+}
+
+function showToast(message) {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.classList.add('show'), 10);
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// --- Import Data ---
+function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+
+            if (!data.profile && !data.workouts && !data.meals && !data.weights) {
+                alert('Invalid FaithFit backup file.');
+                return;
+            }
+
+            if (!confirm('This will replace all your current data with the imported data. Continue?')) return;
+
+            if (data.profile) DB.set('profile', data.profile);
+            if (data.workouts) DB.set('workouts', data.workouts);
+            if (data.meals) DB.set('meals', data.meals);
+            if (data.weights) DB.set('weights', data.weights);
+
+            alert('Data imported successfully!');
+            location.reload();
+        } catch {
+            alert('Could not read file. Make sure it\'s a valid FaithFit backup.');
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+// --- Midnight Reset ---
+// Refreshes all daily data (meals, workouts, verse) when the date changes
+let currentDay = today();
+
+function scheduleMidnightReset() {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0); // next midnight in user's local timezone
+    const msUntilMidnight = midnight - now;
+
+    setTimeout(() => {
+        currentDay = today();
+        displayDailyVerse();
+        updateDashboard();
+        updateTodaysExercises();
+        updateMealsList();
+        updateNutritionBars();
+        showToast('New day! Daily stats have been reset.');
+        // Schedule the next midnight reset
+        scheduleMidnightReset();
+    }, msUntilMidnight);
+}
+
+// Also check on visibility change (user returns to tab after midnight)
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && today() !== currentDay) {
+        currentDay = today();
+        displayDailyVerse();
+        updateDashboard();
+        updateTodaysExercises();
+        updateMealsList();
+        updateNutritionBars();
+        showToast('New day! Daily stats have been reset.');
+        scheduleMidnightReset();
+    }
+});
+
 // --- Initialize ---
 function init() {
     displayDailyVerse();
@@ -855,6 +1062,7 @@ function init() {
     updateMealsList();
     updateNutritionBars();
     drawWeightChart();
+    scheduleMidnightReset();
 
     // Redraw charts on resize
     window.addEventListener('resize', () => {

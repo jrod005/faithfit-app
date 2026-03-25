@@ -6,6 +6,12 @@
     <title>FaithFit - Fitness & Faith Tracker</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4F46E5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FaithFit">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
 </head>
 <body>
     <div id="app">
@@ -21,6 +27,9 @@
         <header class="app-header">
             <h1>FaithFit</h1>
             <p class="tagline">Strengthen body & spirit</p>
+            <div class="header-actions">
+                <button class="btn btn-sm btn-primary" id="install-btn" onclick="installApp()" style="display:none" title="Install FaithFit">&#x2B07; Install</button>
+            </div>
         </header>
 
         <!-- Tab Navigation -->
@@ -84,6 +93,8 @@
                     <p class="empty-state">No workouts logged yet. Start training!</p>
                 </div>
             </div>
+
+            <button class="btn btn-primary btn-full share-progress-btn" onclick="shareProgress()">&#x1F4E4; Share My Progress</button>
         </section>
 
         <!-- Workout Tab -->
@@ -395,6 +406,13 @@
                     <label>Name</label>
                     <input type="text" id="profile-name" placeholder="Your name">
                 </div>
+                <div class="form-group">
+                    <label>Gender</label>
+                    <div class="unit-toggle">
+                        <button class="unit-btn active" id="gender-male" onclick="setGender('male')">Male</button>
+                        <button class="unit-btn" id="gender-female" onclick="setGender('female')">Female</button>
+                    </div>
+                </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>Age</label>
@@ -455,6 +473,10 @@
                 <h2>Data Management</h2>
                 <div class="btn-row">
                     <button class="btn btn-secondary" onclick="exportData()">Export Data</button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('import-file').click()">Import Data</button>
+                    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+                </div>
+                <div class="btn-row" style="margin-top:8px">
                     <button class="btn btn-danger" onclick="clearAllData()">Clear All Data</button>
                 </div>
             </div>
