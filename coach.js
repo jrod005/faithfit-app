@@ -1163,18 +1163,28 @@ function processCoachInput(text, photoData) {
 
     showTyping();
 
-    // Simulate a brief "thinking" delay for natural feel
+    // If photo is attached, run pose detection (async)
+    if (photoData) {
+        // Update typing indicator to show we're analyzing
+        const typingEl = document.getElementById('typing-indicator');
+        if (typingEl) typingEl.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div> <span style="font-size:12px;color:var(--text-light);margin-left:4px">Analyzing your pose...</span>';
+
+        const ctx = getCoachContext();
+        analyzePoseFromPhoto(photoData, ctx, text).then(response => {
+            removeTyping();
+            addBotMessage(response);
+        }).catch(() => {
+            removeTyping();
+            addBotMessage(analyzePhoto(getCoachContext(), text));
+        });
+        return;
+    }
+
+    // Non-photo messages — brief delay for natural feel
     setTimeout(() => {
         removeTyping();
         const ctx = getCoachContext();
         const lower = text.toLowerCase();
-
-        // If photo is attached, run photo analysis
-        if (photoData) {
-            const response = analyzePhoto(ctx, text);
-            addBotMessage(response);
-            return;
-        }
 
         // Find matching topic
         let response = null;
