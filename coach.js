@@ -1140,14 +1140,27 @@ function coachAsk(text) {
 function sendCoachMessage() {
     const input = document.getElementById('coach-input');
     const text = input.value.trim();
-    if (!text) return;
+    const hasPhoto = !!pendingPhoto;
+
+    if (!text && !hasPhoto) return;
     input.value = '';
-    processCoachInput(text);
+
+    const photoData = pendingPhoto;
+    if (hasPhoto) removeCoachPhoto();
+
+    processCoachInput(text || 'Check out my photo', photoData);
 }
 
-function processCoachInput(text) {
+function processCoachInput(text, photoData) {
     initCoach();
-    addUserMessage(text);
+
+    // Show user message with optional photo
+    if (photoData) {
+        addUserMessageWithPhoto(text, photoData);
+    } else {
+        addUserMessage(text);
+    }
+
     showTyping();
 
     // Simulate a brief "thinking" delay for natural feel
@@ -1155,6 +1168,13 @@ function processCoachInput(text) {
         removeTyping();
         const ctx = getCoachContext();
         const lower = text.toLowerCase();
+
+        // If photo is attached, run photo analysis
+        if (photoData) {
+            const response = analyzePhoto(ctx, text);
+            addBotMessage(response);
+            return;
+        }
 
         // Find matching topic
         let response = null;
@@ -1175,4 +1195,16 @@ function processCoachInput(text) {
 
         addBotMessage(response);
     }, 400 + Math.random() * 600);
+}
+
+function addUserMessageWithPhoto(text, photoData) {
+    const container = document.getElementById('coach-messages');
+    const msg = document.createElement('div');
+    msg.className = 'coach-msg user';
+    msg.innerHTML = `<img class="chat-photo" src="${photoData}" onclick="openLightbox('${photoData.substring(0, 50)}')">` +
+        (text ? `<div>${escapeHtml(text)}</div>` : '');
+    // Fix lightbox for inline photos
+    msg.querySelector('img').onclick = function() { openLightbox(this.src); };
+    container.appendChild(msg);
+    container.scrollTop = container.scrollHeight;
 }

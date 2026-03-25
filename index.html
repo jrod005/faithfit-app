@@ -37,10 +37,6 @@
                 <span class="tab-icon">&#x2615;</span>
                 <span>Nutrition</span>
             </button>
-            <button class="tab-btn" data-tab="photos">
-                <span class="tab-icon">&#x25A3;</span>
-                <span>Photos</span>
-            </button>
             <button class="tab-btn" data-tab="coach">
                 <span class="tab-icon">&#x2605;</span>
                 <span>Coach</span>
@@ -347,80 +343,6 @@
             </div>
         </section>
 
-        <!-- Photos Tab -->
-        <section id="photos" class="tab-content">
-            <div class="card">
-                <h2>Progress Photos</h2>
-                <p class="card-description">Track your transformation over time</p>
-                <div class="photo-upload-area" id="photo-drop-zone">
-                    <span class="photo-upload-icon">&#x1F4F7;</span>
-                    <p>Tap to add a photo</p>
-                    <p class="photo-upload-sub">Pick from camera roll or take a new one</p>
-                    <input type="file" id="photo-input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(event)">
-                </div>
-                <div class="form-row" style="margin-top:12px">
-                    <div class="form-group">
-                        <label>Label (optional)</label>
-                        <select id="photo-label">
-                            <option value="front">Front</option>
-                            <option value="side">Side</option>
-                            <option value="back">Back</option>
-                            <option value="flexing">Flexing</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Note (optional)</label>
-                        <input type="text" id="photo-note" placeholder="e.g., Week 4">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Compare Mode -->
-            <div class="card">
-                <h2>Before & After</h2>
-                <div class="compare-controls">
-                    <div class="form-group">
-                        <label>Before</label>
-                        <select id="compare-before" onchange="updateCompare()">
-                            <option value="">-- Select --</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>After</label>
-                        <select id="compare-after" onchange="updateCompare()">
-                            <option value="">-- Select --</option>
-                        </select>
-                    </div>
-                </div>
-                <div id="compare-view" class="compare-view hidden">
-                    <div class="compare-img-wrap">
-                        <img id="compare-before-img" src="" alt="Before">
-                        <span class="compare-label">Before</span>
-                    </div>
-                    <div class="compare-img-wrap">
-                        <img id="compare-after-img" src="" alt="After">
-                        <span class="compare-label">After</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Photo Gallery -->
-            <div class="card">
-                <h2>Gallery</h2>
-                <div class="photo-filter">
-                    <button class="filter-btn active" onclick="filterPhotos('all')">All</button>
-                    <button class="filter-btn" onclick="filterPhotos('front')">Front</button>
-                    <button class="filter-btn" onclick="filterPhotos('side')">Side</button>
-                    <button class="filter-btn" onclick="filterPhotos('back')">Back</button>
-                    <button class="filter-btn" onclick="filterPhotos('flexing')">Flexing</button>
-                </div>
-                <div id="photo-gallery" class="photo-gallery">
-                    <p class="empty-state">No photos yet. Add your first progress photo!</p>
-                </div>
-            </div>
-        </section>
-
         <!-- Coach Tab -->
         <section id="coach" class="tab-content">
             <div class="coach-chat-header">
@@ -438,6 +360,7 @@
                 <button class="quick-btn" onclick="coachAsk('What should I work on next?')">What Next?</button>
                 <button class="quick-btn" onclick="coachAsk('Help me break through a plateau')">Plateau Help</button>
                 <button class="quick-btn" onclick="coachAsk('How is my nutrition looking?')">Nutrition Check</button>
+                <button class="quick-btn" onclick="document.getElementById('coach-photo-input').click()">Attach Photo</button>
             </div>
 
             <div id="coach-messages" class="coach-messages">
@@ -445,8 +368,15 @@
             </div>
 
             <div class="coach-input-area">
+                <button class="btn btn-secondary coach-photo-btn" onclick="document.getElementById('coach-photo-input').click()" title="Add photo">&#x1F4F7;</button>
+                <input type="file" id="coach-photo-input" accept="image/*" style="display:none" onchange="handleCoachPhoto(event)">
                 <input type="text" id="coach-input" placeholder="Ask your coach anything..." onkeydown="if(event.key==='Enter')sendCoachMessage()">
                 <button class="btn btn-primary coach-send-btn" onclick="sendCoachMessage()">&#x27A4;</button>
+            </div>
+            <div id="coach-photo-preview" class="coach-photo-preview hidden">
+                <img id="coach-preview-img" src="">
+                <button class="photo-preview-remove" onclick="removeCoachPhoto()">&times;</button>
+                <span class="photo-preview-label">Photo attached</span>
             </div>
         </section>
 
