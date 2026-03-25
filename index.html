@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FaithFit - Fitness & Faith Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Daily Verse Banner -->
+        <div id="verse-banner" class="verse-banner">
+            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">&#x263C;</button>
+            <span class="verse-icon">&#x2727;</span>
+            <p id="daily-verse" class="verse-text"></p>
+            <p id="verse-ref" class="verse-ref"></p>
+        </div>
+
+        <!-- Header -->
+        <header class="app-header">
+            <h1>FaithFit</h1>
+            <p class="tagline">Strengthen body & spirit</p>
+        </header>
+
+        <!-- Tab Navigation -->
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="dashboard">
+                <span class="tab-icon">&#x25A3;</span>
+                <span>Dashboard</span>
+            </button>
+            <button class="tab-btn" data-tab="workout">
+                <span class="tab-icon">&#x2693;</span>
+                <span>Workout</span>
+            </button>
+            <button class="tab-btn" data-tab="calories">
+                <span class="tab-icon">&#x2615;</span>
+                <span>Nutrition</span>
+            </button>
+            <button class="tab-btn" data-tab="coach">
+                <span class="tab-icon">&#x2605;</span>
+                <span>Coach</span>
+            </button>
+            <button class="tab-btn" data-tab="profile">
+                <span class="tab-icon">&#x263A;</span>
+                <span>Profile</span>
+            </button>
+        </nav>
+
+        <!-- Dashboard Tab -->
+        <section id="dashboard" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card primary">
+                    <h3>Today's Workouts</h3>
+                    <p class="stat-number" id="today-workouts">0</p>
+                </div>
+                <div class="stat-card success">
+                    <h3>Calories Today</h3>
+                    <p class="stat-number" id="today-calories">0</p>
+                    <p class="stat-sub" id="calorie-goal-text">Goal: --</p>
+                </div>
+                <div class="stat-card accent">
+                    <h3>Current Streak</h3>
+                    <p class="stat-number" id="streak-count">0 days</p>
+                </div>
+                <div class="stat-card warning">
+                    <h3>Body Weight</h3>
+                    <p class="stat-number" id="current-weight">-- lbs</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Weight Progress</h2>
+                <canvas id="weight-chart" height="200"></canvas>
+                <div class="weight-input-row">
+                    <input type="number" id="weight-input" placeholder="Enter weight (lbs)" step="0.1">
+                    <button class="btn btn-primary" onclick="logWeight()">Log Weight</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Recent Workouts</h2>
+                <div id="recent-workouts" class="recent-list">
+                    <p class="empty-state">No workouts logged yet. Start training!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Workout Tab -->
+        <section id="workout" class="tab-content">
+            <div class="card">
+                <h2>Log Workout</h2>
+                <div class="form-group">
+                    <label>Exercise Name</label>
+                    <input type="text" id="exercise-name" placeholder="e.g., Bench Press" list="exercise-suggestions">
+                    <datalist id="exercise-suggestions">
+                        <!-- Chest -->
+                        <option value="Bench Press">
+                        <option value="Incline Bench Press">
+                        <option value="Decline Bench Press">
+                        <option value="Dumbbell Bench Press">
+                        <option value="Incline Dumbbell Press">
+                        <option value="Dumbbell Fly">
+                        <option value="Cable Fly">
+                        <option value="Chest Dips">
+                        <option value="Push-ups">
+                        <option value="Machine Chest Press">
+                        <option value="Pec Deck">
+                        <!-- Back -->
+                        <option value="Deadlift">
+                        <option value="Romanian Deadlift">
+                        <option value="Sumo Deadlift">
+                        <option value="Barbell Row">
+                        <option value="Dumbbell Row">
+                        <option value="Pendlay Row">
+                        <option value="T-Bar Row">
+                        <option value="Seated Cable Row">
+                        <option value="Lat Pulldown">
+                        <option value="Pull-ups">
+                        <option value="Chin-ups">
+                        <option value="Face Pulls">
+                        <option value="Straight Arm Pulldown">
+                        <option value="Hyperextensions">
+                        <option value="Good Mornings">
+                        <!-- Shoulders -->
+                        <option value="Overhead Press">
+                        <option value="Seated Dumbbell Press">
+                        <option value="Arnold Press">
+                        <option value="Lateral Raises">
+                        <option value="Front Raises">
+                        <option value="Rear Delt Fly">
+                        <option value="Cable Lateral Raise">
+                        <option value="Upright Row">
+                        <option value="Shrugs">
+                        <option value="Barbell Shrugs">
+                        <option value="Machine Shoulder Press">
+                        <!-- Legs -->
+                        <option value="Squat">
+                        <option value="Front Squat">
+                        <option value="Goblet Squat">
+                        <option value="Bulgarian Split Squat">
+                        <option value="Hack Squat">
+                        <option value="Leg Press">
+                        <option value="Lunges">
+                        <option value="Walking Lunges">
+                        <option value="Reverse Lunges">
+                        <option value="Leg Extension">
+                        <option value="Leg Curl">
+                        <option value="Seated Leg Curl">
+                        <option value="Hip Thrust">
+                        <option value="Glute Bridge">
+                        <option value="Calf Raises">
+                        <option value="Seated Calf Raise">
+                        <option value="Step-ups">
+                        <option value="Box Jumps">
+                        <option value="Leg Press Calf Raise">
+                        <!-- Arms -->
+                        <option value="Bicep Curls">
+                        <option value="Hammer Curls">
+                        <option value="Preacher Curls">
+                        <option value="Concentration Curls">
+                        <option value="Incline Dumbbell Curl">
+                        <option value="EZ Bar Curl">
+                        <option value="Cable Curl">
+                        <option value="Spider Curls">
+                        <option value="Tricep Pushdown">
+                        <option value="Overhead Tricep Extension">
+                        <option value="Skull Crushers">
+                        <option value="Close Grip Bench Press">
+                        <option value="Tricep Dips">
+                        <option value="Tricep Kickbacks">
+                        <option value="Cable Overhead Extension">
+                        <option value="Diamond Push-ups">
+                        <!-- Core -->
+                        <option value="Plank">
+                        <option value="Crunches">
+                        <option value="Hanging Leg Raise">
+                        <option value="Cable Crunch">
+                        <option value="Ab Wheel Rollout">
+                        <option value="Russian Twist">
+                        <option value="Bicycle Crunches">
+                        <option value="Leg Raises">
+                        <option value="Woodchoppers">
+                        <option value="Pallof Press">
+                        <option value="Dead Bug">
+                        <option value="Mountain Climbers">
+                        <!-- Compound / Olympic -->
+                        <option value="Power Clean">
+                        <option value="Clean and Jerk">
+                        <option value="Snatch">
+                        <option value="Thruster">
+                        <option value="Kettlebell Swing">
+                        <option value="Turkish Get-up">
+                        <option value="Farmers Walk">
+                        <!-- Cardio / Conditioning -->
+                        <option value="Battle Ropes">
+                        <option value="Sled Push">
+                        <option value="Sled Pull">
+                        <option value="Burpees">
+                        <option value="Jump Rope">
+                        <option value="Rowing Machine">
+                    </datalist>
+                </div>
+
+                <div id="sets-container">
+                    <div class="set-row" data-set="1">
+                        <span class="set-label">Set 1</span>
+                        <input type="number" class="set-weight" placeholder="Weight" step="2.5">
+                        <span class="x-label">x</span>
+                        <input type="number" class="set-reps" placeholder="Reps">
+                    </div>
+                </div>
+
+                <div class="btn-row">
+                    <button class="btn btn-secondary" onclick="addSet()">+ Add Set</button>
+                    <button class="btn btn-secondary" onclick="removeSet()">- Remove Set</button>
+                </div>
+
+                <button class="btn btn-primary btn-full" onclick="logExercise()">Save Exercise</button>
+            </div>
+
+            <!-- Progressive Overload Tracker -->
+            <div class="card">
+                <h2>Progressive Overload Tracker</h2>
+                <p class="card-description">Track your strength gains over time</p>
+                <div class="form-group">
+                    <label>Select Exercise</label>
+                    <select id="overload-exercise" onchange="showOverloadData()">
+                        <option value="">-- Choose Exercise --</option>
+                    </select>
+                </div>
+                <div id="overload-display">
+                    <div id="overload-stats" class="overload-stats hidden">
+                        <div class="overload-stat">
+                            <span class="label">First Logged</span>
+                            <span class="value" id="overload-first">--</span>
+                        </div>
+                        <div class="overload-stat">
+                            <span class="label">Best Weight</span>
+                            <span class="value" id="overload-best">--</span>
+                        </div>
+                        <div class="overload-stat">
+                            <span class="label">Latest Weight</span>
+                            <span class="value" id="overload-latest">--</span>
+                        </div>
+                        <div class="overload-stat progress-stat">
+                            <span class="label">Progress</span>
+                            <span class="value" id="overload-progress">--</span>
+                        </div>
+                    </div>
+                    <canvas id="overload-chart" height="200" class="hidden"></canvas>
+                </div>
+            </div>
+
+            <!-- Today's Session -->
+            <div class="card">
+                <h2>Today's Session</h2>
+                <div id="todays-exercises" class="exercise-log">
+                    <p class="empty-state">No exercises logged today.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Calories Tab -->
+        <section id="calories" class="tab-content">
+            <div class="card">
+                <h2>Log Meal</h2>
+                <div class="form-group">
+                    <label>Meal / Food Name</label>
+                    <input type="text" id="meal-name" placeholder="e.g., Grilled Chicken Breast">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Calories</label>
+                        <input type="number" id="meal-calories" placeholder="kcal">
+                    </div>
+                    <div class="form-group">
+                        <label>Protein (g)</label>
+                        <input type="number" id="meal-protein" placeholder="g">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Carbs (g)</label>
+                        <input type="number" id="meal-carbs" placeholder="g">
+                    </div>
+                    <div class="form-group">
+                        <label>Fat (g)</label>
+                        <input type="number" id="meal-fat" placeholder="g">
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-full" onclick="logMeal()">Log Meal</button>
+            </div>
+
+            <!-- Daily Nutrition Summary -->
+            <div class="card">
+                <h2>Today's Nutrition</h2>
+                <div class="macro-bars">
+                    <div class="macro-bar-group">
+                        <div class="macro-header">
+                            <span>Calories</span>
+                            <span id="cal-count">0 / --</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill cal-fill" id="cal-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="macro-bar-group">
+                        <div class="macro-header">
+                            <span>Protein</span>
+                            <span id="protein-count">0g</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill protein-fill" id="protein-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="macro-bar-group">
+                        <div class="macro-header">
+                            <span>Carbs</span>
+                            <span id="carbs-count">0g</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill carbs-fill" id="carbs-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="macro-bar-group">
+                        <div class="macro-header">
+                            <span>Fat</span>
+                            <span id="fat-count">0g</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill fat-fill" id="fat-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Meals Today</h2>
+                <div id="meals-list" class="meals-list">
+                    <p class="empty-state">No meals logged today.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Coach Tab -->
+        <section id="coach" class="tab-content">
+            <div class="coach-chat-header">
+                <div class="coach-avatar-sm">&#x2605;</div>
+                <div>
+                    <h2>FaithFit Coach</h2>
+                    <p class="coach-status">Personalized guidance powered by your data</p>
+                </div>
+            </div>
+
+            <div class="quick-actions">
+                <button class="quick-btn" onclick="coachAsk('Generate a workout plan for me')">Workout Plan</button>
+                <button class="quick-btn" onclick="coachAsk('Create a meal plan for me')">Meal Plan</button>
+                <button class="quick-btn" onclick="coachAsk('Analyze my progress')">My Progress</button>
+                <button class="quick-btn" onclick="coachAsk('What should I work on next?')">What Next?</button>
+                <button class="quick-btn" onclick="coachAsk('Help me break through a plateau')">Plateau Help</button>
+                <button class="quick-btn" onclick="coachAsk('How is my nutrition looking?')">Nutrition Check</button>
+            </div>
+
+            <div id="coach-messages" class="coach-messages">
+                <!-- Messages appear here -->
+            </div>
+
+            <div class="coach-input-area">
+                <input type="text" id="coach-input" placeholder="Ask your coach anything..." onkeydown="if(event.key==='Enter')sendCoachMessage()">
+                <button class="btn btn-primary coach-send-btn" onclick="sendCoachMessage()">&#x27A4;</button>
+            </div>
+        </section>
+
+        <!-- Profile Tab -->
+        <section id="profile" class="tab-content">
+            <div class="card">
+                <h2>Your Profile</h2>
+                <div class="form-group">
+                    <label>Units</label>
+                    <div class="unit-toggle">
+                        <button class="unit-btn active" id="unit-imperial" onclick="setUnits('imperial')">Imperial (lbs/ft)</button>
+                        <button class="unit-btn" id="unit-metric" onclick="setUnits('metric')">Metric (kg/cm)</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="profile-name" placeholder="Your name">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Age</label>
+                        <input type="number" id="profile-age" placeholder="Age">
+                    </div>
+                    <div class="form-group">
+                        <label id="weight-label">Weight (lbs)</label>
+                        <input type="number" id="profile-weight" placeholder="e.g., 180" step="0.1">
+                    </div>
+                </div>
+                <div class="form-group" id="height-group">
+                    <label>Height</label>
+                    <div class="form-row" id="height-imperial">
+                        <div class="height-input-group">
+                            <input type="number" id="profile-height-feet" placeholder="Feet" min="3" max="8">
+                            <span class="input-suffix">ft</span>
+                        </div>
+                        <div class="height-input-group">
+                            <input type="number" id="profile-height-inches" placeholder="Inches" min="0" max="11">
+                            <span class="input-suffix">in</span>
+                        </div>
+                    </div>
+                    <div class="height-input-group hidden" id="height-metric">
+                        <input type="number" id="profile-height-cm" placeholder="e.g., 175" step="1">
+                        <span class="input-suffix">cm</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Fitness Goal</label>
+                    <select id="profile-goal">
+                        <option value="lose">Lose Weight</option>
+                        <option value="maintain">Maintain Weight</option>
+                        <option value="gain">Build Muscle / Gain Weight</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Activity Level</label>
+                    <select id="profile-activity">
+                        <option value="sedentary">Sedentary (little exercise)</option>
+                        <option value="light">Lightly Active (1-3 days/week)</option>
+                        <option value="moderate">Moderately Active (3-5 days/week)</option>
+                        <option value="active">Very Active (6-7 days/week)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Daily Calorie Goal</label>
+                    <input type="number" id="profile-calories" placeholder="Auto-calculated or manual">
+                    <button class="btn btn-secondary btn-sm" onclick="calculateCalories()">Auto-Calculate</button>
+                </div>
+                <div class="form-group">
+                    <label>Daily Protein Goal (g)</label>
+                    <input type="number" id="profile-protein" placeholder="e.g., 150">
+                </div>
+                <button class="btn btn-primary btn-full" onclick="saveProfile()">Save Profile</button>
+            </div>
+
+            <div class="card">
+                <h2>Data Management</h2>
+                <div class="btn-row">
+                    <button class="btn btn-secondary" onclick="exportData()">Export Data</button>
+                    <button class="btn btn-danger" onclick="clearAllData()">Clear All Data</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+    <script src="coach.js"></script>
+</body>
+</html>
