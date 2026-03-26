@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#0d0d0d"/>
+    </linearGradient>
+    <linearGradient id="silverGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e0e0e0"/>
+      <stop offset="40%" stop-color="#c0c0c0"/>
+      <stop offset="100%" stop-color="#888888"/>
+    </linearGradient>
+    <linearGradient id="wingGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#d0d0d0"/>
+      <stop offset="50%" stop-color="#999999"/>
+      <stop offset="100%" stop-color="#555555"/>
+    </linearGradient>
+    <linearGradient id="haloGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#cccccc"/>
+    </linearGradient>
+    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#aaaaaa"/>
+      <stop offset="50%" stop-color="#777777"/>
+      <stop offset="100%" stop-color="#555555"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded rect -->
+  <rect width="512" height="512" rx="90" fill="url(#bgGrad)"/>
+
+  <!-- Subtle border -->
+  <rect x="4" y="4" width="504" height="504" rx="87" fill="none" stroke="#333333" stroke-width="3"/>
+
+  <!-- Left wing -->
+  <g opacity="0.9">
+    <!-- Outer wing feathers -->
+    <path d="M120,200 Q60,170 40,130 Q55,160 70,175 Q50,140 35,95 Q55,135 75,160 Q60,115 50,70 Q70,120 85,155 Q78,105 75,55 Q90,110 95,150 Q95,100 100,50 Q105,105 105,150 Q112,95 125,48 Q118,105 112,155 Q125,100 142,55 Q130,110 120,158 Q138,108 158,68 Q140,118 128,165 L150,195 Q140,190 120,200Z" fill="url(#wingGrad)"/>
+    <!-- Inner wing -->
+    <path d="M150,195 L128,165 Q140,175 155,200 Q148,188 150,195Z" fill="#888888"/>
+  </g>
+
+  <!-- Right wing (mirrored) -->
+  <g opacity="0.9">
+    <path d="M392,200 Q452,170 472,130 Q457,160 442,175 Q462,140 477,95 Q457,135 437,160 Q452,115 462,70 Q442,120 427,155 Q434,105 437,55 Q422,110 417,150 Q417,100 412,50 Q407,105 407,150 Q400,95 387,48 Q394,105 400,155 Q387,100 370,55 Q382,110 392,158 Q374,108 354,68 Q372,118 384,165 L362,195 Q372,190 392,200Z" fill="url(#wingGrad)"/>
+    <path d="M362,195 L384,165 Q372,175 357,200 Q364,188 362,195Z" fill="#888888"/>
+  </g>
+
+  <!-- Halo -->
+  <ellipse cx="256" cy="148" rx="38" ry="10" fill="none" stroke="url(#haloGrad)" stroke-width="3.5" opacity="0.85"/>
+
+  <!-- Angel head -->
+  <circle cx="256" cy="175" r="22" fill="url(#silverGrad)"/>
+
+  <!-- Neck -->
+  <rect x="249" y="195" width="14" height="12" fill="url(#silverGrad)" rx="2"/>
+
+  <!-- Torso -->
+  <path d="M230,207 L225,280 L287,280 L282,207 Z" fill="url(#silverGrad)" rx="3"/>
+
+  <!-- Core detail lines on torso -->
+  <line x1="256" y1="220" x2="256" y2="275" stroke="#1a1a1a" stroke-width="1.5" opacity="0.3"/>
+  <line x1="238" y1="245" x2="274" y2="245" stroke="#1a1a1a" stroke-width="1" opacity="0.2"/>
+  <line x1="236" y1="260" x2="276" y2="260" stroke="#1a1a1a" stroke-width="1" opacity="0.2"/>
+
+  <!-- Left arm - raised holding barbell -->
+  <path d="M230,215 L185,195 L155,175" stroke="url(#silverGrad)" stroke-width="14" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Right arm - raised holding barbell -->
+  <path d="M282,215 L327,195 L357,175" stroke="url(#silverGrad)" stroke-width="14" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Barbell bar -->
+  <rect x="100" y="170" width="312" height="7" rx="3.5" fill="url(#barGrad)"/>
+
+  <!-- Left plates -->
+  <rect x="108" y="152" width="14" height="42" rx="3" fill="#666666" stroke="#888888" stroke-width="1"/>
+  <rect x="92" y="156" width="12" height="34" rx="3" fill="#555555" stroke="#777777" stroke-width="1"/>
+  <rect x="78" y="160" width="10" height="26" rx="2" fill="#444444" stroke="#666666" stroke-width="1"/>
+
+  <!-- Right plates -->
+  <rect x="390" y="152" width="14" height="42" rx="3" fill="#666666" stroke="#888888" stroke-width="1"/>
+  <rect x="408" y="156" width="12" height="34" rx="3" fill="#555555" stroke="#777777" stroke-width="1"/>
+  <rect x="424" y="160" width="10" height="26" rx="2" fill="#444444" stroke="#666666" stroke-width="1"/>
+
+  <!-- Legs -->
+  <path d="M237,280 L228,340 L222,340" stroke="url(#silverGrad)" stroke-width="12" fill="none" stroke-linecap="round"/>
+  <path d="M275,280 L284,340 L290,340" stroke="url(#silverGrad)" stroke-width="12" fill="none" stroke-linecap="round"/>
+
+  <!-- "IRON" text -->
+  <text x="256" y="395" text-anchor="middle" font-family="'Arial Black', 'Impact', sans-serif" font-weight="900" font-size="62" fill="url(#silverGrad)" letter-spacing="8">IRON</text>
+
+  <!-- Divider line -->
+  <line x1="145" y1="410" x2="367" y2="410" stroke="#555555" stroke-width="1.5"/>
+
+  <!-- "& FAITH" text -->
+  <text x="256" y="448" text-anchor="middle" font-family="'Georgia', 'Times New Roman', serif" font-weight="400" font-size="36" fill="#999999" letter-spacing="12" font-style="italic">&amp; FAITH</text>
+
+  <!-- Subtle tagline -->
+  <text x="256" y="478" text-anchor="middle" font-family="'Arial', sans-serif" font-weight="300" font-size="13" fill="#555555" letter-spacing="5">STRENGTHEN BODY &amp; SPIRIT</text>
+</svg>

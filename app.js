@@ -35,7 +35,7 @@ function updateThemeIcon(theme) {
 }
 
 function loadTheme() {
-    const saved = localStorage.getItem('faithfit_theme') || 'light';
+    const saved = localStorage.getItem('faithfit_theme') || 'dark';
     document.documentElement.setAttribute('data-theme', saved);
     updateThemeIcon(saved);
 }
@@ -250,7 +250,7 @@ function drawWeightChart() {
 
     // Line
     ctx.beginPath();
-    ctx.strokeStyle = '#4F46E5';
+    ctx.strokeStyle = '#C0C0C0';
     ctx.lineWidth = 2.5;
     ctx.lineJoin = 'round';
 
@@ -268,7 +268,7 @@ function drawWeightChart() {
         const y = padTop + chartH - ((val - min) / range) * chartH;
         ctx.beginPath();
         ctx.arc(x, y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = '#4F46E5';
+        ctx.fillStyle = '#C0C0C0';
         ctx.fill();
         ctx.beginPath();
         ctx.arc(x, y, 2, 0, Math.PI * 2);
@@ -493,12 +493,12 @@ function drawOverloadChart(workouts) {
     ctx.lineTo(padLeft + chartW, padTop + chartH);
     ctx.lineTo(padLeft, padTop + chartH);
     ctx.closePath();
-    ctx.fillStyle = 'rgba(79, 70, 229, 0.1)';
+    ctx.fillStyle = 'rgba(192, 192, 192, 0.1)';
     ctx.fill();
 
     // Line
     ctx.beginPath();
-    ctx.strokeStyle = '#4F46E5';
+    ctx.strokeStyle = '#C0C0C0';
     ctx.lineWidth = 2.5;
     ctx.lineJoin = 'round';
     maxWeights.forEach((val, i) => {
@@ -515,7 +515,7 @@ function drawOverloadChart(workouts) {
         const y = padTop + chartH - ((val - min) / range) * chartH;
         ctx.beginPath();
         ctx.arc(x, y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = '#4F46E5';
+        ctx.fillStyle = '#C0C0C0';
         ctx.fill();
         ctx.beginPath();
         ctx.arc(x, y, 2, 0, Math.PI * 2);
