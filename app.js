@@ -1,5 +1,5 @@
 // =============================================
-// FaithFit - Fitness & Faith Tracker
+// Iron & Faith - Fitness & Faith Tracker
 // =============================================
 
 // --- Data Layer ---
@@ -876,7 +876,7 @@ function installApp() {
             deferredPrompt = null;
         });
     } else {
-        alert('To install FaithFit:\n\n• iOS: Tap the Share button, then "Add to Home Screen"\n• Android Chrome: Tap the menu (⋮), then "Install app"\n• Desktop: Look for the install icon in the address bar');
+        alert('To install Iron & Faith:\n\n• iOS: Tap the Share button, then "Add to Home Screen"\n• Android Chrome: Tap the menu (⋮), then "Install app"\n• Desktop: Look for the install icon in the address bar');
     }
 }
 
@@ -915,11 +915,11 @@ function shareProgress() {
 
     const totalCalories = meals.reduce((sum, m) => sum + m.calories, 0);
     const currentWeight = weights.length > 0 ? `${lbsToDisplay(weights[weights.length - 1].weight)} ${wu()}` : 'Not tracked';
-    const name = profile.name || 'A FaithFit user';
+    const name = profile.name || 'An Iron & Faith user';
 
     const verse = getDailyVerse();
 
-    let text = `💪 ${name}'s FaithFit Progress\n`;
+    let text = `💪 ${name}'s Iron & Faith Progress\n`;
     text += `📅 ${today()}\n\n`;
     text += `🏋️ Workouts today: ${todayWorkouts.length}\n`;
     text += `🔥 Current streak: ${streak} day${streak !== 1 ? 's' : ''}\n`;
@@ -935,10 +935,10 @@ function shareProgress() {
     }
 
     text += `\n✨ "${verse.text}" — ${verse.ref}\n`;
-    text += `\n📲 Track your fitness journey with FaithFit!`;
+    text += `\n📲 Track your fitness journey with Iron & Faith!`;
 
     const shareData = {
-        title: 'My FaithFit Progress',
+        title: 'My Iron & Faith Progress',
         text: text
     };
 
@@ -993,7 +993,7 @@ function importData(event) {
             const data = JSON.parse(e.target.result);
 
             if (!data.profile && !data.workouts && !data.meals && !data.weights) {
-                alert('Invalid FaithFit backup file.');
+                alert('Invalid Iron & Faith backup file.');
                 return;
             }
 
@@ -1007,7 +1007,7 @@ function importData(event) {
             alert('Data imported successfully!');
             location.reload();
         } catch {
-            alert('Could not read file. Make sure it\'s a valid FaithFit backup.');
+            alert('Could not read file. Make sure it\'s a valid Iron & Faith backup.');
         }
     };
     reader.readAsText(file);

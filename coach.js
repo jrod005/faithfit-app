@@ -1,5 +1,5 @@
 // =============================================
-// FaithFit Smart Coach Engine
+// Iron & Faith Smart Coach Engine
 // Personalized fitness coaching without API calls
 // =============================================
 
@@ -1038,7 +1038,7 @@ const TOPIC_RESPONSES = {
                 const hour = new Date().getHours();
                 const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-                let html = `<p>${greeting}, ${name}! I'm your FaithFit Coach. Here's a quick snapshot:</p>`;
+                let html = `<p>${greeting}, ${name}! I'm your Iron & Faith Coach. Here's a quick snapshot:</p>`;
 
                 html += `<ul>`;
                 if (ctx.todayWorkouts.length > 0) {
@@ -1092,7 +1092,7 @@ function initCoach() {
     const hour = new Date().getHours();
     const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-    let welcome = `<p>${greeting}, ${name}! I'm your FaithFit Coach.</p>`;
+    let welcome = `<p>${greeting}, ${name}! I'm your Iron & Faith Coach.</p>`;
     welcome += `<p>I analyze your workouts, nutrition, and weight data to give you personalized advice. Ask me anything or tap a quick action above!</p>`;
     welcome += verseHtml();
 

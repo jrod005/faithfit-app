@@ -1,6 +1,6 @@
 {
-    "name": "FaithFit - Fitness & Faith Tracker",
-    "short_name": "FaithFit",
+    "name": "Iron & Faith - Fitness & Faith Tracker",
+    "short_name": "Iron & Faith",
     "description": "Strengthen body & spirit. Track workouts, nutrition, and faith.",
     "start_url": "./index.html",
     "display": "standalone",
