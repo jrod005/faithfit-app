@@ -1107,7 +1107,7 @@ const ACHIEVEMENTS = [
     { id: 'hundred_workouts', name: 'Centurion', desc: 'Log 100 workouts', icon: '&#x1F451;', check: ctx => ctx.total >= 100 },
     { id: 'twofifty_workouts', name: 'Iron Disciple', desc: 'Log 250 workouts', icon: '&#x1F5E1;', check: ctx => ctx.total >= 250 },
     { id: 'five_hundred', name: 'Legend', desc: 'Log 500 workouts', icon: '&#x1F48E;', check: ctx => ctx.total >= 500 },
-    { id: 'thousand_workouts', name: 'Immortal', desc: 'Log 1000 workouts', icon: '&#x1F30B;', check: ctx => ctx.total >= 1000 },
+    { id: 'thousand_workouts', name: 'Walking Temple', desc: 'Log 1000 workouts', icon: '&#x26EA;', check: ctx => ctx.total >= 1000 },
     // Streaks
     { id: 'three_streak', name: 'Momentum', desc: '3-day workout streak', icon: '&#x26A1;', check: ctx => ctx.streak >= 3 },
     { id: 'week_streak', name: '7-Day Warrior', desc: '7-day workout streak', icon: '&#x1F4A5;', check: ctx => ctx.streak >= 7 },
