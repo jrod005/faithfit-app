@@ -198,6 +198,7 @@ function logWeight() {
     input.value = '';
     updateDashboard();
     drawWeightChart();
+    checkAchievements();
 }
 
 function drawWeightChart() {
@@ -349,7 +350,7 @@ function logExercise() {
     checkForPR(name, sets, workouts);
 
     // Check achievements
-    checkAchievements(workouts);
+    checkAchievements();
 
     // Reset form
     document.getElementById('exercise-name').value = '';
@@ -567,6 +568,7 @@ function logMeal() {
     updateMealsList();
     updateNutritionBars();
     updateDashboard();
+    checkAchievements();
 }
 
 function deleteMeal(timestamp) {
@@ -684,6 +686,7 @@ function saveProfile() {
     updateDashboard();
     updateNutritionBars();
     drawWeightChart();
+    checkAchievements();
 }
 
 function loadProfile() {
@@ -1096,21 +1099,61 @@ function showPRToast(exercise, prs) {
 
 // --- Achievement Badges ---
 const ACHIEVEMENTS = [
+    // Workout milestones
     { id: 'first_workout', name: 'First Rep', desc: 'Log your first workout', icon: '&#x1F4AA;', check: ctx => ctx.total >= 1 },
     { id: 'ten_workouts', name: 'Getting Serious', desc: 'Log 10 workouts', icon: '&#x1F525;', check: ctx => ctx.total >= 10 },
+    { id: 'twentyfive_workouts', name: 'Quarter Century', desc: 'Log 25 workouts', icon: '&#x1F4AB;', check: ctx => ctx.total >= 25 },
     { id: 'fifty_workouts', name: 'Iron Regular', desc: 'Log 50 workouts', icon: '&#x2B50;', check: ctx => ctx.total >= 50 },
     { id: 'hundred_workouts', name: 'Centurion', desc: 'Log 100 workouts', icon: '&#x1F451;', check: ctx => ctx.total >= 100 },
+    { id: 'twofifty_workouts', name: 'Iron Disciple', desc: 'Log 250 workouts', icon: '&#x1F5E1;', check: ctx => ctx.total >= 250 },
     { id: 'five_hundred', name: 'Legend', desc: 'Log 500 workouts', icon: '&#x1F48E;', check: ctx => ctx.total >= 500 },
+    { id: 'thousand_workouts', name: 'Immortal', desc: 'Log 1000 workouts', icon: '&#x1F30B;', check: ctx => ctx.total >= 1000 },
+    // Streaks
+    { id: 'three_streak', name: 'Momentum', desc: '3-day workout streak', icon: '&#x26A1;', check: ctx => ctx.streak >= 3 },
     { id: 'week_streak', name: '7-Day Warrior', desc: '7-day workout streak', icon: '&#x1F4A5;', check: ctx => ctx.streak >= 7 },
+    { id: 'two_week_streak', name: 'Unstoppable', desc: '14-day workout streak', icon: '&#x1F30A;', check: ctx => ctx.streak >= 14 },
     { id: 'month_streak', name: '30-Day Beast', desc: '30-day workout streak', icon: '&#x1F981;', check: ctx => ctx.streak >= 30 },
+    { id: 'sixty_streak', name: 'Iron Will', desc: '60-day workout streak', icon: '&#x1F9CA;', check: ctx => ctx.streak >= 60 },
+    { id: 'hundred_streak', name: 'Unbreakable', desc: '100-day workout streak', icon: '&#x1F6E1;', check: ctx => ctx.streak >= 100 },
+    // PRs
     { id: 'first_pr', name: 'Record Breaker', desc: 'Hit your first PR', icon: '&#x1F3C6;', check: ctx => ctx.prCount >= 1 },
+    { id: 'five_prs', name: 'Climbing', desc: 'Hit 5 personal records', icon: '&#x1F4C8;', check: ctx => ctx.prCount >= 5 },
     { id: 'ten_prs', name: 'PR Machine', desc: 'Hit 10 personal records', icon: '&#x1F3C5;', check: ctx => ctx.prCount >= 10 },
+    { id: 'twentyfive_prs', name: 'Relentless', desc: 'Hit 25 personal records', icon: '&#x1F525;', check: ctx => ctx.prCount >= 25 },
+    { id: 'fifty_prs', name: 'Elite', desc: 'Hit 50 personal records', icon: '&#x1F396;', check: ctx => ctx.prCount >= 50 },
+    // Exercise variety
     { id: 'five_exercises', name: 'Well Rounded', desc: 'Log 5 different exercises', icon: '&#x1F504;', check: ctx => ctx.uniqueExercises >= 5 },
-    { id: 'fifteen_exercises', name: 'Arsenal', desc: 'Log 15 different exercises', icon: '&#x1F52B;', check: ctx => ctx.uniqueExercises >= 15 },
+    { id: 'ten_exercises', name: 'Versatile', desc: 'Log 10 different exercises', icon: '&#x1F3AF;', check: ctx => ctx.uniqueExercises >= 10 },
+    { id: 'fifteen_exercises', name: 'Arsenal', desc: 'Log 15 different exercises', icon: '&#x2694;', check: ctx => ctx.uniqueExercises >= 15 },
+    { id: 'twentyfive_exercises', name: 'Master of All', desc: 'Log 25 different exercises', icon: '&#x1F9E0;', check: ctx => ctx.uniqueExercises >= 25 },
+    // Weight tracking
     { id: 'logged_weight', name: 'Accountable', desc: 'Log your body weight', icon: '&#x2696;', check: ctx => ctx.weighIns >= 1 },
     { id: 'ten_weigh_ins', name: 'Consistent Tracker', desc: 'Log body weight 10 times', icon: '&#x1F4CA;', check: ctx => ctx.weighIns >= 10 },
+    { id: 'fifty_weigh_ins', name: 'Data Driven', desc: 'Log body weight 50 times', icon: '&#x1F4C9;', check: ctx => ctx.weighIns >= 50 },
+    // Nutrition
     { id: 'logged_meal', name: 'Fuel Up', desc: 'Log your first meal', icon: '&#x1F372;', check: ctx => ctx.meals >= 1 },
-    { id: 'thousand_club', name: '1000lb Club', desc: 'Bench+Squat+Deadlift total 1000+ lbs', icon: '&#x1F3CB;', check: ctx => ctx.bigThreeTotal >= 1000 },
+    { id: 'fifty_meals', name: 'Meal Prepper', desc: 'Log 50 meals', icon: '&#x1F957;', check: ctx => ctx.meals >= 50 },
+    { id: 'hundred_meals', name: 'Nutrition Nerd', desc: 'Log 100 meals', icon: '&#x1F468;', check: ctx => ctx.meals >= 100 },
+    // Volume milestones (total lbs lifted all time)
+    { id: 'ten_k_volume', name: 'Heavy Lifter', desc: 'Lift 10,000 lbs total', icon: '&#x1F3CB;', check: ctx => ctx.totalVolume >= 10000 },
+    { id: 'fifty_k_volume', name: 'Iron Mountain', desc: 'Lift 50,000 lbs total', icon: '&#x26F0;', check: ctx => ctx.totalVolume >= 50000 },
+    { id: 'hundred_k_volume', name: 'Titan', desc: 'Lift 100,000 lbs total', icon: '&#x1F30D;', check: ctx => ctx.totalVolume >= 100000 },
+    { id: 'half_mil_volume', name: 'Demigod', desc: 'Lift 500,000 lbs total', icon: '&#x1FA90;', check: ctx => ctx.totalVolume >= 500000 },
+    { id: 'mil_volume', name: 'Million Pound Club', desc: 'Lift 1,000,000 lbs total', icon: '&#x1F4A0;', check: ctx => ctx.totalVolume >= 1000000 },
+    // Big three
+    { id: 'thousand_club', name: '1000lb Club', desc: 'Bench+Squat+Deadlift total 1000+ lbs', icon: '&#x1F947;', check: ctx => ctx.bigThreeTotal >= 1000 },
+    // Muscle coverage
+    { id: 'full_body_week', name: 'No Weak Links', desc: 'Hit all 7 muscle groups in one week', icon: '&#x1F9BE;', check: ctx => ctx.muscleGroupsHit >= 7 },
+    // Training days in a single week
+    { id: 'five_day_week', name: 'Grinder', desc: 'Train 5 days in a single week', icon: '&#x23F1;', check: ctx => ctx.bestWeekDays >= 5 },
+    { id: 'six_day_week', name: 'No Days Off', desc: 'Train 6+ days in a single week', icon: '&#x1F608;', check: ctx => ctx.bestWeekDays >= 6 },
+    // Early bird / night owl
+    { id: 'early_bird', name: 'Early Bird', desc: 'Log a workout before 7am', icon: '&#x1F305;', check: ctx => ctx.earlyWorkout },
+    { id: 'night_owl', name: 'Night Owl', desc: 'Log a workout after 9pm', icon: '&#x1F319;', check: ctx => ctx.lateWorkout },
+    // Profile setup
+    { id: 'profile_complete', name: 'Locked In', desc: 'Complete your profile', icon: '&#x1F512;', check: ctx => ctx.profileComplete },
+    // Coach interaction
+    { id: 'used_coach', name: 'Coachable', desc: 'Ask the coach a question', icon: '&#x1F4AC;', check: ctx => ctx.coachUsed },
 ];
 
 function getAchievementContext() {
@@ -1118,6 +1161,7 @@ function getAchievementContext() {
     const prs = DB.get('prs', []);
     const weights = DB.get('weights', []);
     const meals = DB.get('meals', []);
+    const profile = DB.get('profile', {});
 
     // Calculate streak
     const dates = [...new Set(workouts.map(w => w.date))].sort().reverse();
@@ -1141,6 +1185,55 @@ function getAchievementContext() {
         }
     });
 
+    // Total volume (all time)
+    const totalVolume = workouts.reduce((sum, w) => sum + w.sets.reduce((s, set) => s + set.weight * set.reps, 0), 0);
+
+    // Muscle groups hit this week
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekStr = weekAgo.toISOString().split('T')[0];
+    const weekWorkouts = workouts.filter(w => w.date >= weekStr);
+    const muscleMap = {
+        chest: ['Bench Press','Incline Bench Press','Decline Bench Press','Dumbbell Bench Press','Incline Dumbbell Press','Dumbbell Fly','Cable Fly','Chest Dips','Push-ups','Machine Chest Press'],
+        back: ['Deadlift','Romanian Deadlift','Barbell Row','Dumbbell Row','Lat Pulldown','Pull-ups','Chin-ups','Seated Cable Row','T-Bar Row'],
+        shoulders: ['Overhead Press','Seated Dumbbell Press','Arnold Press','Lateral Raises','Front Raises','Rear Delt Fly','Face Pulls'],
+        legs: ['Squat','Front Squat','Leg Press','Lunges','Walking Lunges','Leg Extension','Leg Curl','Hip Thrust','Calf Raises'],
+        biceps: ['Bicep Curls','Hammer Curls','Preacher Curls','EZ Bar Curl','Cable Curl'],
+        triceps: ['Tricep Pushdown','Overhead Tricep Extension','Skull Crushers','Close Grip Bench Press','Tricep Dips'],
+        core: ['Plank','Crunches','Hanging Leg Raise','Cable Crunch','Ab Wheel Rollout','Russian Twist','Leg Raises'],
+    };
+    const muscleGroupsHit = Object.entries(muscleMap).filter(([, exercises]) =>
+        weekWorkouts.some(w => exercises.some(e => w.name.toLowerCase() === e.toLowerCase()))
+    ).length;
+
+    // Best training days in a single week
+    const weekBuckets = {};
+    dates.forEach(d => {
+        const dt = new Date(d);
+        const weekStart = new Date(dt);
+        weekStart.setDate(dt.getDate() - dt.getDay());
+        const key = weekStart.toISOString().split('T')[0];
+        weekBuckets[key] = (weekBuckets[key] || 0) + 1;
+    });
+    const bestWeekDays = Math.max(0, ...Object.values(weekBuckets));
+
+    // Early bird / night owl
+    let earlyWorkout = false;
+    let lateWorkout = false;
+    workouts.forEach(w => {
+        if (w.timestamp) {
+            const hour = new Date(w.timestamp).getHours();
+            if (hour < 7) earlyWorkout = true;
+            if (hour >= 21) lateWorkout = true;
+        }
+    });
+
+    // Profile complete
+    const profileComplete = !!(profile.name && profile.age && profile.weight && profile.goal);
+
+    // Coach used
+    const coachUsed = DB.get('coachUsed', false);
+
     return {
         total: workouts.length,
         streak,
@@ -1149,10 +1242,17 @@ function getAchievementContext() {
         weighIns: weights.length,
         meals: meals.length,
         bigThreeTotal,
+        totalVolume,
+        muscleGroupsHit,
+        bestWeekDays,
+        earlyWorkout,
+        lateWorkout,
+        profileComplete,
+        coachUsed,
     };
 }
 
-function checkAchievements(workouts) {
+function checkAchievements() {
     const unlocked = DB.get('achievements', []);
     const ctx = getAchievementContext();
     let newUnlock = false;

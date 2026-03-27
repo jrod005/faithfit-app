@@ -1512,6 +1512,7 @@ function sendCoachMessage() {
 
 function processCoachInput(text, photoData) {
     initCoach();
+    DB.set('coachUsed', true);
 
     // Show user message with optional photo
     if (photoData) {
