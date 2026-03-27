@@ -1032,13 +1032,14 @@ const TOPIC_RESPONSES = {
         },
         {
             id: 'one_rep_max',
-            keywords: ['1rm', 'one rep max', 'max.*bench', 'max.*squat', 'max.*deadlift', 'max.*press', 'how much can i', 'my max', 'estimated max', 'e1rm'],
+            keywords: ['1rm', 'one rep max', 'my.*max', 'estimated.*max', 'max.*bench', 'max.*squat', 'max.*deadlift', 'max.*press', 'how much can i', 'how much do i', 'e1rm', 'rep max', 'strongest', 'heaviest'],
             handler: (ctx, input) => {
                 const unit = wu();
                 let html = `<h3>Estimated 1RM</h3>`;
                 if (ctx.workouts.length === 0) {
-                    html += `<p>No workout data yet. Log some exercises and I'll calculate your estimated maxes!</p>`;
-                    return html + verseHtml();
+                    html += `<p>You don't have any workout data logged yet. Head over to the <strong>Workout</strong> tab and log some exercises with weights and reps — then come back and I'll calculate your estimated one-rep max for each lift!</p>`;
+                    html += verseHtml();
+                    return html;
                 }
                 // Find which exercise user is asking about, or show top lifts
                 const lower = input.toLowerCase();
@@ -1057,11 +1058,14 @@ const TOPIC_RESPONSES = {
                         // Epley formula: 1RM = weight × (1 + reps/30)
                         const e1rm = Math.round(bestSet.weight * (1 + bestSet.reps / 30));
                         found = true;
-                        html += insightHtml(`<strong>${name}:</strong> ${lbsToDisplay(bestSet.weight)} ${unit} × ${bestSet.reps} reps → Est. 1RM: <strong>${lbsToDisplay(e1rm)} ${unit}</strong>`);
+                        html += insightHtml(`<strong>${name}:</strong> ${lbsToDisplay(bestSet.weight)} ${unit} x ${bestSet.reps} reps → Est. 1RM: <strong>${lbsToDisplay(e1rm)} ${unit}</strong>`);
                     }
                 });
-                if (!found) html += `<p>No data for those exercises yet. Log some sets first!</p>`;
-                else html += `<p style="font-size:13px;color:var(--text-secondary)">Calculated using the Epley formula. Test your actual 1RM with a spotter for accuracy.</p>`;
+                if (!found) {
+                    html += `<p>You have workout data, but no logged sets for the main compound lifts (Bench Press, Squat, Deadlift, Overhead Press, Barbell Row) with weight and reps. Log some sets for these exercises and I'll crunch the numbers!</p>`;
+                } else {
+                    html += `<p style="font-size:13px;color:var(--text-secondary)">Calculated using the Epley formula. Test your actual 1RM with a spotter for accuracy.</p>`;
+                }
                 html += verseHtml();
                 return html;
             },
@@ -1138,6 +1142,11 @@ const TOPIC_RESPONSES = {
             handler: (ctx) => {
                 const unit = wu();
                 let html = `<h3>Weekly Recap</h3>`;
+                if (ctx.workouts.length === 0) {
+                    html += `<p>No workout data yet! Log some exercises in the <strong>Workout</strong> tab this week, then come back for your weekly recap.</p>`;
+                    html += verseHtml();
+                    return html;
+                }
                 // This week
                 const thisWeekDays = ctx.weekDays;
                 const thisWeekSets = ctx.weekWorkouts.reduce((s, w) => s + w.sets.length, 0);
@@ -1237,6 +1246,11 @@ const TOPIC_RESPONSES = {
             handler: (ctx) => {
                 const unit = wu();
                 let html = `<h3>Progress Projection</h3>`;
+                if (ctx.workouts.length === 0 && ctx.weights.length === 0) {
+                    html += `<p>I need some data to project your progress. Start logging workouts and body weight in the app, and after a couple weeks I'll be able to estimate timelines for your goals!</p>`;
+                    html += verseHtml();
+                    return html;
+                }
                 // Weight goal projection
                 if (ctx.weights.length >= 4) {
                     const recent = ctx.weights.slice(-8);
