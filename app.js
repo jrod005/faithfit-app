@@ -345,6 +345,12 @@ function logExercise() {
     });
     DB.set('workouts', workouts);
 
+    // Check for PRs
+    checkForPR(name, sets, workouts);
+
+    // Check achievements
+    checkAchievements(workouts);
+
     // Reset form
     document.getElementById('exercise-name').value = '';
     document.querySelectorAll('.set-weight, .set-reps').forEach(input => input.value = '');
@@ -794,6 +800,9 @@ function updateDashboard() {
 
     updateStreak();
     updateRecentWorkouts();
+    renderCalendarHeatmap();
+    renderMuscleHeatmap();
+    renderAchievements();
 }
 
 function updateRecentWorkouts() {
@@ -1051,6 +1060,263 @@ document.addEventListener('visibilitychange', () => {
     }
 });
 
+// --- PR Detection ---
+function checkForPR(exerciseName, newSets, allWorkouts) {
+    const previousLogs = allWorkouts.filter(w => w.name === exerciseName);
+    if (previousLogs.length <= 1) return; // need history to compare
+
+    const oldLogs = previousLogs.slice(0, -1);
+    const oldMaxWeight = Math.max(...oldLogs.flatMap(w => w.sets.map(s => s.weight)));
+    const oldMaxVol = Math.max(...oldLogs.map(w => w.sets.reduce((s, set) => s + set.weight * set.reps, 0)));
+    const newMaxWeight = Math.max(...newSets.map(s => s.weight));
+    const newVol = newSets.reduce((s, set) => s + set.weight * set.reps, 0);
+
+    const prs = [];
+    if (newMaxWeight > oldMaxWeight && newMaxWeight > 0) prs.push(`Weight PR: ${lbsToDisplay(newMaxWeight)} ${wu()}`);
+    if (newVol > oldMaxVol && newVol > 0) prs.push(`Volume PR: ${parseFloat(lbsToDisplay(newVol)).toLocaleString()} ${wu()}`);
+
+    if (prs.length > 0) {
+        const prList = DB.get('prs', []);
+        prs.forEach(pr => {
+            prList.push({ exercise: exerciseName, pr, date: today() });
+        });
+        DB.set('prs', prList);
+        showPRToast(exerciseName, prs);
+    }
+}
+
+function showPRToast(exercise, prs) {
+    const el = document.createElement('div');
+    el.className = 'pr-toast';
+    el.innerHTML = `<span class="pr-trophy">&#x1F3C6;</span><strong>NEW PR!</strong><br>${escapeHtml(exercise)}<br>${prs.join(' | ')}`;
+    document.body.appendChild(el);
+    setTimeout(() => el.classList.add('show'), 10);
+    setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 400); }, 3500);
+}
+
+// --- Achievement Badges ---
+const ACHIEVEMENTS = [
+    { id: 'first_workout', name: 'First Rep', desc: 'Log your first workout', icon: '&#x1F4AA;', check: ctx => ctx.total >= 1 },
+    { id: 'ten_workouts', name: 'Getting Serious', desc: 'Log 10 workouts', icon: '&#x1F525;', check: ctx => ctx.total >= 10 },
+    { id: 'fifty_workouts', name: 'Iron Regular', desc: 'Log 50 workouts', icon: '&#x2B50;', check: ctx => ctx.total >= 50 },
+    { id: 'hundred_workouts', name: 'Centurion', desc: 'Log 100 workouts', icon: '&#x1F451;', check: ctx => ctx.total >= 100 },
+    { id: 'five_hundred', name: 'Legend', desc: 'Log 500 workouts', icon: '&#x1F48E;', check: ctx => ctx.total >= 500 },
+    { id: 'week_streak', name: '7-Day Warrior', desc: '7-day workout streak', icon: '&#x1F4A5;', check: ctx => ctx.streak >= 7 },
+    { id: 'month_streak', name: '30-Day Beast', desc: '30-day workout streak', icon: '&#x1F981;', check: ctx => ctx.streak >= 30 },
+    { id: 'first_pr', name: 'Record Breaker', desc: 'Hit your first PR', icon: '&#x1F3C6;', check: ctx => ctx.prCount >= 1 },
+    { id: 'ten_prs', name: 'PR Machine', desc: 'Hit 10 personal records', icon: '&#x1F3C5;', check: ctx => ctx.prCount >= 10 },
+    { id: 'five_exercises', name: 'Well Rounded', desc: 'Log 5 different exercises', icon: '&#x1F504;', check: ctx => ctx.uniqueExercises >= 5 },
+    { id: 'fifteen_exercises', name: 'Arsenal', desc: 'Log 15 different exercises', icon: '&#x1F52B;', check: ctx => ctx.uniqueExercises >= 15 },
+    { id: 'logged_weight', name: 'Accountable', desc: 'Log your body weight', icon: '&#x2696;', check: ctx => ctx.weighIns >= 1 },
+    { id: 'ten_weigh_ins', name: 'Consistent Tracker', desc: 'Log body weight 10 times', icon: '&#x1F4CA;', check: ctx => ctx.weighIns >= 10 },
+    { id: 'logged_meal', name: 'Fuel Up', desc: 'Log your first meal', icon: '&#x1F372;', check: ctx => ctx.meals >= 1 },
+    { id: 'thousand_club', name: '1000lb Club', desc: 'Bench+Squat+Deadlift total 1000+ lbs', icon: '&#x1F3CB;', check: ctx => ctx.bigThreeTotal >= 1000 },
+];
+
+function getAchievementContext() {
+    const workouts = DB.get('workouts', []);
+    const prs = DB.get('prs', []);
+    const weights = DB.get('weights', []);
+    const meals = DB.get('meals', []);
+
+    // Calculate streak
+    const dates = [...new Set(workouts.map(w => w.date))].sort().reverse();
+    let streak = 0;
+    if (dates.includes(today())) {
+        streak = 1;
+        let d = new Date();
+        for (let i = 1; i < 365; i++) {
+            d.setDate(d.getDate() - 1);
+            if (dates.includes(d.toISOString().split('T')[0])) streak++;
+            else break;
+        }
+    }
+
+    // Big three total (best weight per lift)
+    let bigThreeTotal = 0;
+    ['Bench Press', 'Squat', 'Deadlift'].forEach(lift => {
+        const logs = workouts.filter(w => w.name === lift);
+        if (logs.length > 0) {
+            bigThreeTotal += Math.max(...logs.flatMap(w => w.sets.map(s => s.weight)));
+        }
+    });
+
+    return {
+        total: workouts.length,
+        streak,
+        prCount: prs.length,
+        uniqueExercises: new Set(workouts.map(w => w.name)).size,
+        weighIns: weights.length,
+        meals: meals.length,
+        bigThreeTotal,
+    };
+}
+
+function checkAchievements(workouts) {
+    const unlocked = DB.get('achievements', []);
+    const ctx = getAchievementContext();
+    let newUnlock = false;
+
+    ACHIEVEMENTS.forEach(a => {
+        if (!unlocked.includes(a.id) && a.check(ctx)) {
+            unlocked.push(a.id);
+            newUnlock = true;
+            showToast(`${a.icon} Achievement Unlocked: ${a.name}!`);
+        }
+    });
+
+    if (newUnlock) DB.set('achievements', unlocked);
+}
+
+function renderAchievements() {
+    const container = document.getElementById('achievements-grid');
+    if (!container) return;
+    const unlocked = DB.get('achievements', []);
+
+    container.innerHTML = ACHIEVEMENTS.map(a => {
+        const earned = unlocked.includes(a.id);
+        return `<div class="badge ${earned ? 'earned' : 'locked'}" title="${a.desc}">
+            <span class="badge-icon">${a.icon}</span>
+            <span class="badge-name">${a.name}</span>
+        </div>`;
+    }).join('');
+}
+
+// --- Calendar Heatmap ---
+function renderCalendarHeatmap() {
+    const container = document.getElementById('calendar-heatmap');
+    if (!container) return;
+    const workouts = DB.get('workouts', []);
+
+    // Count workouts per day for last 90 days
+    const counts = {};
+    workouts.forEach(w => { counts[w.date] = (counts[w.date] || 0) + 1; });
+
+    const now = new Date();
+    const days = [];
+    for (let i = 89; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        days.push({ date: dateStr, count: counts[dateStr] || 0, day: d.getDay() });
+    }
+
+    // Build grid — weeks as columns, days as rows
+    const weeks = [];
+    let currentWeek = [];
+    days.forEach((d, i) => {
+        if (i === 0) {
+            // Pad first week
+            for (let p = 0; p < d.day; p++) currentWeek.push(null);
+        }
+        currentWeek.push(d);
+        if (d.day === 6 || i === days.length - 1) {
+            weeks.push(currentWeek);
+            currentWeek = [];
+        }
+    });
+
+    let html = '<div class="heatmap-grid">';
+    // Day labels
+    html += '<div class="heatmap-labels"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>';
+    html += '<div class="heatmap-weeks">';
+    weeks.forEach(week => {
+        html += '<div class="heatmap-week">';
+        for (let r = 0; r < 7; r++) {
+            const cell = week[r];
+            if (!cell) {
+                html += '<div class="heatmap-cell empty"></div>';
+            } else {
+                const level = cell.count === 0 ? 0 : cell.count <= 2 ? 1 : cell.count <= 4 ? 2 : 3;
+                html += `<div class="heatmap-cell level-${level}" title="${cell.date}: ${cell.count} exercises"></div>`;
+            }
+        }
+        html += '</div>';
+    });
+    html += '</div></div>';
+
+    // Month labels
+    const months = [];
+    let lastMonth = -1;
+    days.forEach((d, i) => {
+        const m = new Date(d.date).getMonth();
+        if (m !== lastMonth) {
+            months.push({ name: new Date(d.date).toLocaleString('en', { month: 'short' }), index: i });
+            lastMonth = m;
+        }
+    });
+    html += '<div class="heatmap-months">' + months.map(m => `<span>${m.name}</span>`).join('') + '</div>';
+
+    container.innerHTML = html;
+}
+
+// --- Muscle Heatmap ---
+function renderMuscleHeatmap() {
+    const container = document.getElementById('muscle-heatmap');
+    if (!container) return;
+
+    const workouts = DB.get('workouts', []);
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekStr = weekAgo.toISOString().split('T')[0];
+    const weekWorkouts = workouts.filter(w => w.date >= weekStr);
+
+    const muscleMap = {
+        chest: ['Bench Press','Incline Bench Press','Decline Bench Press','Dumbbell Bench Press','Incline Dumbbell Press','Dumbbell Fly','Cable Fly','Chest Dips','Push-ups','Machine Chest Press','Pec Deck'],
+        back: ['Deadlift','Romanian Deadlift','Sumo Deadlift','Barbell Row','Dumbbell Row','Pendlay Row','T-Bar Row','Seated Cable Row','Lat Pulldown','Pull-ups','Chin-ups','Straight Arm Pulldown','Hyperextensions','Good Mornings'],
+        shoulders: ['Overhead Press','Seated Dumbbell Press','Arnold Press','Lateral Raises','Front Raises','Rear Delt Fly','Cable Lateral Raise','Upright Row','Shrugs','Barbell Shrugs','Face Pulls','Machine Shoulder Press'],
+        legs: ['Squat','Front Squat','Goblet Squat','Bulgarian Split Squat','Hack Squat','Leg Press','Lunges','Walking Lunges','Reverse Lunges','Leg Extension','Leg Curl','Seated Leg Curl','Hip Thrust','Glute Bridge','Calf Raises','Seated Calf Raise','Step-ups','Box Jumps'],
+        biceps: ['Bicep Curls','Hammer Curls','Preacher Curls','Concentration Curls','Incline Dumbbell Curl','EZ Bar Curl','Cable Curl','Spider Curls'],
+        triceps: ['Tricep Pushdown','Overhead Tricep Extension','Skull Crushers','Close Grip Bench Press','Tricep Dips','Tricep Kickbacks','Cable Overhead Extension','Diamond Push-ups'],
+        core: ['Plank','Crunches','Hanging Leg Raise','Cable Crunch','Ab Wheel Rollout','Russian Twist','Bicycle Crunches','Leg Raises','Woodchoppers','Pallof Press','Dead Bug','Mountain Climbers'],
+    };
+
+    const volume = {};
+    Object.keys(muscleMap).forEach(g => volume[g] = 0);
+    weekWorkouts.forEach(w => {
+        for (const [group, exercises] of Object.entries(muscleMap)) {
+            if (exercises.some(e => w.name.toLowerCase() === e.toLowerCase())) {
+                volume[group] += w.sets.length;
+            }
+        }
+    });
+
+    const maxVol = Math.max(...Object.values(volume), 1);
+
+    function intensity(group) {
+        const v = volume[group] || 0;
+        if (v === 0) return 'none';
+        const ratio = v / maxVol;
+        if (ratio > 0.7) return 'high';
+        if (ratio > 0.3) return 'med';
+        return 'low';
+    }
+
+    let html = '<div class="muscle-map">';
+    html += '<div class="muscle-body">';
+    // Simple labeled grid approach
+    const groups = [
+        { name: 'Shoulders', key: 'shoulders' },
+        { name: 'Chest', key: 'chest' },
+        { name: 'Back', key: 'back' },
+        { name: 'Biceps', key: 'biceps' },
+        { name: 'Triceps', key: 'triceps' },
+        { name: 'Core', key: 'core' },
+        { name: 'Legs', key: 'legs' },
+    ];
+    groups.forEach(g => {
+        const v = volume[g.key] || 0;
+        const lvl = intensity(g.key);
+        html += `<div class="muscle-group level-${lvl}">
+            <span class="muscle-name">${g.name}</span>
+            <span class="muscle-sets">${v} sets</span>
+        </div>`;
+    });
+    html += '</div></div>';
+
+    container.innerHTML = html;
+}
+
 // --- Initialize ---
 function init() {
     displayDailyVerse();
@@ -1062,6 +1328,9 @@ function init() {
     updateMealsList();
     updateNutritionBars();
     drawWeightChart();
+    renderAchievements();
+    renderCalendarHeatmap();
+    renderMuscleHeatmap();
     scheduleMidnightReset();
 
     // Redraw charts on resize

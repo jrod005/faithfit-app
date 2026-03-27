@@ -1082,6 +1082,141 @@ canvas {
     box-shadow: 0 1px 4px rgba(0,0,0,0.1);
 }
 
+/* ========== PR TOAST ========== */
+.pr-toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    background: linear-gradient(135deg, #ffd700, #ffaa00);
+    color: #000;
+    padding: 16px 24px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    z-index: 10000;
+    box-shadow: 0 8px 32px rgba(255, 215, 0, 0.4);
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    max-width: 90%;
+}
+.pr-toast.show { transform: translateX(-50%) translateY(0); }
+.pr-trophy { font-size: 28px; display: block; margin-bottom: 4px; }
+
+/* ========== ACHIEVEMENTS ========== */
+.achievements-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 8px;
+}
+.badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 6px;
+    border-radius: var(--radius-sm);
+    text-align: center;
+    transition: var(--transition);
+}
+.badge.earned {
+    background: var(--card-bg-elevated);
+    border: 1px solid var(--border-light);
+}
+.badge.locked {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    opacity: 0.35;
+    filter: grayscale(1);
+}
+.badge-icon { font-size: 28px; margin-bottom: 4px; }
+.badge-name { font-size: 10px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+.badge.earned .badge-name { color: var(--text); }
+
+/* ========== CALENDAR HEATMAP ========== */
+.heatmap-grid {
+    display: flex;
+    gap: 3px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+.heatmap-labels {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-right: 4px;
+}
+.heatmap-labels span {
+    width: 14px;
+    height: 14px;
+    font-size: 9px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.heatmap-weeks { display: flex; gap: 3px; }
+.heatmap-week { display: flex; flex-direction: column; gap: 3px; }
+.heatmap-cell {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background: var(--card-bg-elevated);
+    border: 1px solid var(--border);
+}
+.heatmap-cell.empty { visibility: hidden; }
+.heatmap-cell.level-1 { background: rgba(74, 222, 128, 0.25); border-color: rgba(74, 222, 128, 0.3); }
+.heatmap-cell.level-2 { background: rgba(74, 222, 128, 0.5); border-color: rgba(74, 222, 128, 0.5); }
+.heatmap-cell.level-3 { background: rgba(74, 222, 128, 0.85); border-color: rgba(74, 222, 128, 0.8); }
+.heatmap-months {
+    display: flex;
+    gap: 0;
+    margin-top: 6px;
+    padding-left: 20px;
+}
+.heatmap-months span {
+    font-size: 10px;
+    color: var(--text-muted);
+    flex: 1;
+}
+
+/* ========== MUSCLE HEATMAP ========== */
+.muscle-map { padding: 4px 0; }
+.muscle-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+.muscle-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    transition: var(--transition);
+}
+.muscle-group:last-child { grid-column: 1 / -1; }
+.muscle-name { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.muscle-sets { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.muscle-group.level-none { background: var(--card-bg); }
+.muscle-group.level-low {
+    background: rgba(74, 222, 128, 0.08);
+    border-color: rgba(74, 222, 128, 0.2);
+}
+.muscle-group.level-low .muscle-name { color: rgba(74, 222, 128, 0.7); }
+.muscle-group.level-med {
+    background: rgba(74, 222, 128, 0.15);
+    border-color: rgba(74, 222, 128, 0.35);
+}
+.muscle-group.level-med .muscle-name { color: rgba(74, 222, 128, 0.85); }
+.muscle-group.level-high {
+    background: rgba(74, 222, 128, 0.25);
+    border-color: rgba(74, 222, 128, 0.5);
+}
+.muscle-group.level-high .muscle-name { color: #4ade80; }
+.muscle-group.level-high .muscle-sets { color: rgba(74, 222, 128, 0.7); }
+
 /* ========== RESPONSIVE ========== */
 @media (max-width: 400px) {
     .stats-grid {
