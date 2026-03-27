@@ -91,8 +91,8 @@
   <!-- Divider line -->
   <line x1="145" y1="410" x2="367" y2="410" stroke="#555555" stroke-width="1.5"/>
 
-  <!-- "& FAITH" text -->
-  <text x="256" y="448" text-anchor="middle" font-family="'Georgia', 'Times New Roman', serif" font-weight="400" font-size="36" fill="#999999" letter-spacing="12" font-style="italic">&amp; FAITH</text>
+  <!-- "FAITH" text -->
+  <text x="256" y="448" text-anchor="middle" font-family="'Georgia', 'Times New Roman', serif" font-weight="400" font-size="36" fill="#999999" letter-spacing="12" font-style="italic">FAITH</text>
 
   <!-- Subtle tagline -->
   <text x="256" y="478" text-anchor="middle" font-family="'Arial', sans-serif" font-weight="300" font-size="13" fill="#555555" letter-spacing="5">STRENGTHEN BODY &amp; SPIRIT</text>

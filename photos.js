@@ -1,5 +1,5 @@
 // =============================================
-// Iron & Faith - Coach Photo Integration + Pose Detection
+// Iron Faith - Coach Photo Integration + Pose Detection
 // =============================================
 
 let pendingPhoto = null;
