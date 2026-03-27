@@ -1031,6 +1031,341 @@ const TOPIC_RESPONSES = {
             },
         },
         {
+            id: 'one_rep_max',
+            keywords: ['1rm', 'one rep max', 'max.*bench', 'max.*squat', 'max.*deadlift', 'max.*press', 'how much can i', 'my max', 'estimated max', 'e1rm'],
+            handler: (ctx, input) => {
+                const unit = wu();
+                let html = `<h3>Estimated 1RM</h3>`;
+                if (ctx.workouts.length === 0) {
+                    html += `<p>No workout data yet. Log some exercises and I'll calculate your estimated maxes!</p>`;
+                    return html + verseHtml();
+                }
+                // Find which exercise user is asking about, or show top lifts
+                const lower = input.toLowerCase();
+                const compounds = ['Bench Press','Squat','Deadlift','Overhead Press','Barbell Row'];
+                let targets = compounds;
+                for (const c of compounds) {
+                    if (lower.includes(c.toLowerCase().split(' ')[0])) { targets = [c]; break; }
+                }
+                let found = false;
+                targets.forEach(name => {
+                    const logs = ctx.exercisesByName[name];
+                    if (!logs || logs.length === 0) return;
+                    const last = logs[logs.length - 1];
+                    const bestSet = last.sets.reduce((a, b) => (a.weight > b.weight ? a : b), last.sets[0]);
+                    if (bestSet.weight > 0 && bestSet.reps > 0) {
+                        // Epley formula: 1RM = weight × (1 + reps/30)
+                        const e1rm = Math.round(bestSet.weight * (1 + bestSet.reps / 30));
+                        found = true;
+                        html += insightHtml(`<strong>${name}:</strong> ${lbsToDisplay(bestSet.weight)} ${unit} × ${bestSet.reps} reps → Est. 1RM: <strong>${lbsToDisplay(e1rm)} ${unit}</strong>`);
+                    }
+                });
+                if (!found) html += `<p>No data for those exercises yet. Log some sets first!</p>`;
+                else html += `<p style="font-size:13px;color:var(--text-secondary)">Calculated using the Epley formula. Test your actual 1RM with a spotter for accuracy.</p>`;
+                html += verseHtml();
+                return html;
+            },
+        },
+        {
+            id: 'warmup',
+            keywords: ['warm up', 'warmup', 'warm-up', 'stretching', 'stretch', 'before workout', 'pre workout routine', 'dynamic stretch'],
+            handler: (ctx) => {
+                let html = `<h3>Dynamic Warm-Up</h3>`;
+                // Check what they've trained today or suggest general
+                const todayMuscles = new Set();
+                ctx.todayWorkouts.forEach(w => {
+                    for (const [group, exercises] of Object.entries(ctx.muscleMap)) {
+                        if (exercises.some(e => w.name.toLowerCase() === e.toLowerCase())) todayMuscles.add(group);
+                    }
+                });
+                const warmups = {
+                    chest: ['Arm circles (20 each direction)', 'Band pull-aparts (15)', 'Push-ups (2×10 light)'],
+                    back: ['Cat-cow stretches (10)', 'Band pull-aparts (15)', 'Light lat pulldown (2×12)'],
+                    shoulders: ['Arm circles (20 each direction)', 'Band dislocates (15)', 'Empty bar press (2×10)'],
+                    legs: ['Bodyweight squats (15)', 'Leg swings front/side (10 each)', 'Walking lunges (10 steps)', 'Hip circles (10 each)'],
+                    biceps: ['Arm circles (15)', 'Light curls (15 reps)', 'Wrist circles (10 each)'],
+                    triceps: ['Arm circles (15)', 'Light pushdowns (15)', 'Overhead stretch (15s each)'],
+                    core: ['Cat-cow (10)', 'Dead bug (10)', 'Bird dog (10 each side)'],
+                };
+                if (todayMuscles.size > 0) {
+                    html += `<p>Based on today's training:</p>`;
+                    todayMuscles.forEach(g => {
+                        if (warmups[g]) {
+                            html += `<p><strong>${g.charAt(0).toUpperCase() + g.slice(1)}:</strong></p><ul>`;
+                            warmups[g].forEach(w => html += `<li>${w}</li>`);
+                            html += `</ul>`;
+                        }
+                    });
+                } else {
+                    html += `<p>Full-body warm-up (5 min):</p><ol>`;
+                    html += `<li>Jumping jacks or light jog — 2 min</li>`;
+                    html += `<li>Arm circles — 15 each direction</li>`;
+                    html += `<li>Bodyweight squats — 15 reps</li>`;
+                    html += `<li>Leg swings (front & side) — 10 each leg</li>`;
+                    html += `<li>Hip circles — 10 each direction</li>`;
+                    html += `<li>Band pull-aparts — 15 reps</li>`;
+                    html += `<li>Cat-cow stretches — 10 reps</li>`;
+                    html += `</ol>`;
+                    html += `<p>Then do 2 light warm-up sets of your first exercise before working weight.</p>`;
+                }
+                html += verseHtml();
+                return html;
+            },
+        },
+        {
+            id: 'supplements',
+            keywords: ['supplement', 'creatine', 'protein powder', 'pre.?workout', 'bcaa', 'vitamins', 'whey', 'casein'],
+            handler: (ctx) => {
+                let html = `<h3>Evidence-Based Supplements</h3>`;
+                html += `<p><strong>Tier 1 — Actually works:</strong></p><ul>`;
+                html += `<li><strong>Creatine monohydrate</strong> (5g/day) — Most studied supplement in history. Increases strength, muscle size, and recovery. Take daily, no need to cycle.</li>`;
+                html += `<li><strong>Protein powder</strong> — Not magic, just convenient protein. Use it if you struggle to hit ${ctx.profile.proteinGoal || 150}g/day from food alone.</li>`;
+                html += `<li><strong>Caffeine</strong> (200mg pre-workout) — Improves performance 3-5%. Coffee works fine.</li>`;
+                html += `</ul>`;
+                html += `<p><strong>Tier 2 — Helpful for some:</strong></p><ul>`;
+                html += `<li><strong>Vitamin D</strong> — If you're low on sun exposure. Get bloodwork to check.</li>`;
+                html += `<li><strong>Fish oil</strong> — If you don't eat fatty fish 2x/week.</li>`;
+                html += `<li><strong>Magnesium</strong> — Helps sleep quality. Take before bed.</li>`;
+                html += `</ul>`;
+                html += `<p><strong>Skip these:</strong> BCAAs (waste of money if you eat protein), fat burners, testosterone boosters, most pre-workout blends (just drink coffee).</p>`;
+                html += verseHtml();
+                return html;
+            },
+        },
+        {
+            id: 'weekly_recap',
+            keywords: ['weekly recap', 'week.*summary', 'this week.*vs', 'compare.*week', 'weekly report', 'how was my week', 'week review'],
+            handler: (ctx) => {
+                const unit = wu();
+                let html = `<h3>Weekly Recap</h3>`;
+                // This week
+                const thisWeekDays = ctx.weekDays;
+                const thisWeekSets = ctx.weekWorkouts.reduce((s, w) => s + w.sets.length, 0);
+                // Last week
+                const twoWeeksAgo = new Date();
+                twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+                const twoWeekStr = twoWeeksAgo.toISOString().split('T')[0];
+                const weekAgoStr = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+                const lastWeekWorkouts = ctx.workouts.filter(w => w.date >= twoWeekStr && w.date < weekAgoStr);
+                const lastWeekDays = [...new Set(lastWeekWorkouts.map(w => w.date))].length;
+                const lastWeekSets = lastWeekWorkouts.reduce((s, w) => s + w.sets.length, 0);
+
+                html += `<table class="plan-table"><tr><th></th><th>This Week</th><th>Last Week</th><th>Change</th></tr>`;
+                const daysDiff = thisWeekDays - lastWeekDays;
+                const setsDiff = thisWeekSets - lastWeekSets;
+                html += `<tr><td>Training Days</td><td>${thisWeekDays}</td><td>${lastWeekDays}</td><td>${daysDiff > 0 ? '+' : ''}${daysDiff}</td></tr>`;
+                html += `<tr><td>Total Sets</td><td>${thisWeekSets}</td><td>${lastWeekSets}</td><td>${setsDiff > 0 ? '+' : ''}${setsDiff}</td></tr>`;
+
+                if (ctx.weekNutrition.days > 0) {
+                    html += `<tr><td>Avg Calories</td><td>${ctx.weekNutrition.calories}</td><td>—</td><td>—</td></tr>`;
+                    html += `<tr><td>Avg Protein</td><td>${ctx.weekNutrition.protein}g</td><td>—</td><td>—</td></tr>`;
+                }
+                html += `</table>`;
+
+                // Muscle coverage
+                const hitGroups = Object.entries(ctx.weekMuscleVolume).filter(([,v]) => v > 0).length;
+                const totalGroups = Object.keys(ctx.weekMuscleVolume).length;
+                html += insightHtml(`Muscle coverage: <strong>${hitGroups}/${totalGroups}</strong> groups trained this week.`);
+
+                if (thisWeekSets > lastWeekSets) html += `<p>Volume is up — great progress!</p>`;
+                else if (thisWeekSets < lastWeekSets && lastWeekSets > 0) html += `<p>Volume is down from last week. Life happens — just stay consistent.</p>`;
+
+                html += verseHtml();
+                return html;
+            },
+        },
+        {
+            id: 'rest_timer',
+            keywords: ['rest time', 'rest period', 'how long.*rest', 'rest between', 'rest timer', 'break between'],
+            handler: (ctx) => {
+                let html = `<h3>Rest Period Guide</h3>`;
+                html += `<table class="plan-table"><tr><th>Goal</th><th>Rest Time</th><th>Why</th></tr>`;
+                html += `<tr><td><strong>Strength</strong> (1-5 reps)</td><td>3-5 min</td><td>Full ATP recovery for max effort</td></tr>`;
+                html += `<tr><td><strong>Hypertrophy</strong> (6-12 reps)</td><td>60-90 sec</td><td>Metabolic stress drives muscle growth</td></tr>`;
+                html += `<tr><td><strong>Endurance</strong> (12+ reps)</td><td>30-60 sec</td><td>Keeps heart rate up, builds stamina</td></tr>`;
+                html += `<tr><td><strong>Compounds</strong> (squat, dead, bench)</td><td>2-4 min</td><td>Heavier loads need more recovery</td></tr>`;
+                html += `<tr><td><strong>Isolation</strong> (curls, raises)</td><td>60-90 sec</td><td>Smaller muscles recover faster</td></tr>`;
+                html += `</table>`;
+                html += `<p>When in doubt: rest until your breathing normalizes and you feel ready to give the next set full effort.</p>`;
+                html += verseHtml();
+                return html;
+            },
+        },
+        {
+            id: 'exercise_swap',
+            keywords: ['swap', 'alternative', 'instead of', 'replace', 'substitute', 'can\'t do', 'replacement', 'variation'],
+            handler: (ctx, input) => {
+                const swaps = {
+                    'bench press': ['Dumbbell Bench Press', 'Machine Chest Press', 'Push-ups (weighted)', 'Floor Press'],
+                    'squat': ['Leg Press', 'Goblet Squat', 'Hack Squat', 'Bulgarian Split Squat'],
+                    'deadlift': ['Romanian Deadlift', 'Trap Bar Deadlift', 'Hip Thrust', 'Good Mornings'],
+                    'overhead press': ['Seated Dumbbell Press', 'Arnold Press', 'Machine Shoulder Press', 'Landmine Press'],
+                    'pull-ups': ['Lat Pulldown', 'Assisted Pull-ups', 'Chin-ups', 'Band-assisted Pull-ups'],
+                    'barbell row': ['Dumbbell Row', 'Seated Cable Row', 'T-Bar Row', 'Chest-Supported Row'],
+                    'leg press': ['Squat', 'Hack Squat', 'Bulgarian Split Squat', 'Goblet Squat'],
+                    'bicep curls': ['Hammer Curls', 'EZ Bar Curl', 'Cable Curl', 'Concentration Curls'],
+                    'tricep pushdown': ['Overhead Tricep Extension', 'Skull Crushers', 'Diamond Push-ups', 'Tricep Dips'],
+                    'lateral raises': ['Cable Lateral Raise', 'Machine Lateral Raise', 'Upright Row', 'Band Lateral Raise'],
+                    'hip thrust': ['Glute Bridge', 'Cable Pull-through', 'Romanian Deadlift', 'Step-ups'],
+                };
+                const lower = input.toLowerCase();
+                let html = `<h3>Exercise Alternatives</h3>`;
+                let found = false;
+                for (const [exercise, alts] of Object.entries(swaps)) {
+                    if (lower.includes(exercise) || lower.includes(exercise.split(' ')[0])) {
+                        html += `<p>Instead of <strong>${exercise.charAt(0).toUpperCase() + exercise.slice(1)}</strong>, try:</p><ol>`;
+                        alts.forEach(a => html += `<li><strong>${a}</strong></li>`);
+                        html += `</ol>`;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    html += `<p>Tell me which exercise you want to swap and I'll suggest alternatives. For example:</p><ul>`;
+                    html += `<li>"Alternative to bench press"</li>`;
+                    html += `<li>"What can I do instead of squats?"</li>`;
+                    html += `<li>"Swap for pull-ups"</li>`;
+                    html += `</ul>`;
+                }
+                html += verseHtml();
+                return html;
+            },
+        },
+        {
+            id: 'goal_timeline',
+            keywords: ['timeline', 'how long.*until', 'when will i', 'how long.*take', 'predict', 'projection', 'goal.*date', 'reach.*goal'],
+            handler: (ctx) => {
+                const unit = wu();
+                let html = `<h3>Progress Projection</h3>`;
+                // Weight goal projection
+                if (ctx.weights.length >= 4) {
+                    const recent = ctx.weights.slice(-8);
+                    const first = recent[0];
+                    const last = recent[recent.length - 1];
+                    const days = Math.max(1, Math.round((new Date(last.date) - new Date(first.date)) / 86400000));
+                    const ratePerWeek = ((last.weight - first.weight) / days) * 7;
+                    if (Math.abs(ratePerWeek) > 0.1) {
+                        const goalWeight = ctx.profile.goal === 'lose' ? ctx.currentWeight - 20 : ctx.currentWeight + 15;
+                        const diff = goalWeight - ctx.currentWeight;
+                        const weeksNeeded = Math.abs(diff / ratePerWeek);
+                        const targetDate = new Date();
+                        targetDate.setDate(targetDate.getDate() + weeksNeeded * 7);
+                        html += insightHtml(`At your current rate of <strong>${ratePerWeek > 0 ? '+' : ''}${(parseFloat(lbsToDisplay(Math.abs(ratePerWeek)))).toFixed(1)} ${unit}/week</strong>, you'd reach <strong>${lbsToDisplay(goalWeight)} ${unit}</strong> by approximately <strong>${targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</strong>.`);
+                    } else {
+                        html += `<p>Your weight has been stable. Set a clear goal in your profile to get a timeline.</p>`;
+                    }
+                }
+                // Lift projections
+                const compounds = ['Bench Press', 'Squat', 'Deadlift'];
+                let liftProjections = false;
+                compounds.forEach(name => {
+                    const logs = ctx.exercisesByName[name];
+                    if (!logs || logs.length < 4) return;
+                    const early = logs.slice(0, Math.min(3, logs.length));
+                    const late = logs.slice(-3);
+                    const earlyMax = Math.max(...early.map(l => Math.max(...l.sets.map(s => s.weight))));
+                    const lateMax = Math.max(...late.map(l => Math.max(...l.sets.map(s => s.weight))));
+                    const sessions = logs.length;
+                    const gainPerSession = (lateMax - earlyMax) / Math.max(1, sessions - 1);
+                    if (gainPerSession > 0) {
+                        if (!liftProjections) { html += `<h3>Lift Projections</h3>`; liftProjections = true; }
+                        const nextMilestone = Math.ceil(lateMax / 25) * 25 + 25;
+                        const sessionsNeeded = Math.ceil((nextMilestone - lateMax) / gainPerSession);
+                        html += insightHtml(`<strong>${name}:</strong> Current best ${lbsToDisplay(lateMax)} ${unit} → <strong>${lbsToDisplay(nextMilestone)} ${unit}</strong> in ~${sessionsNeeded} sessions`);
+                    }
+                });
+                if (ctx.weights.length < 4 && !liftProjections) {
+                    html += `<p>I need more data to project timelines. Keep logging workouts and weight for 2+ weeks!</p>`;
+                }
+                html += verseHtml();
+                return html;
+            },
+        },
+        {
+            id: 'streak',
+            keywords: ['streak', 'consistency', 'how consistent', 'how many days.*row', 'discipline', 'attendance'],
+            handler: (ctx) => {
+                let html = `<h3>Consistency Tracker</h3>`;
+                if (ctx.workouts.length === 0) {
+                    html += `<p>No workouts yet. Start your streak today!</p>`;
+                    return html + verseHtml();
+                }
+                // Calculate weekly streak
+                const workoutDates = [...new Set(ctx.workouts.map(w => w.date))].sort();
+                const weeks = {};
+                workoutDates.forEach(d => {
+                    const dt = new Date(d);
+                    const weekStart = new Date(dt);
+                    weekStart.setDate(dt.getDate() - dt.getDay());
+                    const key = weekStart.toISOString().split('T')[0];
+                    weeks[key] = (weeks[key] || 0) + 1;
+                });
+                const weekKeys = Object.keys(weeks).sort().reverse();
+                let weekStreak = 0;
+                for (const k of weekKeys) {
+                    if (weeks[k] > 0) weekStreak++;
+                    else break;
+                }
+                const totalDays = workoutDates.length;
+                const firstDate = workoutDates[0];
+                const daysSinceStart = Math.max(1, Math.round((Date.now() - new Date(firstDate)) / 86400000));
+                const avgPerWeek = (totalDays / daysSinceStart * 7).toFixed(1);
+
+                html += insightHtml(`
+                    Training days total: <strong>${totalDays}</strong><br>
+                    Active weeks in a row: <strong>${weekStreak} week${weekStreak !== 1 ? 's' : ''}</strong><br>
+                    Average: <strong>${avgPerWeek} days/week</strong> since you started
+                `);
+                if (weekStreak >= 4) html += `<p>Incredible consistency! You're building something real.</p>`;
+                else if (weekStreak >= 2) html += `<p>Solid streak going. Keep showing up!</p>`;
+                else html += `<p>Every journey starts with day one. Build the habit, one week at a time.</p>`;
+                html += verseHtml({ text: "Let us not become weary in doing good, for at the proper time we will reap a harvest.", ref: "Galatians 6:9" });
+                return html;
+            },
+        },
+        {
+            id: 'cardio',
+            keywords: ['cardio', 'running', 'hiit', 'liss', 'treadmill', 'cycling', 'heart rate', 'conditioning', 'endurance', 'stamina'],
+            handler: (ctx) => {
+                const goal = ctx.profile.goal || 'maintain';
+                let html = `<h3>Cardio Guide</h3>`;
+                html += `<table class="plan-table"><tr><th>Type</th><th>What</th><th>When</th></tr>`;
+                html += `<tr><td><strong>LISS</strong></td><td>Walking, light cycling (can hold a conversation)</td><td>Rest days, post-workout</td></tr>`;
+                html += `<tr><td><strong>HIIT</strong></td><td>Sprints, intervals (20-30 sec hard, 60-90 sec rest)</td><td>1-2x/week max, not on leg day</td></tr>`;
+                html += `<tr><td><strong>Moderate</strong></td><td>Jogging, swimming, rowing (moderate effort)</td><td>2-3x/week, separate from lifting</td></tr>`;
+                html += `</table>`;
+                html += `<h3>Recommendation for Your Goal</h3>`;
+                if (goal === 'lose') {
+                    html += `<p>Focus on <strong>LISS (walking)</strong> — 3-4 times per week, 30 min. Add 1 HIIT session if progress stalls. Walking burns fat without killing recovery.</p>`;
+                } else if (goal === 'gain') {
+                    html += `<p>Keep cardio <strong>minimal</strong> — 2 walks per week. Every calorie burned is a calorie not building muscle. Save your energy for the weights.</p>`;
+                } else {
+                    html += `<p>Mix it up — 2-3 sessions of whatever you enjoy. Consistency matters more than the type. Heart health is part of the mission.</p>`;
+                }
+                html += verseHtml();
+                return html;
+            },
+        },
+        {
+            id: 'meal_timing',
+            keywords: ['meal timing', 'pre.?workout.*meal', 'post.?workout.*meal', 'when.*eat', 'eat before', 'eat after', 'nutrient timing', 'anabolic window'],
+            handler: (ctx) => {
+                let html = `<h3>Workout Nutrition Timing</h3>`;
+                html += `<p><strong>Pre-Workout</strong> (1-2 hours before):</p><ul>`;
+                html += `<li>Moderate carbs + moderate protein, low fat</li>`;
+                html += `<li>Examples: rice + chicken, oatmeal + protein shake, banana + PB toast</li>`;
+                html += `<li>Avoid heavy fat — slows digestion and can cause nausea</li>`;
+                html += `</ul>`;
+                html += `<p><strong>Post-Workout</strong> (within 2 hours after):</p><ul>`;
+                html += `<li>Protein (30-40g) + fast carbs to replenish glycogen</li>`;
+                html += `<li>Examples: protein shake + fruit, chicken + rice, eggs + toast</li>`;
+                html += `</ul>`;
+                html += `<p><strong>The truth about the "anabolic window":</strong> It's not as tight as people think. Just eat a solid meal within 2 hours of training and you're fine. Total daily protein matters way more than timing.</p>`;
+                html += verseHtml();
+                return html;
+            },
+        },
+        {
             id: 'greeting',
             keywords: ['hello', 'hi', 'hey', 'sup', 'what\'s up', 'good morning', 'good evening', 'howdy'],
             handler: (ctx) => {
@@ -1075,6 +1410,16 @@ const TOPIC_RESPONSES = {
         html += `<li><strong>"I need motivation"</strong> — a kick in the pants with love</li>`;
         html += `<li><strong>"How is my nutrition?"</strong> — analysis of your logged meals</li>`;
         html += `<li><strong>"Recovery tips"</strong> — rest, sleep, deload guidance</li>`;
+        html += `<li><strong>"What's my max?"</strong> — estimated 1RM from your lifts</li>`;
+        html += `<li><strong>"Warm-up routine"</strong> — dynamic warm-up for your session</li>`;
+        html += `<li><strong>"Supplements"</strong> — what actually works, what to skip</li>`;
+        html += `<li><strong>"Weekly recap"</strong> — this week vs last week comparison</li>`;
+        html += `<li><strong>"Rest periods"</strong> — how long to rest between sets</li>`;
+        html += `<li><strong>"Alternative to bench"</strong> — exercise swap suggestions</li>`;
+        html += `<li><strong>"When will I hit 225?"</strong> — progress timeline projections</li>`;
+        html += `<li><strong>"My streak"</strong> — consistency and attendance tracking</li>`;
+        html += `<li><strong>"Cardio guide"</strong> — HIIT vs LISS, what's right for you</li>`;
+        html += `<li><strong>"Pre/post workout meal"</strong> — nutrient timing tips</li>`;
         html += `</ul>`;
         html += verseHtml();
         return html;
