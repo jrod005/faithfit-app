@@ -677,6 +677,253 @@ const TOPIC_RESPONSES = {
             handler: (ctx) => generateMealPlan(ctx),
         },
         {
+            id: 'fill_macros',
+            keywords: ['fill.*macro', 'hit.*macro', 'reach.*goal', 'remaining.*cal', 'left.*eat', 'still need', 'short on', 'how.*fill', 'what.*eat.*now', 'hungry', 'snack idea', 'finish.*day', 'close.*goal', 'almost.*goal', 'need more protein', 'need more cal', 'recommend.*food', 'suggest.*food', 'food.*recommend', 'what.*can.*eat'],
+            handler: (ctx) => {
+                const calGoal = ctx.profile.calorieGoal || 2000;
+                const protGoal = ctx.profile.proteinGoal || 150;
+                const carbGoal = Math.round(calGoal * 0.40 / 4);
+                const fatGoal = Math.round(calGoal * 0.30 / 9);
+
+                // Today's intake
+                const todayMeals = ctx.todayMeals;
+                const eaten = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+                todayMeals.forEach(m => {
+                    eaten.calories += m.calories;
+                    eaten.protein += m.protein;
+                    eaten.carbs += m.carbs;
+                    eaten.fat += m.fat;
+                });
+
+                const remaining = {
+                    calories: Math.max(0, calGoal - eaten.calories),
+                    protein: Math.max(0, protGoal - eaten.protein),
+                    carbs: Math.max(0, carbGoal - eaten.carbs),
+                    fat: Math.max(0, fatGoal - eaten.fat),
+                };
+
+                let html = `<h3>&#x1F37D; What to Eat Now</h3>`;
+
+                if (todayMeals.length === 0) {
+                    html += insightHtml(`You haven't logged any meals today. Here's what you need to hit your full daily targets.`);
+                } else {
+                    html += insightHtml(`You've eaten <strong>${eaten.calories} cal</strong> and <strong>${eaten.protein}g protein</strong> today. Here's what's left.`);
+                }
+
+                // Remaining macros display
+                html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin:12px 0;">`;
+                html += `<div style="background:var(--card);padding:10px;border-radius:8px;text-align:center;">
+                    <div style="font-size:20px;font-weight:700;color:${remaining.calories > 200 ? 'var(--accent)' : '#4ade80'};">${remaining.calories}</div>
+                    <div style="font-size:11px;color:var(--text-muted);">cal left</div></div>`;
+                html += `<div style="background:var(--card);padding:10px;border-radius:8px;text-align:center;">
+                    <div style="font-size:20px;font-weight:700;color:${remaining.protein > 20 ? '#f87171' : '#4ade80'};">${remaining.protein}g</div>
+                    <div style="font-size:11px;color:var(--text-muted);">protein</div></div>`;
+                html += `<div style="background:var(--card);padding:10px;border-radius:8px;text-align:center;">
+                    <div style="font-size:20px;font-weight:700;">${remaining.carbs}g</div>
+                    <div style="font-size:11px;color:var(--text-muted);">carbs</div></div>`;
+                html += `<div style="background:var(--card);padding:10px;border-radius:8px;text-align:center;">
+                    <div style="font-size:20px;font-weight:700;">${remaining.fat}g</div>
+                    <div style="font-size:11px;color:var(--text-muted);">fat</div></div>`;
+                html += `</div>`;
+
+                if (remaining.calories <= 50 && remaining.protein <= 10) {
+                    html += `<p style="color:#4ade80;font-weight:600;">&#x2705; You've hit your targets for today! Great work.</p>`;
+                    html += verseHtml();
+                    return html;
+                }
+
+                // --- Smart food matching from FOOD_DB ---
+                const db = (typeof FOOD_DB !== 'undefined') ? FOOD_DB : [];
+
+                // Score each food by how well it fills the remaining macros
+                function scoreFood(f) {
+                    if (f.calories > remaining.calories + 100) return -1;
+                    let score = 0;
+                    // Prioritize protein if that's the biggest gap
+                    if (remaining.protein > 20) score += (f.protein / Math.max(remaining.protein, 1)) * 40;
+                    // Calorie fit
+                    if (f.calories <= remaining.calories) score += 15;
+                    // Penalize foods that blow the budget
+                    if (f.calories > remaining.calories) score -= 10;
+                    // Bonus for balanced macros
+                    score += Math.min(f.carbs, remaining.carbs) * 0.1;
+                    score += Math.min(f.fat, remaining.fat) * 0.1;
+                    return score;
+                }
+
+                const scored = db.map(f => ({ ...f, score: scoreFood(f) }))
+                    .filter(f => f.score > 0)
+                    .sort((a, b) => b.score - a.score);
+
+                // --- Categorize recommendations ---
+                const highProtein = scored.filter(f => f.protein >= 15).slice(0, 6);
+                const quickSnacks = scored.filter(f => f.calories <= 300).slice(0, 6);
+                const fullMeals = scored.filter(f => f.calories >= 300 && f.calories <= remaining.calories).slice(0, 6);
+
+                // Emoji map for food visualization
+                const foodEmoji = {
+                    'chicken': '&#x1F357;', 'turkey': '&#x1F357;', 'steak': '&#x1F969;', 'beef': '&#x1F969;', 'bison': '&#x1F969;',
+                    'salmon': '&#x1F41F;', 'tuna': '&#x1F41F;', 'tilapia': '&#x1F41F;', 'shrimp': '&#x1F990;', 'cod': '&#x1F41F;',
+                    'egg': '&#x1F95A;', 'yogurt': '&#x1F95B;', 'milk': '&#x1F95B;', 'cheese': '&#x1F9C0;', 'cottage': '&#x1F9C0;',
+                    'rice': '&#x1F35A;', 'oat': '&#x1F35A;', 'pasta': '&#x1F35D;', 'bread': '&#x1F35E;', 'bagel': '&#x1F96F;', 'tortilla': '&#x1FAD3;', 'quinoa': '&#x1F35A;',
+                    'banana': '&#x1F34C;', 'apple': '&#x1F34E;', 'blueberr': '&#x1FAD0;', 'strawberr': '&#x1F353;', 'grape': '&#x1F347;', 'orange': '&#x1F34A;', 'mango': '&#x1F96D;', 'avocado': '&#x1F951;', 'watermelon': '&#x1F349;', 'pineapple': '&#x1F34D;', 'peach': '&#x1F351;',
+                    'broccoli': '&#x1F966;', 'salad': '&#x1F957;', 'lettuce': '&#x1F957;', 'spinach': '&#x1F96C;', 'kale': '&#x1F96C;', 'carrot': '&#x1F955;', 'corn': '&#x1F33D;', 'potato': '&#x1F954;', 'sweet potato': '&#x1F360;',
+                    'peanut': '&#x1F95C;', 'almond': '&#x1F95C;', 'walnut': '&#x1F95C;', 'cashew': '&#x1F95C;', 'nut': '&#x1F95C;',
+                    'protein shake': '&#x1F964;', 'protein bar': '&#x1F36B;', 'whey': '&#x1F964;', 'casein': '&#x1F964;',
+                    'pizza': '&#x1F355;', 'burger': '&#x1F354;', 'taco': '&#x1F32E;', 'burrito': '&#x1F32F;', 'sandwich': '&#x1F96A;', 'wrap': '&#x1F32F;',
+                    'pancake': '&#x1F95E;', 'waffle': '&#x1F9C7;', 'bacon': '&#x1F953;', 'sausage': '&#x1F953;',
+                    'cookie': '&#x1F36A;', 'chocolate': '&#x1F36B;', 'ice cream': '&#x1F368;', 'popcorn': '&#x1F37F;',
+                    'coffee': '&#x2615;', 'latte': '&#x2615;', 'juice': '&#x1F9C3;', 'smoothie': '&#x1F964;', 'beer': '&#x1F37A;', 'wine': '&#x1F377;',
+                    'honey': '&#x1F36F;', 'hummus': '&#x1F958;', 'soup': '&#x1F372;', 'ramen': '&#x1F35C;',
+                };
+
+                function getEmoji(name) {
+                    const lower = name.toLowerCase();
+                    for (const [key, emoji] of Object.entries(foodEmoji)) {
+                        if (lower.includes(key)) return emoji;
+                    }
+                    return '&#x1F374;';
+                }
+
+                function renderFoodCards(foods, sectionTitle) {
+                    if (foods.length === 0) return '';
+                    let s = `<h3>${sectionTitle}</h3>`;
+                    s += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 16px;">`;
+                    foods.forEach(f => {
+                        s += `<div style="background:var(--card);padding:10px;border-radius:8px;border:1px solid var(--border);">`;
+                        s += `<div style="font-size:22px;margin-bottom:4px;">${getEmoji(f.name)}</div>`;
+                        s += `<div style="font-size:13px;font-weight:600;">${f.name}</div>`;
+                        s += `<div style="font-size:11px;color:var(--text-muted);margin:2px 0;">${f.serving}</div>`;
+                        s += `<div style="font-size:12px;margin-top:4px;">`;
+                        s += `<span style="color:var(--accent);">${f.calories} cal</span> &middot; `;
+                        s += `<span style="color:#f87171;">${f.protein}g P</span> &middot; `;
+                        s += `<span>${f.carbs}g C</span> &middot; `;
+                        s += `<span>${f.fat}g F</span>`;
+                        s += `</div></div>`;
+                    });
+                    s += `</div>`;
+                    return s;
+                }
+
+                // Show recommendations based on what they need
+                if (remaining.protein > 20 && highProtein.length > 0) {
+                    html += renderFoodCards(highProtein, '&#x1F4AA; High Protein — You Need ' + remaining.protein + 'g More');
+                }
+
+                if (remaining.calories >= 300 && fullMeals.length > 0) {
+                    html += renderFoodCards(fullMeals, '&#x1F37D; Full Meals That Fit Your Remaining Budget');
+                }
+
+                if (remaining.calories > 0 && remaining.calories < 600 && quickSnacks.length > 0) {
+                    html += renderFoodCards(quickSnacks, '&#x26A1; Quick Snacks to Close the Gap');
+                }
+
+                // --- Combo meal suggestions that add up to fill the gap ---
+                html += `<h3>&#x1F468;&#x200D;&#x1F373; Meal Combos to Fill Your Remaining Macros</h3>`;
+
+                // Build smart combos
+                const combos = [];
+
+                // Helper: find foods in a category
+                function pick(keyword, maxCal) {
+                    return db.filter(f => f.name.toLowerCase().includes(keyword) && f.calories <= maxCal);
+                }
+
+                if (remaining.calories >= 400 && remaining.protein >= 25) {
+                    // High protein meal combo
+                    const proteins = pick('chicken', remaining.calories).concat(pick('salmon', remaining.calories), pick('turkey', remaining.calories), pick('steak', remaining.calories));
+                    const carbs = pick('rice', 300).concat(pick('potato', 300), pick('pasta', 300));
+                    const vegs = pick('broccoli', 100).concat(pick('spinach', 100), pick('asparagus', 100));
+                    if (proteins.length > 0 && carbs.length > 0) {
+                        const p = proteins[Math.floor(Math.random() * proteins.length)];
+                        const c = carbs[Math.floor(Math.random() * carbs.length)];
+                        const v = vegs.length > 0 ? vegs[Math.floor(Math.random() * vegs.length)] : null;
+                        const total = { cal: p.calories + c.calories + (v ? v.calories : 0), prot: p.protein + c.protein + (v ? v.protein : 0) };
+                        combos.push({ name: `${p.name} + ${c.name}${v ? ' + ' + v.name : ''}`, calories: total.cal, protein: total.prot, emoji: getEmoji(p.name),
+                            recipe: `Season ${p.serving} of ${p.name.toLowerCase()} with salt, pepper, and garlic powder. Cook on medium-high heat 4-5 min per side. Serve with ${c.serving} of ${c.name.toLowerCase()}${v ? ' and a side of ' + v.name.toLowerCase() + ' (steamed or roasted at 400°F for 15 min)' : ''}.` });
+                    }
+                }
+
+                if (remaining.calories >= 250 && remaining.protein >= 15) {
+                    // Shake/snack combo
+                    const shakes = pick('protein', 300).concat(pick('whey', 300));
+                    const fruits = pick('banana', 150).concat(pick('blueberr', 150), pick('apple', 150));
+                    const fats = pick('peanut butter', 200).concat(pick('almond butter', 200));
+                    if (shakes.length > 0) {
+                        const s = shakes[Math.floor(Math.random() * shakes.length)];
+                        const fr = fruits.length > 0 ? fruits[Math.floor(Math.random() * fruits.length)] : null;
+                        const fa = fats.length > 0 ? fats[Math.floor(Math.random() * fats.length)] : null;
+                        const total = { cal: s.calories + (fr ? fr.calories : 0) + (fa ? fa.calories : 0), prot: s.protein + (fr ? fr.protein : 0) + (fa ? fa.protein : 0) };
+                        combos.push({ name: `Protein Shake Combo`, calories: total.cal, protein: total.prot, emoji: '&#x1F964;',
+                            recipe: `Blend 1 scoop of whey protein with ${fr ? fr.serving + ' ' + fr.name.toLowerCase() + ', ' : ''}${fa ? fa.serving + ' ' + fa.name.toLowerCase() + ', ' : ''}8oz water or milk, and ice. Blend until smooth. Quick, easy, and packed with protein.` });
+                    }
+                }
+
+                if (remaining.calories >= 300) {
+                    // Egg-based meal
+                    const eggs = db.find(f => f.name === 'Egg (Whole)');
+                    const toast = db.find(f => f.name.toLowerCase().includes('wheat bread') || f.name.toLowerCase().includes('bread'));
+                    const avo = db.find(f => f.name.toLowerCase().includes('avocado'));
+                    if (eggs) {
+                        const eggCount = Math.min(4, Math.floor(remaining.protein / eggs.protein));
+                        const total = { cal: eggs.calories * eggCount + (toast ? toast.calories : 0) + (avo ? Math.round(avo.calories/2) : 0),
+                                        prot: eggs.protein * eggCount + (toast ? toast.protein : 0) + (avo ? Math.round(avo.protein/2) : 0) };
+                        combos.push({ name: `${eggCount} Eggs${toast ? ' + Toast' : ''}${avo ? ' + Avocado' : ''}`, calories: total.cal, protein: total.prot, emoji: '&#x1F95A;',
+                            recipe: `Scramble ${eggCount} eggs with salt and pepper in a non-stick pan over medium heat. ${toast ? 'Toast ' + toast.serving + ' of bread.' : ''} ${avo ? 'Slice half an avocado on top or on the side.' : ''} Simple, fast, and hits your protein.` });
+                    }
+                }
+
+                if (remaining.calories >= 200 && remaining.protein >= 10) {
+                    // Greek yogurt bowl
+                    const yogurt = db.find(f => f.name.toLowerCase().includes('greek yogurt') && f.name.toLowerCase().includes('plain'));
+                    const honey = db.find(f => f.name.toLowerCase().includes('honey'));
+                    const granola = db.find(f => f.name.toLowerCase().includes('granola'));
+                    const berries = db.find(f => f.name.toLowerCase().includes('blueberr') || f.name.toLowerCase().includes('strawberr'));
+                    if (yogurt) {
+                        const total = { cal: yogurt.calories + (honey ? honey.calories : 0) + (berries ? berries.calories : 0),
+                                        prot: yogurt.protein + (berries ? berries.protein : 0) };
+                        combos.push({ name: `Greek Yogurt Bowl`, calories: total.cal, protein: total.prot, emoji: '&#x1F963;',
+                            recipe: `Scoop ${yogurt.serving} plain Greek yogurt into a bowl. Top with ${berries ? berries.serving + ' ' + berries.name.toLowerCase() + ', ' : 'fresh berries, '}${honey ? 'a drizzle of honey, ' : ''}and a sprinkle of granola or nuts. High protein, creamy, and satisfying.` });
+                    }
+                }
+
+                if (combos.length > 0) {
+                    combos.forEach(combo => {
+                        html += `<div style="background:var(--card);padding:12px;border-radius:8px;border:1px solid var(--border);margin:8px 0;">`;
+                        html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">`;
+                        html += `<span style="font-size:26px;">${combo.emoji}</span>`;
+                        html += `<div><div style="font-size:14px;font-weight:700;">${combo.name}</div>`;
+                        html += `<div style="font-size:12px;color:var(--text-muted);">${combo.calories} cal &middot; ${combo.protein}g protein</div></div>`;
+                        html += `</div>`;
+                        html += `<div style="font-size:13px;color:var(--text-secondary);line-height:1.5;border-top:1px solid var(--border);padding-top:8px;margin-top:4px;">${combo.recipe}</div>`;
+                        html += `</div>`;
+                    });
+                } else {
+                    html += `<p>Log some meals first and I'll suggest combos to fill the gap!</p>`;
+                }
+
+                // Tip based on what's missing
+                html += `<h3>&#x1F4A1; Tips</h3><ul>`;
+                if (remaining.protein > 30) {
+                    html += `<li><strong>Protein is your priority.</strong> You're ${remaining.protein}g short — lean meats, Greek yogurt, protein shakes, and eggs are your best friends right now.</li>`;
+                }
+                if (remaining.calories > 0 && remaining.calories < 300) {
+                    html += `<li><strong>Almost there!</strong> A quick snack like a protein bar, Greek yogurt, or handful of nuts will close the gap.</li>`;
+                }
+                if (remaining.fat > 20) {
+                    html += `<li><strong>Healthy fats remaining:</strong> Add avocado, nuts, olive oil, or peanut butter to your next meal.</li>`;
+                }
+                if (remaining.carbs > 50) {
+                    html += `<li><strong>Carbs to fill:</strong> Rice, oats, fruit, or a sweet potato will get you there.</li>`;
+                }
+                html += `<li>Remember: hitting your protein goal matters most for body composition. Calories second, then carbs/fat.</li>`;
+                html += `</ul>`;
+
+                html += verseHtml({ text: "Therefore, whether you eat or drink, or whatever you do, do all to the glory of God.", ref: "1 Corinthians 10:31" });
+                return html;
+            },
+        },
+        {
             id: 'progress',
             keywords: ['progress', 'analyze', 'how am i doing', 'my stats', 'report', 'summary', 'overview', 'review'],
             handler: (ctx) => analyzeProgress(ctx),
@@ -1710,6 +1957,7 @@ const TOPIC_RESPONSES = {
         html += `<li><strong>"My streak"</strong> — consistency and attendance tracking</li>`;
         html += `<li><strong>"Cardio guide"</strong> — HIIT vs LISS, what's right for you</li>`;
         html += `<li><strong>"Pre/post workout meal"</strong> — nutrient timing tips</li>`;
+        html += `<li><strong>"What should I eat?"</strong> — smart food recs based on your remaining macros today</li>`;
         html += `<li><strong>"Weak point analysis"</strong> — identify and fix lagging muscles & lift sticking points</li>`;
         html += `</ul>`;
         html += verseHtml();
