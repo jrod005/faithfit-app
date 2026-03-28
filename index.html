@@ -323,7 +323,23 @@
                         <input type="number" id="meal-fat" placeholder="g">
                     </div>
                 </div>
-                <button class="btn btn-primary btn-full" onclick="logMeal()">Log Meal</button>
+                <div class="form-row" style="gap:8px;">
+                    <button class="btn btn-primary btn-full" onclick="logMeal()">Log Meal</button>
+                    <button class="btn btn-secondary btn-full" onclick="openBarcodeScanner()" style="flex:0 0 auto;padding:10px 16px;" title="Scan Barcode">&#x1F4F7; Scan</button>
+                </div>
+            </div>
+
+            <!-- Barcode Scanner Modal -->
+            <div id="barcode-modal" class="barcode-modal" style="display:none;">
+                <div class="barcode-modal-content">
+                    <div class="barcode-modal-header">
+                        <h3>Scan Barcode</h3>
+                        <button class="btn btn-secondary" onclick="closeBarcodeScanner()" style="padding:4px 12px;">&#x2715;</button>
+                    </div>
+                    <div id="barcode-reader"></div>
+                    <div id="barcode-status" class="barcode-status">Point your camera at a barcode</div>
+                    <div id="barcode-result" class="barcode-result" style="display:none;"></div>
+                </div>
             </div>
 
             <!-- Daily Nutrition Summary -->
@@ -515,6 +531,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="food-db.js"></script>
     <script src="app.js"></script>
     <script src="photos.js"></script>

@@ -611,6 +611,140 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// --- Barcode Scanner ---
+let barcodeScanner = null;
+
+function openBarcodeScanner() {
+    const modal = document.getElementById('barcode-modal');
+    modal.style.display = 'flex';
+    document.getElementById('barcode-status').textContent = 'Starting camera...';
+    document.getElementById('barcode-result').style.display = 'none';
+
+    barcodeScanner = new Html5Qrcode('barcode-reader');
+    barcodeScanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 280, height: 120 }, formatsToSupport: [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+        ]},
+        (decodedText) => { onBarcodeScanned(decodedText); },
+        () => {}
+    ).then(() => {
+        document.getElementById('barcode-status').textContent = 'Point your camera at a barcode';
+    }).catch(err => {
+        document.getElementById('barcode-status').textContent = 'Camera access denied. Please allow camera permissions.';
+    });
+}
+
+function closeBarcodeScanner() {
+    const modal = document.getElementById('barcode-modal');
+    modal.style.display = 'none';
+    if (barcodeScanner) {
+        barcodeScanner.stop().catch(() => {});
+        barcodeScanner.clear();
+        barcodeScanner = null;
+    }
+}
+
+function onBarcodeScanned(barcode) {
+    // Stop scanning
+    if (barcodeScanner) {
+        barcodeScanner.stop().catch(() => {});
+    }
+
+    document.getElementById('barcode-status').textContent = 'Looking up product...';
+    document.getElementById('barcode-result').style.display = 'none';
+
+    // Look up on Open Food Facts API
+    fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 1 && data.product) {
+                const p = data.product;
+                const n = p.nutriments || {};
+                const name = p.product_name || p.generic_name || 'Unknown Product';
+                const servingSize = p.serving_size || p.quantity || '';
+                const calories = Math.round(n['energy-kcal_serving'] || n['energy-kcal_100g'] || 0);
+                const protein = Math.round(n.proteins_serving || n.proteins_100g || 0);
+                const carbs = Math.round(n.carbohydrates_serving || n.carbohydrates_100g || 0);
+                const fat = Math.round(n.fat_serving || n.fat_100g || 0);
+
+                const resultDiv = document.getElementById('barcode-result');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div class="barcode-product">
+                        <strong>${escapeHtml(name)}</strong>
+                        ${servingSize ? `<span class="barcode-serving">${escapeHtml(servingSize)}</span>` : ''}
+                        <div class="barcode-macros">
+                            <span>${calories} cal</span>
+                            <span>${protein}g protein</span>
+                            <span>${carbs}g carbs</span>
+                            <span>${fat}g fat</span>
+                        </div>
+                        <button class="btn btn-primary btn-full" onclick="useBarcodeResult('${escapeHtml(name).replace(/'/g, "\\'")}', ${calories}, ${protein}, ${carbs}, ${fat})">Add This Food</button>
+                        <button class="btn btn-secondary btn-full" onclick="retryBarcodeScan()" style="margin-top:6px;">Scan Again</button>
+                    </div>`;
+                document.getElementById('barcode-status').textContent = 'Product found!';
+            } else {
+                document.getElementById('barcode-status').textContent = 'Product not found in database.';
+                const resultDiv = document.getElementById('barcode-result');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div class="barcode-product">
+                        <p>Barcode: <strong>${barcode}</strong></p>
+                        <p style="color:var(--text-muted);font-size:13px;">This product isn't in the Open Food Facts database. You can enter the nutrition info manually.</p>
+                        <button class="btn btn-secondary btn-full" onclick="retryBarcodeScan()">Scan Again</button>
+                        <button class="btn btn-secondary btn-full" onclick="closeBarcodeScanner()" style="margin-top:6px;">Enter Manually</button>
+                    </div>`;
+            }
+        })
+        .catch(() => {
+            document.getElementById('barcode-status').textContent = 'Network error — check your connection.';
+            const resultDiv = document.getElementById('barcode-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+                <div class="barcode-product">
+                    <p style="color:var(--text-muted);font-size:13px;">Could not reach the food database. Make sure you're online.</p>
+                    <button class="btn btn-secondary btn-full" onclick="retryBarcodeScan()">Retry</button>
+                </div>`;
+        });
+}
+
+function useBarcodeResult(name, calories, protein, carbs, fat) {
+    document.getElementById('meal-name').value = name;
+    document.getElementById('meal-calories').value = calories;
+    document.getElementById('meal-protein').value = protein;
+    document.getElementById('meal-carbs').value = carbs;
+    document.getElementById('meal-fat').value = fat;
+    document.getElementById('food-serving-row').style.display = 'none';
+    selectedFood = null;
+    closeBarcodeScanner();
+}
+
+function retryBarcodeScan() {
+    document.getElementById('barcode-result').style.display = 'none';
+    document.getElementById('barcode-status').textContent = 'Point your camera at a barcode';
+    if (barcodeScanner) {
+        barcodeScanner.start(
+            { facingMode: 'environment' },
+            { fps: 10, qrbox: { width: 280, height: 120 }, formatsToSupport: [
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39,
+            ]},
+            (decodedText) => { onBarcodeScanned(decodedText); },
+            () => {}
+        ).catch(() => {});
+    }
+}
+
 // --- Nutrition / Calorie Tracking ---
 function logMeal() {
     const name = document.getElementById('meal-name').value.trim();
