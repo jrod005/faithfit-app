@@ -1179,43 +1179,104 @@ canvas {
     flex: 1;
 }
 
-/* ========== MUSCLE HEATMAP ========== */
-.muscle-map { padding: 4px 0; }
-.muscle-body {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
+/* ========== MUSCLE HEATMAP (SVG MANNEQUIN) ========== */
+.muscle-map-body {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 0 12px;
 }
-.muscle-group {
+.mannequin-view {
+    flex: 1;
+    max-width: 180px;
+    text-align: center;
+}
+.mannequin-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+.mannequin-svg {
+    width: 100%;
+    height: auto;
+}
+.mannequin-svg path,
+.mannequin-svg ellipse,
+.mannequin-svg rect {
+    transition: opacity 0.2s;
+    cursor: default;
+}
+.mannequin-svg path:hover {
+    opacity: 0.8;
+    filter: brightness(1.3);
+}
+
+/* Legend */
+.muscle-heatmap-legend {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 8px 0;
+    flex-wrap: wrap;
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+/* Detail Grid */
+.muscle-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+    padding: 4px 0;
+}
+.muscle-detail-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 14px;
+    padding: 6px 10px;
     border-radius: var(--radius-xs);
     border: 1px solid var(--border);
     background: var(--card-bg);
     transition: var(--transition);
 }
-.muscle-group:last-child { grid-column: 1 / -1; }
-.muscle-name { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
-.muscle-sets { font-size: 12px; color: var(--text-muted); font-weight: 500; }
-.muscle-group.level-none { background: var(--card-bg); }
-.muscle-group.level-low {
+.muscle-detail-name { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+.muscle-detail-sets { font-size: 10px; color: var(--text-muted); font-weight: 500; }
+.muscle-detail-item.level-none { background: var(--card-bg); }
+.muscle-detail-item.level-low {
     background: rgba(74, 222, 128, 0.08);
     border-color: rgba(74, 222, 128, 0.2);
 }
-.muscle-group.level-low .muscle-name { color: rgba(74, 222, 128, 0.7); }
-.muscle-group.level-med {
+.muscle-detail-item.level-low .muscle-detail-name { color: rgba(74, 222, 128, 0.7); }
+.muscle-detail-item.level-med {
     background: rgba(74, 222, 128, 0.15);
     border-color: rgba(74, 222, 128, 0.35);
 }
-.muscle-group.level-med .muscle-name { color: rgba(74, 222, 128, 0.85); }
-.muscle-group.level-high {
+.muscle-detail-item.level-med .muscle-detail-name { color: rgba(74, 222, 128, 0.85); }
+.muscle-detail-item.level-high {
     background: rgba(74, 222, 128, 0.25);
     border-color: rgba(74, 222, 128, 0.5);
 }
-.muscle-group.level-high .muscle-name { color: #4ade80; }
-.muscle-group.level-high .muscle-sets { color: rgba(74, 222, 128, 0.7); }
+.muscle-detail-item.level-high .muscle-detail-name { color: #4ade80; }
+.muscle-detail-item.level-high .muscle-detail-sets { color: rgba(74, 222, 128, 0.7); }
+
+@media (max-width: 400px) {
+    .muscle-detail-grid { grid-template-columns: 1fr 1fr; }
+    .mannequin-view { max-width: 150px; }
+}
 
 /* ========== RESPONSIVE ========== */
 @media (max-width: 400px) {
