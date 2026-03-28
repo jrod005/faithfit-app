@@ -1380,6 +1380,282 @@ const TOPIC_RESPONSES = {
             },
         },
         {
+            id: 'weak_point',
+            keywords: ['weak point', 'weak.?point', 'imbalance', 'lagging', 'underdeveloped', 'asymmetr', 'weak muscle', 'physique.*weak', 'aesthetic.*weak', 'performance.*weak', 'weak.*analysis', 'eliminate.*weak', 'fix.*weak'],
+            handler: (ctx, input) => {
+                // --- Corrective exercise database by muscle group ---
+                const correctiveDB = {
+                    chest: { muscle: 'Chest', exercises: [
+                        { name: 'Low Incline Dumbbell Press (15-30°)', sets: '4×8-10', tempo: '3-1-1-0', cues: 'Set bench to 1-2 clicks. Flare elbows ~60°. Lower to upper chest, drive up and slightly inward.' },
+                        { name: 'Cable Fly (various angles)', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Adjust pulley height to target weak area. Squeeze for 2 seconds at peak contraction.' },
+                        { name: 'Dumbbell Bench Press (deep stretch)', sets: '3×10-12', tempo: '3-0-1-0', cues: 'Go slightly deeper than barbell allows. Slow eccentric builds pec strength through greater ROM.' }
+                    ], timeline: '6-8 weeks for improved fullness; 12-16 weeks for visible change.', markers: 'Press weight increases 10-15%, visible chest development in relaxed pose.' },
+                    back: { muscle: 'Back', exercises: [
+                        { name: 'Wide-Grip Lat Pulldown', sets: '4×10-12', tempo: '2-0-1-2', cues: 'Lean back slightly, pull elbows DOWN and INTO your sides. Think "pull with elbows, not hands."' },
+                        { name: 'Straight-Arm Pulldown', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Isolates lats with zero bicep involvement. Arc the bar from face-height to thighs.' },
+                        { name: 'Chest-Supported Row', sets: '3×10-12', tempo: '2-0-1-2', cues: 'Eliminates momentum. Squeeze shoulder blades together at the top. 2 sec hold.' }
+                    ], timeline: '6-8 weeks for mind-muscle connection; 12-16 weeks for visible V-taper.', markers: 'Pulldown/row weight increases 15%+, visible lat spread in relaxed pose.' },
+                    shoulders: { muscle: 'Shoulders', exercises: [
+                        { name: 'Face Pulls', sets: '4×15-20', tempo: '2-0-1-2', cues: 'Pull to forehead height, externally rotate so thumbs point behind you. Elbows high.' },
+                        { name: 'Cable Lateral Raise', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Constant tension from the cable. Lead with elbows, not hands. Slight lean away.' },
+                        { name: 'Prone Incline Rear Delt Fly', sets: '3×15-20', tempo: '2-0-1-2', cues: 'Lie chest-down on 30° incline. Light dumbbells, lead with pinkies, hold the squeeze.' }
+                    ], timeline: '4-6 weeks for visible rounding; 10-12 weeks for structural change.', markers: 'Shoulder "cap" visible from front, face pull weight increases 20%+.' },
+                    legs: { muscle: 'Legs', exercises: [
+                        { name: 'Romanian Deadlift', sets: '4×8-10', tempo: '3-1-1-0', cues: 'Push hips BACK. Bar glides down thighs. Stop at deep hamstring stretch. Squeeze glutes to return.' },
+                        { name: 'Bulgarian Split Squat', sets: '3×10-12 per leg', tempo: '3-0-1-0', cues: 'Lean torso slightly forward to bias glutes. 3-second eccentric. Deep stretch at bottom.' },
+                        { name: 'Leg Curl (seated or lying)', sets: '4×10-12', tempo: '2-0-1-2', cues: 'Squeeze at full contraction for 2 seconds. Control the eccentric — no dropping.' }
+                    ], timeline: '6-8 weeks for strength gains; 12 weeks for visible development.', markers: 'RDL weight increases 15%+, visible hamstring/quad separation.' },
+                    biceps: { muscle: 'Biceps', exercises: [
+                        { name: 'Incline Dumbbell Curl', sets: '3×10-12', tempo: '2-0-1-2', cues: 'Set bench to 45°. Arms hang straight down. Curl without swinging — targets long head for peak.' },
+                        { name: 'Hammer Curls', sets: '3×10-12', tempo: '2-0-1-1', cues: 'Builds brachialis and forearm thickness. Neutral grip, no swinging.' },
+                        { name: 'Cable Curl (low pulley)', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Constant tension. Squeeze hard at top. Keep elbows pinned.' }
+                    ], timeline: '6-8 weeks for arm fullness; 12 weeks for measurable size.', markers: 'Arm circumference +0.25-0.5 inches, visible peak when flexed.' },
+                    triceps: { muscle: 'Triceps', exercises: [
+                        { name: 'Overhead Cable Tricep Extension', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Stretch hard at the bottom, squeeze at lockout. Elbows stay pointed forward.' },
+                        { name: 'Close-Grip Bench Press', sets: '3×8-10', tempo: '3-0-1-0', cues: 'Hands shoulder-width. Tuck elbows. Builds tricep mass and pressing power.' },
+                        { name: 'Tricep Dips (weighted)', sets: '3×8-12', tempo: '2-0-1-0', cues: 'Lean slightly forward for chest, stay upright for tricep focus. Full lockout at top.' }
+                    ], timeline: '6-8 weeks for visible horseshoe; 12 weeks for measurable size.', markers: 'Tricep horseshoe visible from the side, close-grip bench increases 10%+.' },
+                    core: { muscle: 'Core', exercises: [
+                        { name: 'Hanging Leg Raise', sets: '3×10-15', tempo: '2-0-1-1', cues: 'Curl pelvis up, don\'t just swing legs. Control the descent. Progress to straight legs.' },
+                        { name: 'Cable Crunch', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Crunch ribs toward hips, not just hinge at the hip. Squeeze at the bottom.' },
+                        { name: 'Pallof Press', sets: '3×10-12 per side', tempo: '2-2-2-0', cues: 'Anti-rotation — resist the cable pulling you. Press out, hold 2 sec, return. Builds real core stability.' }
+                    ], timeline: '4-6 weeks for strength; 8-12 weeks with low body fat for visibility.', markers: 'Plank hold time increases, improved brace on compound lifts, reduced lower back fatigue.' }
+                };
+
+                // --- Stagnation corrective database by lift type ---
+                const stagnationDB = {
+                    press: { lift: 'Pressing Movements (Bench/OHP)', cause: 'Weak pecs at full stretch, tricep lockout weakness, or loss of upper back tightness.', exercises: [
+                        { name: 'Spoto Press / Pause Press', sets: '4×4-6 @ 70-80%', tempo: '3-2-1-0', cues: 'Lower to 1 inch above chest, hold 2 seconds. Builds strength at the sticking point.' },
+                        { name: 'Close-Grip Bench Press', sets: '3×6-8', tempo: '3-0-1-0', cues: 'Overloads triceps for lockout strength. Hands shoulder-width.' },
+                        { name: 'Pin Press (at sticking point)', sets: '3×3-5', tempo: '1-1-1-0', cues: 'Set pins at your sticking point. Dead-stop press eliminates momentum.' }
+                    ], timeline: '4-6 weeks for improved bar speed through sticking point; 8-12 weeks for PR.', markers: 'Pause press reaches 85%+ of competition lift, bar speed at sticking point improves visibly.' },
+                    squat: { lift: 'Squat', cause: 'Quad weakness at depth, poor bracing, or hip/ankle mobility limitations.', exercises: [
+                        { name: 'Pause Squat (3-sec pause)', sets: '4×4-6 @ 65-75%', tempo: '3-3-1-0', cues: 'Hold motionless at the bottom for 3 seconds while maintaining brace. No bounce on the way up.' },
+                        { name: 'Front Squat', sets: '3×6-8', tempo: '3-0-1-0', cues: 'Forces upright torso and quad dominance. Fixes forward collapse.' },
+                        { name: 'Goblet Squat to Box', sets: '3×10-12', tempo: '3-1-1-0', cues: 'Sit back to box, pause, drive up. Teaches you to own the bottom position.' }
+                    ], timeline: '4-6 weeks for confidence in the hole; 8-12 weeks for measurable strength gains.', markers: 'Pause squat reaches 80%+ of back squat, no forward lean at the bottom.' },
+                    deadlift: { lift: 'Deadlift', cause: 'Weak glutes/upper back, or hips shooting up too fast leaving the back to finish the lift.', exercises: [
+                        { name: 'Block/Rack Pulls (knee height)', sets: '4×3-5 (heavy)', tempo: '1-0-1-0', cues: 'Overloads the lockout. Go 10-20% heavier than full deadlift. Brace hard.' },
+                        { name: 'Deficit Deadlift', sets: '3×4-6 @ 70-80%', tempo: '2-0-1-0', cues: 'Stand on 1-2 inch platform. Forces better positioning off the floor.' },
+                        { name: 'Barbell Hip Thrust (heavy)', sets: '3×6-8', tempo: '2-0-1-2', cues: 'Builds lockout-specific glute power. Squeeze HARD at top for 2 seconds.' }
+                    ], timeline: '4-6 weeks for smoother lockout; 8-12 weeks for hitch elimination.', markers: 'Rack pull exceeds deadlift by 15%+, no visible hitch on heavy singles.' },
+                    row: { lift: 'Rowing / Pull Movements', cause: 'Weak mid-back, bicep fatigue limiting volume, or poor scapular control.', exercises: [
+                        { name: 'Chest-Supported Row', sets: '4×8-10', tempo: '2-0-1-2', cues: 'Removes momentum. Focus purely on squeezing shoulder blades. 2 sec hold at top.' },
+                        { name: 'Straight-Arm Pulldown', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Isolates lats without bicep fatigue. Great for building the mind-muscle connection.' },
+                        { name: 'Face Pulls', sets: '3×15-20', tempo: '2-0-1-2', cues: 'Builds rear delts and mid-traps. Externally rotate at the end of each rep.' }
+                    ], timeline: '4-6 weeks for improved mind-muscle connection; 8-12 weeks for weight increases.', markers: 'Row weight increases 10-15%, improved upper back tightness on compounds.' },
+                    curl: { lift: 'Curl Movements', cause: 'Momentum compensation, insufficient time under tension, or relying on compounds for bicep growth.', exercises: [
+                        { name: 'Incline Dumbbell Curl', sets: '3×10-12', tempo: '2-0-1-3', cues: 'Set bench to 45°. 3-second eccentric. No swinging — the incline prevents cheating.' },
+                        { name: 'Preacher Curl', sets: '3×10-12', tempo: '2-0-1-2', cues: 'Eliminates momentum completely. Squeeze hard at the top.' },
+                        { name: 'Cable Curl (constant tension)', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Cables keep tension throughout the whole range. Slow and controlled.' }
+                    ], timeline: '4-6 weeks for improved strength; 8-12 weeks for visible growth.', markers: 'Curl weight increases 15%+, visible bicep peak when flexed.' }
+                };
+
+                // Helper: classify an exercise name into a lift category for stagnation fixes
+                function getLiftCategory(exerciseName) {
+                    const n = exerciseName.toLowerCase();
+                    if (n.includes('bench') || n.includes('overhead') || n.includes('ohp') || n.includes('incline press') || n.includes('shoulder press') || n.includes('dumbbell press') || n.includes('machine press') || n.includes('chest press')) return 'press';
+                    if (n.includes('squat') || n.includes('leg press') || n.includes('hack')) return 'squat';
+                    if (n.includes('deadlift') || n.includes('rdl') || n.includes('romanian')) return 'deadlift';
+                    if (n.includes('row') || n.includes('pull-up') || n.includes('pullup') || n.includes('chin-up') || n.includes('pulldown') || n.includes('lat pull')) return 'row';
+                    if (n.includes('curl')) return 'curl';
+                    return null;
+                }
+
+                // =============================================
+                // AUTO-DETECT weak points from user's data
+                // =============================================
+                let html = `<h3>Weak Point Analysis</h3>`;
+                html += `<p style="opacity:0.8;font-style:italic;">Auto-detected from your logged workouts and training history.</p>`;
+
+                const totalWorkouts = ctx.workouts.length;
+                if (totalWorkouts === 0) {
+                    html += `<p>You haven't logged any workouts yet, so I can't auto-detect your weak points. Start logging your exercises and come back — I'll analyze your data to find:</p><ul>`;
+                    html += `<li><strong>Neglected muscle groups</strong> that aren't getting enough volume</li>`;
+                    html += `<li><strong>Stalled lifts</strong> where your weight hasn't increased in 4+ sessions</li>`;
+                    html += `<li><strong>Volume imbalances</strong> between push/pull, upper/lower, etc.</li>`;
+                    html += `</ul>`;
+                    html += `<p>Log at least 2-3 weeks of training for the best analysis.</p>`;
+                    html += verseHtml();
+                    return html;
+                }
+
+                let priority = 1;
+                const findings = { neglected: [], undertrained: [], stagnating: [], imbalanced: [] };
+
+                // --- 1. NEGLECTED muscle groups (zero sets in last 30 days) ---
+                const monthMuscleVolume = {};
+                Object.keys(ctx.muscleMap).forEach(group => { monthMuscleVolume[group] = 0; });
+                ctx.monthWorkouts.forEach(w => {
+                    for (const [group, exercises] of Object.entries(ctx.muscleMap)) {
+                        if (exercises.some(e => w.name.toLowerCase() === e.toLowerCase())) {
+                            monthMuscleVolume[group] += w.sets.length;
+                        }
+                    }
+                });
+
+                const sortedVolume = Object.entries(monthMuscleVolume).sort((a, b) => a[1] - b[1]);
+                const totalSets = sortedVolume.reduce((sum, [, v]) => sum + v, 0);
+                const avgSetsPerGroup = totalSets / sortedVolume.length;
+
+                sortedVolume.forEach(([group, sets]) => {
+                    if (sets === 0) {
+                        findings.neglected.push(group);
+                    } else if (sets < avgSetsPerGroup * 0.4) {
+                        findings.undertrained.push({ group, sets, avg: Math.round(avgSetsPerGroup) });
+                    }
+                });
+
+                // --- 2. STAGNATING lifts (weight hasn't increased in 4+ sessions) ---
+                const stagnatingLifts = [];
+                ctx.stagnant.forEach(name => {
+                    const category = getLiftCategory(name);
+                    stagnatingLifts.push({ name, category });
+                });
+
+                // --- 3. PUSH/PULL and UPPER/LOWER imbalance detection ---
+                const pushVolume = (monthMuscleVolume.chest || 0) + (monthMuscleVolume.shoulders || 0) + (monthMuscleVolume.triceps || 0);
+                const pullVolume = (monthMuscleVolume.back || 0) + (monthMuscleVolume.biceps || 0);
+                const upperVolume = pushVolume + pullVolume;
+                const lowerVolume = (monthMuscleVolume.legs || 0);
+                const pushPullRatio = pullVolume > 0 ? (pushVolume / pullVolume) : 0;
+                const upperLowerRatio = lowerVolume > 0 ? (upperVolume / lowerVolume) : 0;
+
+                if (pushPullRatio > 1.8 && pushVolume > 0 && pullVolume > 0) {
+                    findings.imbalanced.push({ type: 'Push vs Pull', detail: `Your push volume (${pushVolume} sets) is ${pushPullRatio.toFixed(1)}× your pull volume (${pullVolume} sets). This can lead to rounded shoulders and shoulder injuries. Aim for a 1:1 to 1:1.5 push-to-pull ratio.` });
+                } else if (pushPullRatio < 0.55 && pushVolume > 0 && pullVolume > 0) {
+                    findings.imbalanced.push({ type: 'Pull vs Push', detail: `Your pull volume (${pullVolume} sets) far exceeds your push volume (${pushVolume} sets). Add more pressing work for balanced development.` });
+                }
+                if (upperLowerRatio > 2.5 && upperVolume > 0 && lowerVolume > 0) {
+                    findings.imbalanced.push({ type: 'Upper vs Lower', detail: `Your upper body volume (${upperVolume} sets) is ${upperLowerRatio.toFixed(1)}× your lower body volume (${lowerVolume} sets). Don't skip leg day — lower body training drives total-body growth and hormonal response.` });
+                } else if (upperLowerRatio < 0.8 && upperVolume > 0 && lowerVolume > 0) {
+                    findings.imbalanced.push({ type: 'Lower vs Upper', detail: `Your lower body volume (${lowerVolume} sets) significantly exceeds upper body (${upperVolume} sets). Add more upper body pressing and pulling for balanced development.` });
+                }
+
+                // --- BUILD THE REPORT ---
+                const hasFindings = findings.neglected.length > 0 || findings.undertrained.length > 0 || stagnatingLifts.length > 0 || findings.imbalanced.length > 0;
+
+                if (!hasFindings) {
+                    html += insightHtml(`Looking good — no major weak points detected in your training data. Your volume is balanced across muscle groups and none of your lifts are stagnating.`);
+                    html += `<p>Keep training consistently. Come back and check again in a few weeks, or if you feel something is lagging.</p>`;
+                    html += verseHtml({ text: "He gives strength to the weary and increases the power of the weak.", ref: "Isaiah 40:29" });
+                    return html;
+                }
+
+                // Monthly volume overview
+                html += `<h3>Your 30-Day Volume Breakdown</h3>`;
+                html += `<table class="plan-table"><tr><th>Muscle Group</th><th>Total Sets</th><th>Status</th></tr>`;
+                sortedVolume.forEach(([group, sets]) => {
+                    const name = group.charAt(0).toUpperCase() + group.slice(1);
+                    let status = '&#x2705; On Track';
+                    if (sets === 0) status = '&#x1F534; Neglected';
+                    else if (sets < avgSetsPerGroup * 0.4) status = '&#x1F7E1; Undertrained';
+                    html += `<tr><td>${name}</td><td>${sets}</td><td>${status}</td></tr>`;
+                });
+                html += `</table>`;
+
+                // NEGLECTED muscle groups
+                if (findings.neglected.length > 0) {
+                    html += `<h3>Priority #${priority}: Neglected Muscle Groups</h3>`;
+                    html += insightHtml(`These muscles have <strong>ZERO</strong> sets logged in the past 30 days. This is your biggest opportunity for improvement.`);
+                    findings.neglected.forEach(group => {
+                        const fix = correctiveDB[group];
+                        if (!fix) return;
+                        html += `<div style="background:var(--card);padding:1rem;border-radius:8px;margin:0.75rem 0;">`;
+                        html += `<h3>${fix.muscle}</h3>`;
+                        html += `<p><strong>Root Cause:</strong> This group is completely absent from your program — likely a programming gap, not a conscious choice.</p>`;
+                        html += `<table class="plan-table"><tr><th>Exercise</th><th>Sets × Reps</th><th>Tempo</th><th>Coaching Cues</th></tr>`;
+                        fix.exercises.forEach(ex => {
+                            html += `<tr><td>${ex.name}</td><td>${ex.sets}</td><td>${ex.tempo}</td><td>${ex.cues}</td></tr>`;
+                        });
+                        html += `</table>`;
+                        html += `<p><strong>Timeline:</strong> ${fix.timeline}</p>`;
+                        html += `<p><strong>Measurable Markers:</strong> ${fix.markers}</p>`;
+                        html += `</div>`;
+                    });
+                    priority++;
+                }
+
+                // UNDERTRAINED muscle groups
+                if (findings.undertrained.length > 0) {
+                    html += `<h3>Priority #${priority}: Undertrained Muscle Groups</h3>`;
+                    html += insightHtml(`These muscles are getting some work but significantly less than your other groups (avg: ${Math.round(avgSetsPerGroup)} sets/month).`);
+                    findings.undertrained.forEach(({ group, sets, avg }) => {
+                        const fix = correctiveDB[group];
+                        if (!fix) return;
+                        const name = group.charAt(0).toUpperCase() + group.slice(1);
+                        html += `<div style="background:var(--card);padding:1rem;border-radius:8px;margin:0.75rem 0;">`;
+                        html += `<h3>${fix.muscle} — ${sets} sets vs ${avg} avg</h3>`;
+                        html += `<p><strong>Root Cause:</strong> Volume imbalance — ${name} is getting less than half the attention of your other muscle groups. This will show up as a visual weak point over time.</p>`;
+                        html += `<p><strong>Quick Fix:</strong> Add ${Math.max(2, Math.round((avg - sets) / 4))} more sets of ${name} work per week. Here are the best exercises to add:</p>`;
+                        html += `<table class="plan-table"><tr><th>Exercise</th><th>Sets × Reps</th><th>Tempo</th><th>Coaching Cues</th></tr>`;
+                        fix.exercises.slice(0, 2).forEach(ex => {
+                            html += `<tr><td>${ex.name}</td><td>${ex.sets}</td><td>${ex.tempo}</td><td>${ex.cues}</td></tr>`;
+                        });
+                        html += `</table>`;
+                        html += `</div>`;
+                    });
+                    priority++;
+                }
+
+                // STAGNATING lifts
+                if (stagnatingLifts.length > 0) {
+                    html += `<h3>Priority #${priority}: Stalled Lifts</h3>`;
+                    html += insightHtml(`These exercises haven't increased in weight over your last 4+ sessions — you've hit a plateau.`);
+                    const processedCategories = new Set();
+                    stagnatingLifts.forEach(({ name, category }) => {
+                        html += `<div style="background:var(--card);padding:1rem;border-radius:8px;margin:0.75rem 0;">`;
+                        html += `<h3>${name} — Stalled</h3>`;
+                        const maxWeight = ctx.exercisePRs[name] || 0;
+                        const unit = ctx.profile.unit === 'metric' ? 'kg' : 'lbs';
+                        if (maxWeight > 0) {
+                            html += `<p>Current best: <strong>${maxWeight} ${unit}</strong> (unchanged for 4+ sessions)</p>`;
+                        }
+                        if (category && stagnationDB[category] && !processedCategories.has(category)) {
+                            processedCategories.add(category);
+                            const fix = stagnationDB[category];
+                            html += `<p><strong>Root Cause:</strong> ${fix.cause}</p>`;
+                            html += `<table class="plan-table"><tr><th>Exercise</th><th>Sets × Reps</th><th>Tempo</th><th>Coaching Cues</th></tr>`;
+                            fix.exercises.forEach(ex => {
+                                html += `<tr><td>${ex.name}</td><td>${ex.sets}</td><td>${ex.tempo}</td><td>${ex.cues}</td></tr>`;
+                            });
+                            html += `</table>`;
+                            html += `<p><strong>Timeline:</strong> ${fix.timeline}</p>`;
+                            html += `<p><strong>Measurable Markers:</strong> ${fix.markers}</p>`;
+                        } else if (!category) {
+                            html += `<p><strong>General Fix:</strong> Drop weight by 10%, increase reps to 10-12, build back up over 3-4 weeks. Or try a close variation of this exercise.</p>`;
+                        }
+                        html += `</div>`;
+                    });
+                    priority++;
+                }
+
+                // VOLUME IMBALANCES
+                if (findings.imbalanced.length > 0) {
+                    html += `<h3>Priority #${priority}: Volume Imbalances</h3>`;
+                    findings.imbalanced.forEach(({ type, detail }) => {
+                        html += `<div style="background:var(--card);padding:1rem;border-radius:8px;margin:0.75rem 0;">`;
+                        html += `<h3>${type} Imbalance</h3>`;
+                        html += `<p>${detail}</p>`;
+                        html += `</div>`;
+                    });
+                    priority++;
+                }
+
+                // Integration advice
+                html += `<h3>Your Action Plan — Start This Week</h3><ul>`;
+                html += `<li><strong>Add, don't replace:</strong> Slot corrective exercises at the END of the relevant training day.</li>`;
+                html += `<li><strong>2-3 exercises per weak point, 2× per week:</strong> Frequency beats volume. Spread the work across the week.</li>`;
+                html += `<li><strong>Fatigue management:</strong> Keep corrective work at RPE 7-8 (2-3 reps in reserve). These are builders, not grinders.</li>`;
+                html += `<li><strong>Track everything:</strong> Log these corrective exercises here in Iron Faith so you can see progression over time.</li>`;
+                html += `<li><strong>Reassess in 8 weeks:</strong> Come back to this analysis and compare. Take progress photos now so you have a baseline.</li>`;
+                html += `</ul>`;
+
+                html += verseHtml({ text: "He gives strength to the weary and increases the power of the weak.", ref: "Isaiah 40:29" });
+                return html;
+            },
+        },
+        {
             id: 'greeting',
             keywords: ['hello', 'hi', 'hey', 'sup', 'what\'s up', 'good morning', 'good evening', 'howdy'],
             handler: (ctx) => {
@@ -1434,6 +1710,7 @@ const TOPIC_RESPONSES = {
         html += `<li><strong>"My streak"</strong> — consistency and attendance tracking</li>`;
         html += `<li><strong>"Cardio guide"</strong> — HIIT vs LISS, what's right for you</li>`;
         html += `<li><strong>"Pre/post workout meal"</strong> — nutrient timing tips</li>`;
+        html += `<li><strong>"Weak point analysis"</strong> — identify and fix lagging muscles & lift sticking points</li>`;
         html += `</ul>`;
         html += verseHtml();
         return html;
