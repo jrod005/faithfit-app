@@ -291,9 +291,17 @@
         <section id="calories" class="tab-content">
             <div class="card">
                 <h2>Log Meal</h2>
-                <div class="form-group">
+                <div class="form-group" style="position:relative;">
                     <label>Meal / Food Name</label>
-                    <input type="text" id="meal-name" placeholder="e.g., Grilled Chicken Breast">
+                    <input type="text" id="meal-name" placeholder="e.g., Chicken Breast" autocomplete="off" oninput="onFoodSearch(this.value)" onfocus="onFoodSearch(this.value)">
+                    <div id="food-suggestions" class="food-suggestions"></div>
+                </div>
+                <div id="food-serving-row" class="form-row" style="display:none;">
+                    <div class="form-group">
+                        <label>Serving Size</label>
+                        <span id="food-serving-label" style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px;"></span>
+                        <input type="number" id="food-servings" value="1" min="0.25" step="0.25" placeholder="# of servings" oninput="onServingsChange()">
+                    </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -507,6 +515,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    <script src="food-db.js"></script>
     <script src="app.js"></script>
     <script src="photos.js"></script>
     <script src="coach.js"></script>

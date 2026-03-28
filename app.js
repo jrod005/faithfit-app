@@ -542,6 +542,75 @@ function drawOverloadChart(workouts) {
     }
 }
 
+// --- Food Database Auto-Suggest ---
+let selectedFood = null;
+
+function onFoodSearch(query) {
+    const dropdown = document.getElementById('food-suggestions');
+    if (!query || query.length < 2) {
+        dropdown.innerHTML = '';
+        dropdown.style.display = 'none';
+        return;
+    }
+
+    const lower = query.toLowerCase();
+    const results = (typeof FOOD_DB !== 'undefined' ? FOOD_DB : []).filter(f =>
+        f.name.toLowerCase().includes(lower)
+    ).slice(0, 8);
+
+    if (results.length === 0) {
+        dropdown.innerHTML = '';
+        dropdown.style.display = 'none';
+        return;
+    }
+
+    dropdown.innerHTML = results.map(f =>
+        `<div class="food-suggestion-item" onmousedown="selectFood('${f.name.replace(/'/g, "\\'")}')">
+            <span class="food-sug-name">${f.name}</span>
+            <span class="food-sug-info">${f.calories} cal · ${f.protein}p · ${f.serving}</span>
+        </div>`
+    ).join('');
+    dropdown.style.display = 'block';
+}
+
+function selectFood(name) {
+    const food = (typeof FOOD_DB !== 'undefined' ? FOOD_DB : []).find(f => f.name === name);
+    if (!food) return;
+
+    selectedFood = { ...food };
+    document.getElementById('meal-name').value = food.name;
+    document.getElementById('food-suggestions').style.display = 'none';
+
+    // Show serving row
+    const servingRow = document.getElementById('food-serving-row');
+    servingRow.style.display = '';
+    document.getElementById('food-serving-label').textContent = `1 serving = ${food.serving}`;
+    document.getElementById('food-servings').value = 1;
+
+    // Fill macros
+    document.getElementById('meal-calories').value = food.calories;
+    document.getElementById('meal-protein').value = food.protein;
+    document.getElementById('meal-carbs').value = food.carbs;
+    document.getElementById('meal-fat').value = food.fat;
+}
+
+function onServingsChange() {
+    if (!selectedFood) return;
+    const mult = parseFloat(document.getElementById('food-servings').value) || 1;
+    document.getElementById('meal-calories').value = Math.round(selectedFood.calories * mult);
+    document.getElementById('meal-protein').value = Math.round(selectedFood.protein * mult);
+    document.getElementById('meal-carbs').value = Math.round(selectedFood.carbs * mult);
+    document.getElementById('meal-fat').value = Math.round(selectedFood.fat * mult);
+}
+
+// Close suggestions when clicking outside
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('food-suggestions');
+    if (dropdown && !e.target.closest('#meal-name') && !e.target.closest('#food-suggestions')) {
+        dropdown.style.display = 'none';
+    }
+});
+
 // --- Nutrition / Calorie Tracking ---
 function logMeal() {
     const name = document.getElementById('meal-name').value.trim();
@@ -564,6 +633,9 @@ function logMeal() {
     document.getElementById('meal-protein').value = '';
     document.getElementById('meal-carbs').value = '';
     document.getElementById('meal-fat').value = '';
+    document.getElementById('food-serving-row').style.display = 'none';
+    document.getElementById('food-servings').value = 1;
+    selectedFood = null;
 
     updateMealsList();
     updateNutritionBars();

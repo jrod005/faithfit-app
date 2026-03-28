@@ -1179,6 +1179,47 @@ canvas {
     flex: 1;
 }
 
+/* ========== FOOD AUTO-SUGGEST ========== */
+.food-suggestions {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius-xs) var(--radius-xs);
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.food-suggestion-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+}
+.food-suggestion-item:last-child { border-bottom: none; }
+.food-suggestion-item:hover {
+    background: rgba(74, 222, 128, 0.1);
+}
+.food-sug-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.food-sug-info {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    margin-left: 8px;
+}
+
 /* ========== MUSCLE HEATMAP (SVG MANNEQUIN) ========== */
 .muscle-map-body {
     display: flex;
