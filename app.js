@@ -751,6 +751,93 @@ function drawWeightChart() {
     }
 }
 
+// --- Daily Verse ---
+function getDailyVerse() {
+    const verses = (typeof BIBLE_VERSES !== 'undefined' && BIBLE_VERSES.length > 0)
+        ? BIBLE_VERSES
+        : [{ ref: 'Philippians 4:13', text: 'I can do all things through Christ who strengthens me.' }];
+    const stored = DB.get('dailyVerse', null);
+    const todayStr = today();
+    if (stored && stored.date === todayStr && typeof stored.idx === 'number' && stored.idx < verses.length) {
+        return { ...verses[stored.idx], idx: stored.idx };
+    }
+    // Deterministic pick by date so it's stable across reloads
+    const seed = todayStr.split('-').reduce((a, p) => a + parseInt(p, 10), 0);
+    const idx = seed % verses.length;
+    DB.set('dailyVerse', { date: todayStr, idx });
+    return { ...verses[idx], idx };
+}
+
+function renderDailyVerse() {
+    const txt = document.getElementById('daily-verse-text');
+    const ref = document.getElementById('daily-verse-ref');
+    if (!txt || !ref) return;
+    const v = getDailyVerse();
+    txt.textContent = `"${v.text}"`;
+    ref.textContent = `— ${v.ref}`;
+}
+
+function rotateDailyVerse() {
+    if (typeof BIBLE_VERSES === 'undefined' || BIBLE_VERSES.length === 0) return;
+    const stored = DB.get('dailyVerse', { idx: 0 });
+    const next = (stored.idx + 1) % BIBLE_VERSES.length;
+    DB.set('dailyVerse', { date: today(), idx: next });
+    renderDailyVerse();
+}
+
+// --- Prayer Journal ---
+function getPrayerEntries() {
+    return DB.get('prayerEntries', []);
+}
+
+function savePrayerEntry() {
+    const input = document.getElementById('prayer-journal-input');
+    const text = input.value.trim();
+    if (!text) {
+        alert('Please write something before saving.');
+        return;
+    }
+    const entries = getPrayerEntries();
+    entries.push({ date: today(), text, timestamp: Date.now() });
+    DB.set('prayerEntries', entries);
+    input.value = '';
+    showToast('Entry saved &#x1F64F;');
+    renderPrayerHistory();
+}
+
+function deletePrayerEntry(timestamp) {
+    if (!confirm('Delete this entry?')) return;
+    const entries = getPrayerEntries().filter(e => e.timestamp !== timestamp);
+    DB.set('prayerEntries', entries);
+    renderPrayerHistory();
+}
+
+function togglePrayerHistory() {
+    const wrap = document.getElementById('prayer-journal-history');
+    if (!wrap) return;
+    wrap.classList.toggle('hidden');
+    if (!wrap.classList.contains('hidden')) renderPrayerHistory();
+}
+
+function renderPrayerHistory() {
+    const wrap = document.getElementById('prayer-journal-history');
+    if (!wrap || wrap.classList.contains('hidden')) return;
+    const entries = getPrayerEntries().slice().reverse();
+    if (entries.length === 0) {
+        wrap.innerHTML = '<p class="empty-state">No entries yet.</p>';
+        return;
+    }
+    wrap.innerHTML = entries.map(e => `
+        <div class="prayer-entry">
+            <div class="prayer-entry-head">
+                <span class="prayer-entry-date">${e.date}</span>
+                <button class="prayer-entry-del" onclick="deletePrayerEntry(${e.timestamp})">&times;</button>
+            </div>
+            <p class="prayer-entry-text">${escapeHtml(e.text)}</p>
+        </div>
+    `).join('');
+}
+
 // --- Progress Charts ---
 // Epley 1RM estimate: weight * (1 + reps/30)
 function estimate1RM(weight, reps) {
@@ -1737,6 +1824,7 @@ function updateDashboard() {
         document.getElementById('current-weight').textContent = `${lbsToDisplay(weights[weights.length - 1].weight)} ${wu()}`;
     }
 
+    renderDailyVerse();
     updateStreak();
     updateRecentWorkouts();
     renderProgressCharts();
@@ -1758,16 +1846,31 @@ function updateRecentWorkouts() {
     container.innerHTML = workouts.map(w => {
         const totalVol = w.sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
         const bestSet = w.sets.reduce((best, s) => s.weight > best.weight ? s : best, w.sets[0]);
+        const ts = w.timestamp || 0;
         return `
             <div class="workout-item">
-                <div>
+                <div class="workout-item-main">
                     <h4>${escapeHtml(w.name)}</h4>
                     <p>${w.date} &middot; ${w.sets.length} sets &middot; Best: ${lbsToDisplay(bestSet.weight)}${wu()} x ${bestSet.reps}</p>
                 </div>
-                <span style="font-weight:600; color:var(--primary);">${parseFloat(lbsToDisplay(totalVol)).toLocaleString()} ${wu()}</span>
+                <div class="workout-item-actions">
+                    <span class="workout-item-vol">${parseFloat(lbsToDisplay(totalVol)).toLocaleString()} ${wu()}</span>
+                    <button class="workout-item-del" title="Delete" onclick="deleteWorkout(${ts})">&times;</button>
+                </div>
             </div>
         `;
     }).join('');
+}
+
+function deleteWorkout(timestamp) {
+    if (!timestamp) return;
+    if (!confirm('Delete this workout? This cannot be undone.')) return;
+    const workouts = DB.get('workouts', []).filter(w => w.timestamp !== timestamp);
+    DB.set('workouts', workouts);
+    updateDashboard();
+    if (typeof updateTodaysExercises === 'function') updateTodaysExercises();
+    if (typeof updateOverloadDropdown === 'function') updateOverloadDropdown();
+    showToast('Workout deleted');
 }
 
 // --- Data Management ---

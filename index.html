@@ -183,6 +183,25 @@
                 </div>
             </div>
 
+            <div class="card daily-verse-card" id="daily-verse-card">
+                <div class="daily-verse-header">
+                    <span class="daily-verse-label">&#x2727; Verse of the Day</span>
+                    <button class="daily-verse-refresh" onclick="rotateDailyVerse()" title="New verse">&#x21BB;</button>
+                </div>
+                <p class="daily-verse-text" id="daily-verse-text"></p>
+                <p class="daily-verse-ref" id="daily-verse-ref"></p>
+            </div>
+
+            <div class="card prayer-journal-card">
+                <div class="prayer-journal-header">
+                    <h2>&#x270D; Prayer &amp; Gratitude</h2>
+                    <button class="btn btn-sm btn-secondary" onclick="togglePrayerHistory()" id="prayer-history-toggle">History</button>
+                </div>
+                <textarea id="prayer-journal-input" placeholder="What are you thankful for today? What are you praying for?" rows="3"></textarea>
+                <button class="btn btn-primary btn-full" onclick="savePrayerEntry()">Save Entry</button>
+                <div id="prayer-journal-history" class="prayer-journal-history hidden"></div>
+            </div>
+
             <div class="card weekly-report-card" id="weekly-report" style="display:none;">
                 <div class="report-header">
                     <h2>&#x1F4CA; Weekly Report Card</h2>

@@ -2236,6 +2236,139 @@ canvas {
 }
 .post-like-btn.liked { color: #ef4444; border-color: rgba(239,68,68,0.3); }
 .post-like-btn:hover { border-color: var(--text-muted); }
+.daily-verse-card {
+    background: linear-gradient(135deg, rgba(192,192,192,0.08), rgba(192,192,192,0.02));
+    border-left: 3px solid var(--accent, #C0C0C0);
+}
+.daily-verse-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.daily-verse-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+}
+.daily-verse-refresh {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+}
+.daily-verse-refresh:hover { color: var(--text-primary); border-color: var(--text-muted); }
+.daily-verse-text {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    font-style: italic;
+    margin: 0 0 8px 0;
+}
+.daily-verse-ref {
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: right;
+    margin: 0;
+}
+
+.prayer-journal-card textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+    margin-bottom: 10px;
+}
+.prayer-journal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.prayer-journal-header h2 { margin: 0; }
+.prayer-journal-history {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+.prayer-entry {
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+.prayer-entry-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.prayer-entry-date {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.prayer-entry-del {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+}
+.prayer-entry-del:hover { color: #ef4444; }
+.prayer-entry-text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.workout-item-main { flex: 1; min-width: 0; }
+.workout-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.workout-item-vol {
+    font-weight: 600;
+    color: var(--primary, var(--accent));
+    font-size: 13px;
+}
+.workout-item-del {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+}
+.workout-item-del:hover { color: #ef4444; border-color: #ef4444; }
+
 .strength-progress-controls {
     margin-bottom: 12px;
 }
