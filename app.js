@@ -751,6 +751,81 @@ function drawWeightChart() {
     }
 }
 
+// --- Quick-add and auto-fill helpers ---
+function autofillFromHistory() {
+    const nameEl = document.getElementById('exercise-name');
+    if (!nameEl) return;
+    const name = nameEl.value.trim();
+    if (!name) return;
+    // Match by exact name (case-insensitive); fall back to nothing
+    const workouts = DB.get('workouts', []);
+    const matches = workouts.filter(w => w.name.toLowerCase() === name.toLowerCase());
+    if (matches.length === 0) return;
+    const last = matches.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))[0];
+    populateSetRowsFromSets(last.sets);
+}
+
+function populateSetRowsFromSets(sets) {
+    if (!sets || sets.length === 0) return;
+    const container = document.getElementById('sets-container');
+    if (!container) return;
+    // Only autofill if user hasn't already entered weights
+    const existing = container.querySelectorAll('.set-row');
+    let userTouched = false;
+    existing.forEach(row => {
+        const w = row.querySelector('.set-weight');
+        const r = row.querySelector('.set-reps');
+        if ((w && w.value) || (r && r.value)) userTouched = true;
+    });
+    if (userTouched) return;
+
+    // Reset to needed number of rows
+    while (container.children.length > 1) container.removeChild(container.lastElementChild);
+    setCount = 1;
+    for (let i = 1; i < sets.length; i++) addSet();
+
+    const rows = container.querySelectorAll('.set-row');
+    sets.forEach((s, i) => {
+        if (!rows[i]) return;
+        const wInput = rows[i].querySelector('.set-weight');
+        const rInput = rows[i].querySelector('.set-reps');
+        if (wInput) wInput.value = parseFloat(lbsToDisplay(s.weight));
+        if (rInput) rInput.value = s.reps;
+    });
+}
+
+function logAgain(timestamp) {
+    const workouts = DB.get('workouts', []);
+    const w = workouts.find(x => x.timestamp === timestamp);
+    if (!w) return;
+    // Switch to workout tab
+    const wkBtn = document.querySelector('[data-tab="workout"]');
+    if (wkBtn) wkBtn.click();
+    // Make sure manual logger is visible (not in template session)
+    const manualCard = document.getElementById('log-workout-card');
+    const tplSession = document.getElementById('template-session');
+    if (manualCard) manualCard.classList.remove('hidden');
+    if (tplSession) tplSession.classList.add('hidden');
+    // Fill in name + sets
+    const nameEl = document.getElementById('exercise-name');
+    if (nameEl) nameEl.value = w.name;
+    // Force-fill, ignoring "user touched" guard
+    const container = document.getElementById('sets-container');
+    if (container) {
+        container.querySelectorAll('.set-weight, .set-reps').forEach(i => i.value = '');
+    }
+    populateSetRowsFromSets(w.sets);
+    if (nameEl) nameEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    showToast('Loaded — adjust and save');
+}
+
+function isWorkoutPR(timestamp) {
+    const prList = DB.get('prs', []);
+    const w = DB.get('workouts', []).find(x => x.timestamp === timestamp);
+    if (!w) return false;
+    return prList.some(p => p.exercise === w.name && p.date === w.date);
+}
+
 // --- Exercise Info Modal ---
 function showExerciseInfo(rawName) {
     const modal = document.getElementById('exercise-info-modal');
@@ -1865,14 +1940,16 @@ function updateRecentWorkouts() {
         const bestSet = w.sets.reduce((best, s) => s.weight > best.weight ? s : best, w.sets[0]);
         const ts = w.timestamp || 0;
         const safeName = escapeHtml(w.name).replace(/'/g, '&#39;');
+        const prBadge = isWorkoutPR(ts) ? '<span class="pr-badge" title="Personal Record!">&#x1F3C6; PR</span>' : '';
         return `
             <div class="workout-item">
                 <div class="workout-item-main info-tappable" onclick="showExerciseInfo('${safeName}')">
-                    <h4>${escapeHtml(w.name)} <span class="info-icon">&#9432;</span></h4>
+                    <h4>${escapeHtml(w.name)} ${prBadge} <span class="info-icon">&#9432;</span></h4>
                     <p>${w.date} &middot; ${w.sets.length} sets &middot; Best: ${lbsToDisplay(bestSet.weight)}${wu()} x ${bestSet.reps}</p>
                 </div>
                 <div class="workout-item-actions">
                     <span class="workout-item-vol">${parseFloat(lbsToDisplay(totalVol)).toLocaleString()} ${wu()}</span>
+                    <button class="workout-item-again" title="Log this again" onclick="logAgain(${ts})">&#x21BB;</button>
                     <button class="workout-item-del" title="Delete" onclick="deleteWorkout(${ts})">&times;</button>
                 </div>
             </div>
@@ -4680,6 +4757,13 @@ function init() {
     renderCustomExercises();
     refreshCustomExerciseIntegration();
     showOnboarding();
+
+    // Auto-fill exercise inputs from history when name changes
+    const exNameEl = document.getElementById('exercise-name');
+    if (exNameEl) {
+        exNameEl.addEventListener('change', autofillFromHistory);
+        exNameEl.addEventListener('blur', autofillFromHistory);
+    }
 
     // Redraw charts on resize
     window.addEventListener('resize', () => {

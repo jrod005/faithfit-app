@@ -2415,20 +2415,35 @@ canvas {
     color: var(--primary, var(--accent));
     font-size: 13px;
 }
-.workout-item-del {
+.workout-item-del,
+.workout-item-again {
     background: none;
     border: 1px solid var(--border);
     color: var(--text-muted);
     border-radius: 50%;
     width: 26px;
     height: 26px;
-    font-size: 16px;
+    font-size: 14px;
     line-height: 1;
     cursor: pointer;
     padding: 0;
     flex-shrink: 0;
 }
 .workout-item-del:hover { color: #ef4444; border-color: #ef4444; }
+.workout-item-again { font-size: 16px; }
+.workout-item-again:hover { color: var(--text-primary); border-color: var(--text-muted); }
+.pr-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #1a1a1a;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    margin-left: 6px;
+    vertical-align: middle;
+    letter-spacing: 0.5px;
+}
 
 .strength-progress-controls {
     margin-bottom: 12px;
