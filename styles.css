@@ -1032,21 +1032,120 @@ canvas {
     transform: translateX(-50%) translateY(20px);
     background: #ffffff;
     color: #0a0a0a;
-    padding: 14px 28px;
+    padding: 12px 22px;
     border-radius: 28px;
     font-size: 14px;
     font-weight: 600;
     opacity: 0;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 150;
+    z-index: 1500;
     max-width: 90%;
     text-align: center;
     box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    border-left: 4px solid #94a3b8;
 }
+.toast .toast-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.toast.toast-success { border-left-color: #16a34a; }
+.toast.toast-success .toast-icon { background: #dcfce7; color: #15803d; }
+.toast.toast-error { border-left-color: #dc2626; }
+.toast.toast-error .toast-icon { background: #fee2e2; color: #b91c1c; }
+.toast.toast-warn { border-left-color: #f59e0b; }
+.toast.toast-warn .toast-icon { background: #fef3c7; color: #b45309; }
+.toast.toast-info { border-left-color: #3b82f6; }
+.toast.toast-info .toast-icon { background: #dbeafe; color: #1d4ed8; }
 
 .toast.show {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+}
+
+/* ─── Confirm dialog ─── */
+.confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.confirm-overlay.show { opacity: 1; }
+.confirm-dialog {
+    background: var(--card-bg, #1a1a1a);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    max-width: 360px;
+    width: 100%;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    transform: scale(0.95);
+    transition: transform 0.2s ease;
+}
+.confirm-overlay.show .confirm-dialog { transform: scale(1); }
+.confirm-message {
+    margin: 0 0 20px 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--text, var(--text-primary));
+    text-align: center;
+}
+.confirm-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: stretch;
+}
+.confirm-actions .btn { flex: 1; }
+
+/* ─── Empty state cards ─── */
+.empty-state-card {
+    text-align: center;
+    padding: 32px 20px;
+    color: var(--text-muted);
+}
+.empty-state-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+    opacity: 0.7;
+}
+.empty-state-title {
+    margin: 0 0 6px 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.empty-state-sub {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    max-width: 280px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.workout-item-dur {
+    display: inline-block;
+    color: var(--text-muted);
+    font-size: 11px;
 }
 
 /* ========== LIGHT MODE ========== */

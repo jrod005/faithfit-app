@@ -898,8 +898,9 @@ function savePrayerEntry() {
     renderPrayerHistory();
 }
 
-function deletePrayerEntry(timestamp) {
-    if (!confirm('Delete this entry?')) return;
+async function deletePrayerEntry(timestamp) {
+    const ok = await confirmDialog('Delete this entry?', { danger: true, okText: 'Delete' });
+    if (!ok) return;
     const entries = getPrayerEntries().filter(e => e.timestamp !== timestamp);
     DB.set('prayerEntries', entries);
     renderPrayerHistory();
@@ -1283,7 +1284,12 @@ function updateTodaysExercises() {
     const container = document.getElementById('todays-exercises');
 
     if (workouts.length === 0) {
-        container.innerHTML = '<p class="empty-state">No exercises logged today.</p>';
+        container.innerHTML = `
+            <div class="empty-state-card">
+                <div class="empty-state-icon">&#x2693;</div>
+                <p class="empty-state-title">Nothing logged today</p>
+                <p class="empty-state-sub">Pick a routine from the hub above or log a freestyle exercise below.</p>
+            </div>`;
         return;
     }
 
@@ -1701,7 +1707,12 @@ function updateMealsList() {
     const container = document.getElementById('meals-list');
 
     if (meals.length === 0) {
-        container.innerHTML = '<p class="empty-state">No meals logged today.</p>';
+        container.innerHTML = `
+            <div class="empty-state-card">
+                <div class="empty-state-icon">&#x1F37D;</div>
+                <p class="empty-state-title">No meals logged today</p>
+                <p class="empty-state-sub">Search the food database or add a meal manually to track your calories.</p>
+            </div>`;
         return;
     }
 
@@ -1926,12 +1937,26 @@ function updateDashboard() {
     renderWeeklyReport();
 }
 
+function formatDuration(ms) {
+    if (!ms || ms < 1000) return '';
+    const min = Math.round(ms / 60000);
+    if (min < 60) return `${min}m`;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return m ? `${h}h ${m}m` : `${h}h`;
+}
+
 function updateRecentWorkouts() {
     const workouts = DB.get('workouts', []).slice(-10).reverse();
     const container = document.getElementById('recent-workouts');
 
     if (workouts.length === 0) {
-        container.innerHTML = '<p class="empty-state">No workouts logged yet. Start training!</p>';
+        container.innerHTML = `
+            <div class="empty-state-card">
+                <div class="empty-state-icon">&#x1F4AA;</div>
+                <p class="empty-state-title">No workouts yet</p>
+                <p class="empty-state-sub">Log your first lift to see it here and start tracking PRs.</p>
+            </div>`;
         return;
     }
 
@@ -1941,11 +1966,13 @@ function updateRecentWorkouts() {
         const ts = w.timestamp || 0;
         const safeName = escapeHtml(w.name).replace(/'/g, '&#39;');
         const prBadge = isWorkoutPR(ts) ? '<span class="pr-badge" title="Personal Record!">&#x1F3C6; PR</span>' : '';
+        const dur = formatDuration(w.durationMs);
+        const durHtml = dur ? ` &middot; <span class="workout-item-dur">&#x23F1; ${dur}</span>` : '';
         return `
             <div class="workout-item">
                 <div class="workout-item-main info-tappable" onclick="showExerciseInfo('${safeName}')">
                     <h4>${escapeHtml(w.name)} ${prBadge} <span class="info-icon">&#9432;</span></h4>
-                    <p>${w.date} &middot; ${w.sets.length} sets &middot; Best: ${lbsToDisplay(bestSet.weight)}${wu()} x ${bestSet.reps}</p>
+                    <p>${w.date} &middot; ${w.sets.length} sets${durHtml} &middot; Best: ${lbsToDisplay(bestSet.weight)}${wu()} x ${bestSet.reps}</p>
                 </div>
                 <div class="workout-item-actions">
                     <span class="workout-item-vol">${parseFloat(lbsToDisplay(totalVol)).toLocaleString()} ${wu()}</span>
@@ -1957,15 +1984,16 @@ function updateRecentWorkouts() {
     }).join('');
 }
 
-function deleteWorkout(timestamp) {
+async function deleteWorkout(timestamp) {
     if (!timestamp) return;
-    if (!confirm('Delete this workout? This cannot be undone.')) return;
+    const ok = await confirmDialog('Delete this workout? This cannot be undone.', { danger: true, okText: 'Delete' });
+    if (!ok) return;
     const workouts = DB.get('workouts', []).filter(w => w.timestamp !== timestamp);
     DB.set('workouts', workouts);
     updateDashboard();
     if (typeof updateTodaysExercises === 'function') updateTodaysExercises();
     if (typeof updateOverloadDropdown === 'function') updateOverloadDropdown();
-    showToast('Workout deleted');
+    showToast('Workout deleted', 'success');
 }
 
 // --- Data Management ---
@@ -1986,15 +2014,15 @@ function exportData() {
     URL.revokeObjectURL(url);
 }
 
-function clearAllData() {
-    if (confirm('Are you sure you want to delete ALL your data? This cannot be undone!')) {
-        if (confirm('Really? This will erase all workouts, meals, and weight history.')) {
-            ['profile', 'workouts', 'meals', 'weights'].forEach(key => {
-                localStorage.removeItem('faithfit_' + key);
-            });
-            location.reload();
-        }
-    }
+async function clearAllData() {
+    const ok1 = await confirmDialog('Delete ALL your data? This cannot be undone.', { danger: true, okText: 'Continue' });
+    if (!ok1) return;
+    const ok2 = await confirmDialog('Really? This will erase all workouts, meals, and weight history.', { danger: true, okText: 'Erase Everything' });
+    if (!ok2) return;
+    ['profile', 'workouts', 'meals', 'weights'].forEach(key => {
+        localStorage.removeItem('faithfit_' + key);
+    });
+    location.reload();
 }
 
 // --- Utilities ---
@@ -2062,13 +2090,22 @@ function copyToClipboard(text, message) {
     });
 }
 
-function showToast(message) {
+function showToast(message, type) {
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
 
+    const t = (type || 'info').toLowerCase();
+    const icons = {
+        success: '&#x2713;',
+        error: '&#x2715;',
+        warn: '&#9888;',
+        info: '&#8505;'
+    };
+    const icon = icons[t] || icons.info;
+
     const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.textContent = message;
+    toast.className = `toast toast-${t}`;
+    toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-msg">${message}</span>`;
     document.body.appendChild(toast);
 
     setTimeout(() => toast.classList.add('show'), 10);
@@ -2078,32 +2115,61 @@ function showToast(message) {
     }, 3000);
 }
 
+// Custom confirm dialog — returns a promise
+function confirmDialog(message, opts) {
+    return new Promise(resolve => {
+        const o = opts || {};
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-overlay';
+        overlay.innerHTML = `
+            <div class="confirm-dialog">
+                <p class="confirm-message">${message}</p>
+                <div class="confirm-actions">
+                    <button class="btn btn-secondary confirm-cancel">${o.cancelText || 'Cancel'}</button>
+                    <button class="btn ${o.danger ? 'btn-danger' : 'btn-primary'} confirm-ok">${o.okText || 'OK'}</button>
+                </div>
+            </div>
+        `;
+        const close = (val) => {
+            overlay.classList.remove('show');
+            setTimeout(() => overlay.remove(), 200);
+            resolve(val);
+        };
+        overlay.querySelector('.confirm-cancel').onclick = () => close(false);
+        overlay.querySelector('.confirm-ok').onclick = () => close(true);
+        overlay.onclick = (e) => { if (e.target === overlay) close(false); };
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => overlay.classList.add('show'));
+    });
+}
+
 // --- Import Data ---
 function importData(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
         try {
             const data = JSON.parse(e.target.result);
 
             if (!data.profile && !data.workouts && !data.meals && !data.weights) {
-                alert('Invalid Iron Faith backup file.');
+                showToast('Invalid Iron Faith backup file', 'error');
                 return;
             }
 
-            if (!confirm('This will replace all your current data with the imported data. Continue?')) return;
+            const ok = await confirmDialog('This will replace all your current data with the imported data. Continue?', { okText: 'Import' });
+            if (!ok) return;
 
             if (data.profile) DB.set('profile', data.profile);
             if (data.workouts) DB.set('workouts', data.workouts);
             if (data.meals) DB.set('meals', data.meals);
             if (data.weights) DB.set('weights', data.weights);
 
-            alert('Data imported successfully!');
-            location.reload();
+            showToast('Data imported successfully!', 'success');
+            setTimeout(() => location.reload(), 800);
         } catch {
-            alert('Could not read file. Make sure it\'s a valid Iron Faith backup.');
+            showToast('Could not read file. Make sure it\'s a valid backup.', 'error');
         }
     };
     reader.readAsText(file);
@@ -2786,8 +2852,9 @@ function renameTemplate(index) {
     renderRoutinesList();
 }
 
-function deleteTemplate(index) {
-    if (!confirm('Delete this routine?')) return;
+async function deleteTemplate(index) {
+    const ok = await confirmDialog('Delete this routine?', { danger: true, okText: 'Delete' });
+    if (!ok) return;
     const templates = getTemplates();
     templates.splice(index, 1);
     saveTemplates(templates);
@@ -3818,8 +3885,9 @@ function completeChallengeDay() {
     checkAchievements();
 }
 
-function abandonChallenge() {
-    if (!confirm('Are you sure you want to quit this challenge? Your progress will be lost.')) return;
+async function abandonChallenge() {
+    const ok = await confirmDialog('Quit this challenge? Your progress will be lost.', { danger: true, okText: 'Quit' });
+    if (!ok) return;
     DB.set('challenge', null);
     renderChallenges();
 }
@@ -4603,8 +4671,9 @@ function skipRest() {
     document.getElementById('active-rest-timer').classList.add('hidden');
 }
 
-function endActiveWorkout() {
-    if (!confirm('End workout without saving?')) return;
+async function endActiveWorkout() {
+    const ok = await confirmDialog('End workout without saving?', { danger: true, okText: 'Discard' });
+    if (!ok) return;
     activeWorkout = null;
     if (activeWorkoutTimer) clearInterval(activeWorkoutTimer);
     if (activeRestTimer) clearInterval(activeRestTimer);
@@ -4612,8 +4681,10 @@ function endActiveWorkout() {
     document.getElementById('workout-hub-card').classList.remove('hidden');
 }
 
-function finishActiveWorkout() {
+async function finishActiveWorkout() {
     if (!activeWorkout) return;
+    const sessionName = activeWorkout.dayName;
+    const durationMs = activeWorkout.startedAt ? Date.now() - activeWorkout.startedAt : 0;
     let saved = 0;
     const workouts = DB.get('workouts', []);
     activeWorkout.exercises.forEach(ex => {
@@ -4629,7 +4700,8 @@ function finishActiveWorkout() {
             name: ex.name,
             sets: realWeights,
             date: today(),
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            durationMs
         });
         saved++;
     });
@@ -4640,21 +4712,17 @@ function finishActiveWorkout() {
     document.getElementById('active-workout').classList.add('hidden');
     document.getElementById('workout-hub-card').classList.remove('hidden');
     const sharePrompt = saved > 0;
-    const sessionName = activeWorkout && activeWorkout.dayName;
     updateDashboard();
     updateTodaysExercises();
     renderTodaysWorkoutBanner();
     checkAchievements();
-    showToast(`Saved ${saved} exercise${saved !== 1 ? 's' : ''}!`);
+    showToast(`Saved ${saved} exercise${saved !== 1 ? 's' : ''}!`, 'success');
 
     if (sharePrompt && typeof currentUser !== 'undefined' && currentUser) {
-        setTimeout(() => {
-            if (confirm('Share this workout to your feed?')) {
-                if (typeof openPostModalFromWorkout === 'function') {
-                    openPostModalFromWorkout(`Just finished ${sessionName || 'a session'}!`);
-                }
-            }
-        }, 400);
+        const share = await confirmDialog('Share this workout to your feed?', { okText: 'Share' });
+        if (share && typeof openPostModalFromWorkout === 'function') {
+            openPostModalFromWorkout(`Just finished ${sessionName || 'a session'}!`);
+        }
     }
 }
 

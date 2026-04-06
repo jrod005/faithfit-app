@@ -249,7 +249,11 @@
             <div class="card">
                 <h2>Recent Workouts</h2>
                 <div id="recent-workouts" class="recent-list">
-                    <p class="empty-state">No workouts logged yet. Start training!</p>
+                    <div class="empty-state-card">
+                        <div class="empty-state-icon">&#x1F4AA;</div>
+                        <p class="empty-state-title">No workouts yet</p>
+                        <p class="empty-state-sub">Log your first lift to see it here and start tracking PRs.</p>
+                    </div>
                 </div>
             </div>
 
@@ -539,7 +543,11 @@
             <div class="card">
                 <h2>Today's Session</h2>
                 <div id="todays-exercises" class="exercise-log">
-                    <p class="empty-state">No exercises logged today.</p>
+                    <div class="empty-state-card">
+                        <div class="empty-state-icon">&#x2693;</div>
+                        <p class="empty-state-title">Nothing logged today</p>
+                        <p class="empty-state-sub">Pick a routine from the hub above or log a freestyle exercise below.</p>
+                    </div>
                 </div>
             </div>
             <button class="btn btn-secondary btn-full" onclick="saveAsTemplate()" id="save-template-btn" style="display:none">Save Session as Routine</button>
@@ -670,7 +678,11 @@
             <div class="card">
                 <h2>Meals Today</h2>
                 <div id="meals-list" class="meals-list">
-                    <p class="empty-state">No meals logged today.</p>
+                    <div class="empty-state-card">
+                        <div class="empty-state-icon">&#x1F37D;</div>
+                        <p class="empty-state-title">No meals logged today</p>
+                        <p class="empty-state-sub">Search the food database or add a meal manually to track your calories.</p>
+                    </div>
                 </div>
             </div>
         </section>
