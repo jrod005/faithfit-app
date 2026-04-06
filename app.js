@@ -751,6 +751,43 @@ function drawWeightChart() {
     }
 }
 
+// --- Visual: count-up animation ---
+function animateCount(el, target, opts) {
+    if (!el) return;
+    const o = opts || {};
+    const duration = o.duration || 700;
+    const suffix = o.suffix || '';
+    const decimals = o.decimals || 0;
+    const start = parseFloat(el.dataset.countCurrent || '0') || 0;
+    if (start === target) {
+        el.textContent = `${target.toFixed(decimals)}${suffix}`;
+        return;
+    }
+    const startTime = performance.now();
+    const ease = (t) => 1 - Math.pow(1 - t, 3);
+    function step(now) {
+        const elapsed = now - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        const val = start + (target - start) * ease(t);
+        el.textContent = `${val.toFixed(decimals)}${suffix}`;
+        if (t < 1) {
+            el._countRaf = requestAnimationFrame(step);
+        } else {
+            el.dataset.countCurrent = target;
+        }
+    }
+    if (el._countRaf) cancelAnimationFrame(el._countRaf);
+    el._countRaf = requestAnimationFrame(step);
+}
+
+function streakFire(streak) {
+    if (streak >= 100) return '&#x1F525;&#x1F525;&#x1F525;&#x1F525;';
+    if (streak >= 30) return '&#x1F525;&#x1F525;&#x1F525;';
+    if (streak >= 7) return '&#x1F525;&#x1F525;';
+    if (streak >= 3) return '&#x1F525;';
+    return '';
+}
+
 // --- Quick-add and auto-fill helpers ---
 function autofillFromHistory() {
     const nameEl = document.getElementById('exercise-name');
@@ -980,10 +1017,10 @@ function drawStrengthChart() {
     const ctx = canvas.getContext('2d');
 
     canvas.width = canvas.offsetWidth * 2;
-    canvas.height = 400;
+    canvas.height = 240;
     ctx.scale(2, 2);
     const w = canvas.offsetWidth;
-    const h = 200;
+    const h = 120;
     ctx.clearRect(0, 0, w, h);
 
     if (!name) {
@@ -1013,23 +1050,23 @@ function drawStrengthChart() {
     const max = Math.max(...values) + 2;
     const range = max - min || 1;
 
-    const padTop = 20, padBot = 40, padLeft = 45, padRight = 15;
+    const padTop = 10, padBot = 22, padLeft = 38, padRight = 10;
     const chartW = w - padLeft - padRight;
     const chartH = h - padTop - padBot;
 
     // Grid
     ctx.strokeStyle = '#E2E8F0';
     ctx.lineWidth = 0.5;
-    for (let i = 0; i <= 4; i++) {
-        const y = padTop + (chartH / 4) * i;
+    for (let i = 0; i <= 3; i++) {
+        const y = padTop + (chartH / 3) * i;
         ctx.beginPath();
         ctx.moveTo(padLeft, y);
         ctx.lineTo(w - padRight, y);
         ctx.stroke();
         ctx.fillStyle = '#94A3B8';
-        ctx.font = '11px Inter, sans-serif';
+        ctx.font = '10px Inter, sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText((max - (range / 4) * i).toFixed(0), padLeft - 8, y + 4);
+        ctx.fillText((max - (range / 3) * i).toFixed(0), padLeft - 6, y + 3);
     }
 
     // Filled area
@@ -1075,13 +1112,13 @@ function drawStrengthChart() {
 
     // Date labels
     ctx.fillStyle = '#94A3B8';
-    ctx.font = '10px Inter, sans-serif';
+    ctx.font = '9px Inter, sans-serif';
     ctx.textAlign = 'center';
-    const labelCount = Math.min(series.length, 6);
+    const labelCount = Math.min(series.length, 4);
     for (let i = 0; i < labelCount; i++) {
         const idx = Math.round(i * (series.length - 1) / (labelCount - 1));
         const x = padLeft + (chartW / (series.length - 1)) * idx;
-        ctx.fillText(series[idx].date.slice(5), x, h - 8);
+        ctx.fillText(series[idx].date.slice(5), x, h - 6);
     }
 
     if (summary) {
@@ -1910,7 +1947,17 @@ function updateStreak() {
         }
     }
 
-    document.getElementById('streak-count').textContent = `${streak} day${streak !== 1 ? 's' : ''}`;
+    const streakEl = document.getElementById('streak-count');
+    if (streakEl) {
+        const fire = streakFire(streak);
+        const fireHtml = fire ? ` <span class="streak-fire" aria-hidden="true">${fire}</span>` : '';
+        animateCount(streakEl, streak, { suffix: ` day${streak !== 1 ? 's' : ''}` });
+        // append fire after animation tick
+        setTimeout(() => {
+            if (streakEl.querySelector('.streak-fire')) return;
+            if (fireHtml) streakEl.innerHTML = streakEl.textContent + fireHtml;
+        }, 720);
+    }
 }
 
 // --- Dashboard ---
@@ -1920,12 +1967,14 @@ function updateDashboard() {
     const weights = DB.get('weights', []);
     const profile = DB.get('profile', {});
 
-    document.getElementById('today-workouts').textContent = workouts.length;
-    document.getElementById('today-calories').textContent = meals.reduce((sum, m) => sum + m.calories, 0);
+    animateCount(document.getElementById('today-workouts'), workouts.length);
+    animateCount(document.getElementById('today-calories'), meals.reduce((sum, m) => sum + m.calories, 0));
     document.getElementById('calorie-goal-text').textContent = `Goal: ${profile.calorieGoal || '--'}`;
 
     if (weights.length > 0) {
-        document.getElementById('current-weight').textContent = `${lbsToDisplay(weights[weights.length - 1].weight)} ${wu()}`;
+        const wEl = document.getElementById('current-weight');
+        const val = parseFloat(lbsToDisplay(weights[weights.length - 1].weight));
+        animateCount(wEl, val, { suffix: ` ${wu()}`, decimals: 1 });
     }
 
     updateStreak();
@@ -4627,7 +4676,21 @@ function addExerciseToActive() {
 function completeSet(exIdx, sIdx) {
     const ex = activeWorkout.exercises[exIdx];
     const set = ex.logged[sIdx];
-    if (!set.w || !set.r) return showToast('Enter weight and reps');
+    if (!set.w || !set.r) return showToast('Enter weight and reps', 'warn');
+    // Visual: animate the row + button
+    const rows = document.querySelectorAll('.active-ex')[exIdx];
+    if (rows) {
+        const setRows = rows.querySelectorAll('.active-set-row');
+        const row = setRows[sIdx];
+        if (row) {
+            row.classList.add('set-completed');
+            const btn = row.querySelector('.active-done-btn');
+            if (btn) {
+                btn.classList.add('checked');
+                if (navigator.vibrate) navigator.vibrate(20);
+            }
+        }
+    }
     startRestTimer(ex.rest || 90);
 }
 

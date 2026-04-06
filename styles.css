@@ -1148,6 +1148,70 @@ canvas {
     font-size: 11px;
 }
 
+/* ─── Visual polish ─── */
+.streak-fire {
+    display: inline-block;
+    margin-left: 4px;
+    animation: flame-flicker 1.6s ease-in-out infinite alternate;
+    transform-origin: bottom center;
+}
+@keyframes flame-flicker {
+    0%   { transform: scale(1) rotate(-1deg); filter: brightness(1); }
+    50%  { transform: scale(1.08) rotate(1deg); filter: brightness(1.15); }
+    100% { transform: scale(1) rotate(-1deg); filter: brightness(1); }
+}
+
+/* Tap micro-interaction on buttons */
+.btn:active,
+.tab-btn:active,
+.routine-card:active,
+.hub-btn:active,
+.workout-item-del:active,
+.workout-item-again:active,
+.daily-verse-refresh:active,
+.exercise-info-close:active {
+    transform: scale(0.96);
+}
+.btn,
+.tab-btn,
+.routine-card,
+.hub-btn,
+.workout-item-del,
+.workout-item-again,
+.daily-verse-refresh,
+.exercise-info-close {
+    transition: transform 0.1s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Set completion animation in active workout */
+.active-set-row.set-completed {
+    background: rgba(34, 197, 94, 0.08);
+    border-color: rgba(34, 197, 94, 0.3);
+    transition: background 0.3s ease, border-color 0.3s ease;
+}
+.active-set-row.set-completed input {
+    color: var(--text-muted);
+}
+.active-done-btn {
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease, color 0.2s ease;
+}
+.active-done-btn.checked {
+    background: #22c55e !important;
+    color: #fff !important;
+    border-color: #22c55e !important;
+    animation: check-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes check-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.25); }
+    100% { transform: scale(1); }
+}
+
+/* Stat number subtle pulse on update */
+.stat-number {
+    transition: color 0.3s ease;
+}
+
 /* ========== LIGHT MODE ========== */
 [data-theme="light"] {
     --bg: #f5f5f5;
@@ -2544,18 +2608,41 @@ canvas {
     letter-spacing: 0.5px;
 }
 
-.strength-progress-controls {
-    margin-bottom: 12px;
+.strength-progress-compact {
+    padding: 14px 16px !important;
 }
-.strength-progress-controls select {
-    width: 100%;
+.strength-compact-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.strength-compact-header h3 {
+    margin: 0;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    font-weight: 600;
+    flex-shrink: 0;
+}
+.strength-compact-header select {
+    flex: 1;
+    min-width: 0;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    padding: 10px 12px;
+    padding: 6px 10px;
     color: var(--text-primary);
     font-family: inherit;
-    font-size: 14px;
+    font-size: 12px;
+    max-width: 60%;
+}
+.strength-progress-compact .strength-pr-summary {
+    margin-top: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
 }
 .strength-pr-summary {
     display: flex;
