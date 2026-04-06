@@ -405,20 +405,16 @@
         <section id="calories" class="tab-content">
             <div class="card">
                 <h2>Log Meal</h2>
-                <div class="form-group">
-                    <label>Search Food or Enter Name</label>
-                    <div class="food-search-wrap">
-                        <input type="text" id="meal-name" placeholder="e.g., Chicken Breast or custom meal" oninput="searchFood(this.value)" autocomplete="off">
-                        <div id="food-search-results" class="food-search-results hidden"></div>
-                    </div>
+                <div class="form-group" style="position:relative;">
+                    <label>Meal / Food Name</label>
+                    <input type="text" id="meal-name" placeholder="e.g., Chicken Breast" autocomplete="off" oninput="onFoodSearch(this.value)" onfocus="onFoodSearch(this.value)">
+                    <div id="food-suggestions" class="food-suggestions"></div>
                 </div>
-                <div class="form-group" id="servings-group" style="display:none">
-                    <label>Servings</label>
-                    <div class="servings-row">
-                        <button class="btn btn-secondary btn-sm" onclick="adjustServings(-0.5)">-</button>
-                        <span id="serving-count">1</span>
-                        <button class="btn btn-secondary btn-sm" onclick="adjustServings(0.5)">+</button>
-                        <span id="serving-desc" class="serving-desc"></span>
+                <div id="food-serving-row" class="form-row" style="display:none;">
+                    <div class="form-group">
+                        <label>Serving Size</label>
+                        <span id="food-serving-label" style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px;"></span>
+                        <input type="number" id="food-servings" value="1" min="0.25" step="0.25" placeholder="# of servings" oninput="onServingsChange()">
                     </div>
                 </div>
                 <div class="form-row">
@@ -441,7 +437,23 @@
                         <input type="number" id="meal-fat" placeholder="g">
                     </div>
                 </div>
-                <button class="btn btn-primary btn-full" onclick="logMeal()">Log Meal</button>
+                <div class="form-row" style="gap:8px;">
+                    <button class="btn btn-primary btn-full" onclick="logMeal()">Log Meal</button>
+                    <button class="btn btn-secondary btn-full" onclick="openBarcodeScanner()" style="flex:0 0 auto;padding:10px 16px;" title="Scan Barcode">&#x1F4F7; Scan</button>
+                </div>
+            </div>
+
+            <!-- Barcode Scanner Modal -->
+            <div id="barcode-modal" class="barcode-modal" style="display:none;">
+                <div class="barcode-modal-content">
+                    <div class="barcode-modal-header">
+                        <h3>Scan Barcode</h3>
+                        <button class="btn btn-secondary" onclick="closeBarcodeScanner()" style="padding:4px 12px;">&#x2715;</button>
+                    </div>
+                    <div id="barcode-reader"></div>
+                    <div id="barcode-status" class="barcode-status">Point your camera at a barcode</div>
+                    <div id="barcode-result" class="barcode-result" style="display:none;"></div>
+                </div>
             </div>
 
             <!-- Daily Nutrition Summary -->
@@ -508,6 +520,7 @@
             <div class="quick-actions">
                 <button class="quick-btn" onclick="coachAsk('Generate a workout plan for me')">Workout Plan</button>
                 <button class="quick-btn" onclick="coachAsk('Create a meal plan for me')">Meal Plan</button>
+                <button class="quick-btn" onclick="coachAsk('What should I eat to fill my macros')">What to Eat</button>
                 <button class="quick-btn" onclick="coachAsk('Analyze my progress')">My Progress</button>
                 <button class="quick-btn" onclick="coachAsk('What should I work on next?')">What Next?</button>
                 <button class="quick-btn" onclick="coachAsk('Help me break through a plateau')">Plateau Help</button>
@@ -516,6 +529,7 @@
                 <button class="quick-btn" onclick="coachAsk('Weekly recap')">Weekly Recap</button>
                 <button class="quick-btn" onclick="coachAsk('How is my consistency?')">My Streak</button>
                 <button class="quick-btn" onclick="coachAsk('Warm-up routine')">Warm-Up</button>
+                <button class="quick-btn" onclick="coachAsk('Weak point analysis')">Weak Points</button>
                 <button class="quick-btn" onclick="document.getElementById('coach-photo-input').click()">Attach Photo</button>
             </div>
 
@@ -778,6 +792,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="food-db.js"></script>
     <script src="app.js"></script>
     <script src="photos.js"></script>
     <script src="coach.js"></script>

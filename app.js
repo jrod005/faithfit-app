@@ -1004,6 +1004,209 @@ function drawOverloadChart(workouts) {
     }
 }
 
+// --- Food Database Auto-Suggest ---
+let selectedFood = null;
+
+function onFoodSearch(query) {
+    const dropdown = document.getElementById('food-suggestions');
+    if (!query || query.length < 2) {
+        dropdown.innerHTML = '';
+        dropdown.style.display = 'none';
+        return;
+    }
+
+    const lower = query.toLowerCase();
+    const results = (typeof FOOD_DB !== 'undefined' ? FOOD_DB : []).filter(f =>
+        f.name.toLowerCase().includes(lower)
+    ).slice(0, 8);
+
+    if (results.length === 0) {
+        dropdown.innerHTML = '';
+        dropdown.style.display = 'none';
+        return;
+    }
+
+    dropdown.innerHTML = results.map(f =>
+        `<div class="food-suggestion-item" onmousedown="selectFood('${f.name.replace(/'/g, "\\'")}')">
+            <span class="food-sug-name">${f.name}</span>
+            <span class="food-sug-info">${f.calories} cal · ${f.protein}p · ${f.serving}</span>
+        </div>`
+    ).join('');
+    dropdown.style.display = 'block';
+}
+
+function selectFood(name) {
+    const food = (typeof FOOD_DB !== 'undefined' ? FOOD_DB : []).find(f => f.name === name);
+    if (!food) return;
+
+    selectedFood = { ...food };
+    document.getElementById('meal-name').value = food.name;
+    document.getElementById('food-suggestions').style.display = 'none';
+
+    // Show serving row
+    const servingRow = document.getElementById('food-serving-row');
+    servingRow.style.display = '';
+    document.getElementById('food-serving-label').textContent = `1 serving = ${food.serving}`;
+    document.getElementById('food-servings').value = 1;
+
+    // Fill macros
+    document.getElementById('meal-calories').value = food.calories;
+    document.getElementById('meal-protein').value = food.protein;
+    document.getElementById('meal-carbs').value = food.carbs;
+    document.getElementById('meal-fat').value = food.fat;
+}
+
+function onServingsChange() {
+    if (!selectedFood) return;
+    const mult = parseFloat(document.getElementById('food-servings').value) || 1;
+    document.getElementById('meal-calories').value = Math.round(selectedFood.calories * mult);
+    document.getElementById('meal-protein').value = Math.round(selectedFood.protein * mult);
+    document.getElementById('meal-carbs').value = Math.round(selectedFood.carbs * mult);
+    document.getElementById('meal-fat').value = Math.round(selectedFood.fat * mult);
+}
+
+// Close suggestions when clicking outside
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('food-suggestions');
+    if (dropdown && !e.target.closest('#meal-name') && !e.target.closest('#food-suggestions')) {
+        dropdown.style.display = 'none';
+    }
+});
+
+// --- Barcode Scanner ---
+let barcodeScanner = null;
+
+function openBarcodeScanner() {
+    const modal = document.getElementById('barcode-modal');
+    modal.style.display = 'flex';
+    document.getElementById('barcode-status').textContent = 'Starting camera...';
+    document.getElementById('barcode-result').style.display = 'none';
+
+    barcodeScanner = new Html5Qrcode('barcode-reader');
+    barcodeScanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 280, height: 120 }, formatsToSupport: [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+        ]},
+        (decodedText) => { onBarcodeScanned(decodedText); },
+        () => {}
+    ).then(() => {
+        document.getElementById('barcode-status').textContent = 'Point your camera at a barcode';
+    }).catch(err => {
+        document.getElementById('barcode-status').textContent = 'Camera access denied. Please allow camera permissions.';
+    });
+}
+
+function closeBarcodeScanner() {
+    const modal = document.getElementById('barcode-modal');
+    modal.style.display = 'none';
+    if (barcodeScanner) {
+        barcodeScanner.stop().catch(() => {});
+        barcodeScanner.clear();
+        barcodeScanner = null;
+    }
+}
+
+function onBarcodeScanned(barcode) {
+    // Stop scanning
+    if (barcodeScanner) {
+        barcodeScanner.stop().catch(() => {});
+    }
+
+    document.getElementById('barcode-status').textContent = 'Looking up product...';
+    document.getElementById('barcode-result').style.display = 'none';
+
+    // Look up on Open Food Facts API
+    fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 1 && data.product) {
+                const p = data.product;
+                const n = p.nutriments || {};
+                const name = p.product_name || p.generic_name || 'Unknown Product';
+                const servingSize = p.serving_size || p.quantity || '';
+                const calories = Math.round(n['energy-kcal_serving'] || n['energy-kcal_100g'] || 0);
+                const protein = Math.round(n.proteins_serving || n.proteins_100g || 0);
+                const carbs = Math.round(n.carbohydrates_serving || n.carbohydrates_100g || 0);
+                const fat = Math.round(n.fat_serving || n.fat_100g || 0);
+
+                const resultDiv = document.getElementById('barcode-result');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div class="barcode-product">
+                        <strong>${escapeHtml(name)}</strong>
+                        ${servingSize ? `<span class="barcode-serving">${escapeHtml(servingSize)}</span>` : ''}
+                        <div class="barcode-macros">
+                            <span>${calories} cal</span>
+                            <span>${protein}g protein</span>
+                            <span>${carbs}g carbs</span>
+                            <span>${fat}g fat</span>
+                        </div>
+                        <button class="btn btn-primary btn-full" onclick="useBarcodeResult('${escapeHtml(name).replace(/'/g, "\\'")}', ${calories}, ${protein}, ${carbs}, ${fat})">Add This Food</button>
+                        <button class="btn btn-secondary btn-full" onclick="retryBarcodeScan()" style="margin-top:6px;">Scan Again</button>
+                    </div>`;
+                document.getElementById('barcode-status').textContent = 'Product found!';
+            } else {
+                document.getElementById('barcode-status').textContent = 'Product not found in database.';
+                const resultDiv = document.getElementById('barcode-result');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div class="barcode-product">
+                        <p>Barcode: <strong>${barcode}</strong></p>
+                        <p style="color:var(--text-muted);font-size:13px;">This product isn't in the Open Food Facts database. You can enter the nutrition info manually.</p>
+                        <button class="btn btn-secondary btn-full" onclick="retryBarcodeScan()">Scan Again</button>
+                        <button class="btn btn-secondary btn-full" onclick="closeBarcodeScanner()" style="margin-top:6px;">Enter Manually</button>
+                    </div>`;
+            }
+        })
+        .catch(() => {
+            document.getElementById('barcode-status').textContent = 'Network error — check your connection.';
+            const resultDiv = document.getElementById('barcode-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+                <div class="barcode-product">
+                    <p style="color:var(--text-muted);font-size:13px;">Could not reach the food database. Make sure you're online.</p>
+                    <button class="btn btn-secondary btn-full" onclick="retryBarcodeScan()">Retry</button>
+                </div>`;
+        });
+}
+
+function useBarcodeResult(name, calories, protein, carbs, fat) {
+    document.getElementById('meal-name').value = name;
+    document.getElementById('meal-calories').value = calories;
+    document.getElementById('meal-protein').value = protein;
+    document.getElementById('meal-carbs').value = carbs;
+    document.getElementById('meal-fat').value = fat;
+    document.getElementById('food-serving-row').style.display = 'none';
+    selectedFood = null;
+    closeBarcodeScanner();
+}
+
+function retryBarcodeScan() {
+    document.getElementById('barcode-result').style.display = 'none';
+    document.getElementById('barcode-status').textContent = 'Point your camera at a barcode';
+    if (barcodeScanner) {
+        barcodeScanner.start(
+            { facingMode: 'environment' },
+            { fps: 10, qrbox: { width: 280, height: 120 }, formatsToSupport: [
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39,
+            ]},
+            (decodedText) => { onBarcodeScanned(decodedText); },
+            () => {}
+        ).catch(() => {});
+    }
+}
+
 // --- Nutrition / Calorie Tracking ---
 function logMeal() {
     const name = document.getElementById('meal-name').value.trim();
@@ -1026,10 +1229,9 @@ function logMeal() {
     document.getElementById('meal-protein').value = '';
     document.getElementById('meal-carbs').value = '';
     document.getElementById('meal-fat').value = '';
+    document.getElementById('food-serving-row').style.display = 'none';
+    document.getElementById('food-servings').value = 1;
     selectedFood = null;
-    currentServings = 1;
-    document.getElementById('servings-group').style.display = 'none';
-    document.getElementById('serving-count').textContent = '1';
 
     updateMealsList();
     updateNutritionBars();
@@ -1561,7 +1763,7 @@ const ACHIEVEMENTS = [
     { id: 'full_body_week', name: 'No Weak Links', desc: 'Hit all 7 muscle groups in one week', icon: '&#x1F9BE;', verse: 'The body is not made up of one part but of many. — 1 Corinthians 12:14', check: ctx => ctx.muscleGroupsHit >= 7, progress: ctx => ({ cur: ctx.muscleGroupsHit, goal: 7 }) },
     // Training days in a single week
     { id: 'five_day_week', name: 'Grinder', desc: 'Train 5 days in a single week', icon: '&#x23F1;', verse: 'The hand of the diligent will rule. — Proverbs 12:24', check: ctx => ctx.bestWeekDays >= 5, progress: ctx => ({ cur: ctx.bestWeekDays, goal: 5 }) },
-    { id: 'six_day_week', name: 'No Days Off', desc: 'Train 6+ days in a single week', icon: '&#x1F608;', verse: 'Six days you shall labor and do all your work. — Exodus 20:9', check: ctx => ctx.bestWeekDays >= 6, progress: ctx => ({ cur: ctx.bestWeekDays, goal: 6 }) },
+    { id: 'six_day_week', name: 'No Days Off', desc: 'Train 6+ days in a single week', icon: '&#x1F525;', verse: 'Six days you shall labor and do all your work. — Exodus 20:9', check: ctx => ctx.bestWeekDays >= 6, progress: ctx => ({ cur: ctx.bestWeekDays, goal: 6 }) },
     // Early bird / night owl
     { id: 'early_bird', name: 'Early Bird', desc: 'Log a workout before 7am', icon: '&#x1F305;', verse: 'Very early in the morning, while it was still dark, Jesus got up and prayed. — Mark 1:35', check: ctx => ctx.earlyWorkout },
     { id: 'night_owl', name: 'Night Owl', desc: 'Log a workout after 9pm', icon: '&#x1F319;', verse: 'By night I sought him whom my soul loveth. — Song of Solomon 3:1', check: ctx => ctx.lateWorkout },
@@ -1772,7 +1974,7 @@ function renderCalendarHeatmap() {
     container.innerHTML = html;
 }
 
-// --- Muscle Heatmap ---
+// --- Muscle Heatmap (SVG Body Mannequin) ---
 function renderMuscleHeatmap() {
     const container = document.getElementById('muscle-heatmap');
     if (!container) return;
@@ -1785,6 +1987,7 @@ function renderMuscleHeatmap() {
 
     const muscleMap = getFullMuscleMap();
 
+    // Calculate volume per sub-group
     const volume = {};
     Object.keys(muscleMap).forEach(g => volume[g] = 0);
     weekWorkouts.forEach(w => {
@@ -1797,36 +2000,185 @@ function renderMuscleHeatmap() {
 
     const maxVol = Math.max(...Object.values(volume), 1);
 
-    function intensity(group) {
+    // Color function: 0 = base gray, then green gradient
+    function heatColor(group) {
         const v = volume[group] || 0;
-        if (v === 0) return 'none';
+        if (v === 0) return 'rgba(255,255,255,0.06)';
         const ratio = v / maxVol;
-        if (ratio > 0.7) return 'high';
-        if (ratio > 0.3) return 'med';
-        return 'low';
+        if (ratio > 0.7) return 'rgba(74,222,128,0.85)';
+        if (ratio > 0.4) return 'rgba(74,222,128,0.5)';
+        return 'rgba(74,222,128,0.25)';
     }
 
-    let html = '<div class="muscle-map">';
-    html += '<div class="muscle-body">';
-    // Simple labeled grid approach
-    const groups = [
-        { name: 'Shoulders', key: 'shoulders' },
-        { name: 'Chest', key: 'chest' },
-        { name: 'Back', key: 'back' },
-        { name: 'Biceps', key: 'biceps' },
-        { name: 'Triceps', key: 'triceps' },
-        { name: 'Core', key: 'core' },
-        { name: 'Legs', key: 'legs' },
+    function strokeColor(group) {
+        const v = volume[group] || 0;
+        if (v === 0) return 'rgba(255,255,255,0.1)';
+        return 'rgba(74,222,128,0.4)';
+    }
+
+    // Build SVG mannequin — front and back views
+    // Each muscle region is a path/shape that gets colored by volume
+    let html = '<div class="muscle-map-body">';
+
+    // --- FRONT VIEW ---
+    html += `<div class="mannequin-view"><div class="mannequin-label">Front</div>`;
+    html += `<svg viewBox="0 0 200 420" class="mannequin-svg" xmlns="http://www.w3.org/2000/svg">`;
+
+    // Head
+    html += `<ellipse cx="100" cy="30" rx="18" ry="22" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>`;
+    // Neck
+    html += `<rect x="92" y="50" width="16" height="14" rx="4" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>`;
+
+    // Traps (front visible portion)
+    html += `<path d="M80,64 L92,60 L100,64 L108,60 L120,64 L116,74 L84,74 Z" fill="${heatColor('traps')}" stroke="${strokeColor('traps')}" stroke-width="0.7" data-muscle="traps" data-sets="${volume.traps}"><title>Traps: ${volume.traps} sets</title></path>`;
+
+    // Front Delts
+    html += `<path d="M64,74 L80,68 L84,74 L84,96 L68,92 Z" fill="${heatColor('front_delts')}" stroke="${strokeColor('front_delts')}" stroke-width="0.7" data-muscle="front_delts"><title>Front Delts: ${volume.front_delts} sets</title></path>`;
+    html += `<path d="M136,74 L120,68 L116,74 L116,96 L132,92 Z" fill="${heatColor('front_delts')}" stroke="${strokeColor('front_delts')}" stroke-width="0.7" data-muscle="front_delts"><title>Front Delts: ${volume.front_delts} sets</title></path>`;
+
+    // Side Delts
+    html += `<path d="M58,78 L64,74 L68,92 L60,94 Z" fill="${heatColor('side_delts')}" stroke="${strokeColor('side_delts')}" stroke-width="0.7"><title>Side Delts: ${volume.side_delts} sets</title></path>`;
+    html += `<path d="M142,78 L136,74 L132,92 L140,94 Z" fill="${heatColor('side_delts')}" stroke="${strokeColor('side_delts')}" stroke-width="0.7"><title>Side Delts: ${volume.side_delts} sets</title></path>`;
+
+    // Upper Chest
+    html += `<path d="M84,74 L100,78 L116,74 L116,90 L100,94 L84,90 Z" fill="${heatColor('upper_chest')}" stroke="${strokeColor('upper_chest')}" stroke-width="0.7"><title>Upper Chest: ${volume.upper_chest} sets</title></path>`;
+
+    // Mid Chest
+    html += `<path d="M84,90 L100,94 L116,90 L116,110 L100,114 L84,110 Z" fill="${heatColor('mid_chest')}" stroke="${strokeColor('mid_chest')}" stroke-width="0.7"><title>Mid Chest: ${volume.mid_chest} sets</title></path>`;
+
+    // Lower Chest
+    html += `<path d="M84,110 L100,114 L116,110 L114,122 L100,124 L86,122 Z" fill="${heatColor('lower_chest')}" stroke="${strokeColor('lower_chest')}" stroke-width="0.7"><title>Lower Chest: ${volume.lower_chest} sets</title></path>`;
+
+    // Biceps
+    html += `<path d="M60,94 L68,92 L66,140 L56,138 Z" fill="${heatColor('biceps')}" stroke="${strokeColor('biceps')}" stroke-width="0.7"><title>Biceps: ${volume.biceps} sets</title></path>`;
+    html += `<path d="M140,94 L132,92 L134,140 L144,138 Z" fill="${heatColor('biceps')}" stroke="${strokeColor('biceps')}" stroke-width="0.7"><title>Biceps: ${volume.biceps} sets</title></path>`;
+
+    // Triceps (front visible inner arm)
+    html += `<path d="M68,92 L84,96 L82,140 L66,140 Z" fill="${heatColor('triceps')}" stroke="${strokeColor('triceps')}" stroke-width="0.7"><title>Triceps: ${volume.triceps} sets</title></path>`;
+    html += `<path d="M132,92 L116,96 L118,140 L134,140 Z" fill="${heatColor('triceps')}" stroke="${strokeColor('triceps')}" stroke-width="0.7"><title>Triceps: ${volume.triceps} sets</title></path>`;
+
+    // Forearms
+    html += `<path d="M56,138 L66,140 L62,188 L52,184 Z" fill="${heatColor('forearms')}" stroke="${strokeColor('forearms')}" stroke-width="0.7"><title>Forearms: ${volume.forearms} sets</title></path>`;
+    html += `<path d="M82,140 L66,140 L62,188 L76,188 Z" fill="${heatColor('forearms')}" stroke="${strokeColor('forearms')}" stroke-width="0.7"><title>Forearms: ${volume.forearms} sets</title></path>`;
+    html += `<path d="M144,138 L134,140 L138,188 L148,184 Z" fill="${heatColor('forearms')}" stroke="${strokeColor('forearms')}" stroke-width="0.7"><title>Forearms: ${volume.forearms} sets</title></path>`;
+    html += `<path d="M118,140 L134,140 L138,188 L124,188 Z" fill="${heatColor('forearms')}" stroke="${strokeColor('forearms')}" stroke-width="0.7"><title>Forearms: ${volume.forearms} sets</title></path>`;
+
+    // Abs
+    html += `<path d="M88,124 L100,126 L112,124 L112,180 L100,182 L88,180 Z" fill="${heatColor('abs')}" stroke="${strokeColor('abs')}" stroke-width="0.7"><title>Abs: ${volume.abs} sets</title></path>`;
+
+    // Obliques
+    html += `<path d="M84,122 L88,124 L88,180 L82,178 L80,140 Z" fill="${heatColor('obliques')}" stroke="${strokeColor('obliques')}" stroke-width="0.7"><title>Obliques: ${volume.obliques} sets</title></path>`;
+    html += `<path d="M116,122 L112,124 L112,180 L118,178 L120,140 Z" fill="${heatColor('obliques')}" stroke="${strokeColor('obliques')}" stroke-width="0.7"><title>Obliques: ${volume.obliques} sets</title></path>`;
+
+    // Quads
+    html += `<path d="M82,190 L100,194 L100,290 L80,286 Z" fill="${heatColor('quads')}" stroke="${strokeColor('quads')}" stroke-width="0.7"><title>Quads: ${volume.quads} sets</title></path>`;
+    html += `<path d="M118,190 L100,194 L100,290 L120,286 Z" fill="${heatColor('quads')}" stroke="${strokeColor('quads')}" stroke-width="0.7"><title>Quads: ${volume.quads} sets</title></path>`;
+
+    // Calves (front - tibialis area + calves)
+    html += `<path d="M82,296 L98,298 L96,370 L78,366 Z" fill="${heatColor('calves')}" stroke="${strokeColor('calves')}" stroke-width="0.7"><title>Calves: ${volume.calves} sets</title></path>`;
+    html += `<path d="M118,296 L102,298 L104,370 L122,366 Z" fill="${heatColor('calves')}" stroke="${strokeColor('calves')}" stroke-width="0.7"><title>Calves: ${volume.calves} sets</title></path>`;
+
+    html += `</svg></div>`;
+
+    // --- BACK VIEW ---
+    html += `<div class="mannequin-view"><div class="mannequin-label">Back</div>`;
+    html += `<svg viewBox="0 0 200 420" class="mannequin-svg" xmlns="http://www.w3.org/2000/svg">`;
+
+    // Head
+    html += `<ellipse cx="100" cy="30" rx="18" ry="22" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>`;
+    // Neck
+    html += `<rect x="92" y="50" width="16" height="14" rx="4" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>`;
+
+    // Traps (back - larger)
+    html += `<path d="M76,64 L92,56 L100,62 L108,56 L124,64 L120,82 L80,82 Z" fill="${heatColor('traps')}" stroke="${strokeColor('traps')}" stroke-width="0.7"><title>Traps: ${volume.traps} sets</title></path>`;
+
+    // Rear Delts
+    html += `<path d="M60,74 L76,68 L80,82 L80,98 L64,94 Z" fill="${heatColor('rear_delts')}" stroke="${strokeColor('rear_delts')}" stroke-width="0.7"><title>Rear Delts: ${volume.rear_delts} sets</title></path>`;
+    html += `<path d="M140,74 L124,68 L120,82 L120,98 L136,94 Z" fill="${heatColor('rear_delts')}" stroke="${strokeColor('rear_delts')}" stroke-width="0.7"><title>Rear Delts: ${volume.rear_delts} sets</title></path>`;
+
+    // Upper Back / Rhomboids
+    html += `<path d="M80,82 L100,86 L120,82 L120,120 L100,124 L80,120 Z" fill="${heatColor('upper_back')}" stroke="${strokeColor('upper_back')}" stroke-width="0.7"><title>Upper Back: ${volume.upper_back} sets</title></path>`;
+
+    // Lats
+    html += `<path d="M80,98 L80,120 L100,124 L100,160 L78,150 L74,110 Z" fill="${heatColor('lats')}" stroke="${strokeColor('lats')}" stroke-width="0.7"><title>Lats: ${volume.lats} sets</title></path>`;
+    html += `<path d="M120,98 L120,120 L100,124 L100,160 L122,150 L126,110 Z" fill="${heatColor('lats')}" stroke="${strokeColor('lats')}" stroke-width="0.7"><title>Lats: ${volume.lats} sets</title></path>`;
+
+    // Lower Back / Erectors
+    html += `<path d="M86,150 L100,160 L114,150 L114,186 L100,190 L86,186 Z" fill="${heatColor('lower_back')}" stroke="${strokeColor('lower_back')}" stroke-width="0.7"><title>Lower Back: ${volume.lower_back} sets</title></path>`;
+
+    // Triceps (back view - more visible)
+    html += `<path d="M56,94 L64,94 L66,140 L54,138 Z" fill="${heatColor('triceps')}" stroke="${strokeColor('triceps')}" stroke-width="0.7"><title>Triceps: ${volume.triceps} sets</title></path>`;
+    html += `<path d="M64,94 L80,98 L78,140 L66,140 Z" fill="${heatColor('triceps')}" stroke="${strokeColor('triceps')}" stroke-width="0.7"><title>Triceps: ${volume.triceps} sets</title></path>`;
+    html += `<path d="M144,94 L136,94 L134,140 L146,138 Z" fill="${heatColor('triceps')}" stroke="${strokeColor('triceps')}" stroke-width="0.7"><title>Triceps: ${volume.triceps} sets</title></path>`;
+    html += `<path d="M136,94 L120,98 L122,140 L134,140 Z" fill="${heatColor('triceps')}" stroke="${strokeColor('triceps')}" stroke-width="0.7"><title>Triceps: ${volume.triceps} sets</title></path>`;
+
+    // Forearms (back)
+    html += `<path d="M54,138 L66,140 L62,188 L50,184 Z" fill="${heatColor('forearms')}" stroke="${strokeColor('forearms')}" stroke-width="0.7"><title>Forearms: ${volume.forearms} sets</title></path>`;
+    html += `<path d="M78,140 L66,140 L62,188 L74,188 Z" fill="${heatColor('forearms')}" stroke="${strokeColor('forearms')}" stroke-width="0.7"><title>Forearms: ${volume.forearms} sets</title></path>`;
+    html += `<path d="M146,138 L134,140 L138,188 L150,184 Z" fill="${heatColor('forearms')}" stroke="${strokeColor('forearms')}" stroke-width="0.7"><title>Forearms: ${volume.forearms} sets</title></path>`;
+    html += `<path d="M122,140 L134,140 L138,188 L126,188 Z" fill="${heatColor('forearms')}" stroke="${strokeColor('forearms')}" stroke-width="0.7"><title>Forearms: ${volume.forearms} sets</title></path>`;
+
+    // Glutes
+    html += `<path d="M80,186 L100,190 L100,218 L78,214 Z" fill="${heatColor('glutes')}" stroke="${strokeColor('glutes')}" stroke-width="0.7"><title>Glutes: ${volume.glutes} sets</title></path>`;
+    html += `<path d="M120,186 L100,190 L100,218 L122,214 Z" fill="${heatColor('glutes')}" stroke="${strokeColor('glutes')}" stroke-width="0.7"><title>Glutes: ${volume.glutes} sets</title></path>`;
+
+    // Hamstrings
+    html += `<path d="M78,218 L100,222 L100,296 L80,290 Z" fill="${heatColor('hamstrings')}" stroke="${strokeColor('hamstrings')}" stroke-width="0.7"><title>Hamstrings: ${volume.hamstrings} sets</title></path>`;
+    html += `<path d="M122,218 L100,222 L100,296 L120,290 Z" fill="${heatColor('hamstrings')}" stroke="${strokeColor('hamstrings')}" stroke-width="0.7"><title>Hamstrings: ${volume.hamstrings} sets</title></path>`;
+
+    // Calves (back)
+    html += `<path d="M80,296 L98,300 L96,370 L76,366 Z" fill="${heatColor('calves')}" stroke="${strokeColor('calves')}" stroke-width="0.7"><title>Calves: ${volume.calves} sets</title></path>`;
+    html += `<path d="M120,296 L102,300 L104,370 L124,366 Z" fill="${heatColor('calves')}" stroke="${strokeColor('calves')}" stroke-width="0.7"><title>Calves: ${volume.calves} sets</title></path>`;
+
+    html += `</svg></div>`;
+
+    html += '</div>';
+
+    // --- Legend + detail grid ---
+    html += '<div class="muscle-heatmap-legend">';
+    html += '<span class="legend-item"><span class="legend-swatch" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1)"></span> Not trained</span>';
+    html += '<span class="legend-item"><span class="legend-swatch" style="background:rgba(74,222,128,0.25)"></span> Low</span>';
+    html += '<span class="legend-item"><span class="legend-swatch" style="background:rgba(74,222,128,0.5)"></span> Moderate</span>';
+    html += '<span class="legend-item"><span class="legend-swatch" style="background:rgba(74,222,128,0.85)"></span> High</span>';
+    html += '</div>';
+
+    // Detail grid showing all sub-groups with set counts
+    const detailGroups = [
+        { label: 'Upper Chest', key: 'upper_chest' },
+        { label: 'Mid Chest', key: 'mid_chest' },
+        { label: 'Lower Chest', key: 'lower_chest' },
+        { label: 'Front Delts', key: 'front_delts' },
+        { label: 'Side Delts', key: 'side_delts' },
+        { label: 'Rear Delts', key: 'rear_delts' },
+        { label: 'Traps', key: 'traps' },
+        { label: 'Lats', key: 'lats' },
+        { label: 'Upper Back', key: 'upper_back' },
+        { label: 'Lower Back', key: 'lower_back' },
+        { label: 'Biceps', key: 'biceps' },
+        { label: 'Triceps', key: 'triceps' },
+        { label: 'Forearms', key: 'forearms' },
+        { label: 'Abs', key: 'abs' },
+        { label: 'Obliques', key: 'obliques' },
+        { label: 'Quads', key: 'quads' },
+        { label: 'Hamstrings', key: 'hamstrings' },
+        { label: 'Glutes', key: 'glutes' },
+        { label: 'Calves', key: 'calves' },
     ];
-    groups.forEach(g => {
+
+    html += '<div class="muscle-detail-grid">';
+    detailGroups.forEach(g => {
         const v = volume[g.key] || 0;
-        const lvl = intensity(g.key);
-        html += `<div class="muscle-group level-${lvl}">
-            <span class="muscle-name">${g.name}</span>
-            <span class="muscle-sets">${v} sets</span>
+        const ratio = v / maxVol;
+        let lvl = 'none';
+        if (v > 0 && ratio > 0.7) lvl = 'high';
+        else if (v > 0 && ratio > 0.4) lvl = 'med';
+        else if (v > 0) lvl = 'low';
+        html += `<div class="muscle-detail-item level-${lvl}">
+            <span class="muscle-detail-name">${g.label}</span>
+            <span class="muscle-detail-sets">${v} sets</span>
         </div>`;
     });
-    html += '</div></div>';
+    html += '</div>';
 
     container.innerHTML = html;
 }
@@ -3193,20 +3545,37 @@ function refreshCustomExerciseIntegration() {
 }
 
 function getFullMuscleMap() {
-    // Base muscle map
+    // Detailed sub-group muscle map for SVG mannequin heatmap
     const muscleMap = {
-        chest: ['Bench Press','Incline Bench Press','Decline Bench Press','Dumbbell Bench Press','Incline Dumbbell Press','Dumbbell Fly','Cable Fly','Chest Dips','Push-ups','Machine Chest Press','Pec Deck'],
-        back: ['Deadlift','Romanian Deadlift','Sumo Deadlift','Barbell Row','Dumbbell Row','Pendlay Row','T-Bar Row','Seated Cable Row','Lat Pulldown','Pull-ups','Chin-ups','Straight Arm Pulldown','Hyperextensions','Good Mornings'],
-        shoulders: ['Overhead Press','Seated Dumbbell Press','Arnold Press','Lateral Raises','Front Raises','Rear Delt Fly','Cable Lateral Raise','Upright Row','Shrugs','Barbell Shrugs','Face Pulls','Machine Shoulder Press'],
-        legs: ['Squat','Front Squat','Goblet Squat','Bulgarian Split Squat','Hack Squat','Leg Press','Lunges','Walking Lunges','Reverse Lunges','Leg Extension','Leg Curl','Seated Leg Curl','Hip Thrust','Glute Bridge','Calf Raises','Seated Calf Raise','Step-ups','Box Jumps'],
-        biceps: ['Bicep Curls','Hammer Curls','Preacher Curls','Concentration Curls','Incline Dumbbell Curl','EZ Bar Curl','Cable Curl','Spider Curls'],
-        triceps: ['Tricep Pushdown','Overhead Tricep Extension','Skull Crushers','Close Grip Bench Press','Tricep Dips','Tricep Kickbacks','Cable Overhead Extension','Diamond Push-ups'],
-        core: ['Plank','Crunches','Hanging Leg Raise','Cable Crunch','Ab Wheel Rollout','Russian Twist','Bicycle Crunches','Leg Raises','Woodchoppers','Pallof Press','Dead Bug','Mountain Climbers'],
+        upper_chest:    ['Incline Bench Press','Incline Dumbbell Press','Low Incline Dumbbell Press'],
+        mid_chest:      ['Bench Press','Dumbbell Bench Press','Machine Chest Press','Dumbbell Fly','Cable Fly','Pec Deck','Push-ups'],
+        lower_chest:    ['Decline Bench Press','Chest Dips'],
+        front_delts:    ['Overhead Press','Seated Dumbbell Press','Arnold Press','Front Raises','Machine Shoulder Press'],
+        side_delts:     ['Lateral Raises','Cable Lateral Raise','Upright Row'],
+        rear_delts:     ['Rear Delt Fly','Face Pulls','Reverse Pec Deck'],
+        traps:          ['Shrugs','Barbell Shrugs','Upright Row','Face Pulls'],
+        lats:           ['Lat Pulldown','Pull-ups','Chin-ups','Straight Arm Pulldown'],
+        upper_back:     ['Barbell Row','Dumbbell Row','Pendlay Row','T-Bar Row','Seated Cable Row'],
+        lower_back:     ['Deadlift','Romanian Deadlift','Sumo Deadlift','Hyperextensions','Good Mornings'],
+        biceps:         ['Bicep Curls','Hammer Curls','Preacher Curls','Concentration Curls','Incline Dumbbell Curl','EZ Bar Curl','Cable Curl','Spider Curls'],
+        triceps:        ['Tricep Pushdown','Overhead Tricep Extension','Skull Crushers','Close Grip Bench Press','Tricep Dips','Tricep Kickbacks','Cable Overhead Extension','Diamond Push-ups'],
+        forearms:       ['Hammer Curls','Wrist Curls','Reverse Curls','Farmer Carries'],
+        abs:            ['Crunches','Hanging Leg Raise','Cable Crunch','Ab Wheel Rollout','Bicycle Crunches','Leg Raises','Dead Bug','Mountain Climbers','Plank'],
+        obliques:       ['Russian Twist','Woodchoppers','Pallof Press','Side Plank'],
+        quads:          ['Squat','Front Squat','Goblet Squat','Bulgarian Split Squat','Hack Squat','Leg Press','Lunges','Walking Lunges','Reverse Lunges','Leg Extension','Step-ups','Box Jumps'],
+        hamstrings:     ['Romanian Deadlift','Leg Curl','Seated Leg Curl','Sumo Deadlift','Good Mornings','Nordic Curl'],
+        glutes:         ['Hip Thrust','Glute Bridge','Bulgarian Split Squat','Squat','Lunges','Walking Lunges','Reverse Lunges','Step-ups','Cable Pull-through'],
+        calves:         ['Calf Raises','Seated Calf Raise','Standing Calf Raise','Single-Leg Calf Raise'],
     };
-    // Merge custom exercises
+    // Merge custom exercises — map simple groups to sub-groups
+    const customGroupMap = {
+        chest: 'mid_chest', back: 'upper_back', shoulders: 'front_delts',
+        legs: 'quads', core: 'abs', biceps: 'biceps', triceps: 'triceps'
+    };
     getCustomExercises().forEach(e => {
-        if (muscleMap[e.muscle]) {
-            muscleMap[e.muscle].push(e.name);
+        const target = customGroupMap[e.muscle] || e.muscle;
+        if (muscleMap[target]) {
+            muscleMap[target].push(e.name);
         }
     });
     return muscleMap;

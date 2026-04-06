@@ -679,6 +679,253 @@ const TOPIC_RESPONSES = {
             handler: (ctx) => generateMealPlan(ctx),
         },
         {
+            id: 'fill_macros',
+            keywords: ['fill.*macro', 'hit.*macro', 'reach.*goal', 'remaining.*cal', 'left.*eat', 'still need', 'short on', 'how.*fill', 'what.*eat.*now', 'hungry', 'snack idea', 'finish.*day', 'close.*goal', 'almost.*goal', 'need more protein', 'need more cal', 'recommend.*food', 'suggest.*food', 'food.*recommend', 'what.*can.*eat'],
+            handler: (ctx) => {
+                const calGoal = ctx.profile.calorieGoal || 2000;
+                const protGoal = ctx.profile.proteinGoal || 150;
+                const carbGoal = Math.round(calGoal * 0.40 / 4);
+                const fatGoal = Math.round(calGoal * 0.30 / 9);
+
+                // Today's intake
+                const todayMeals = ctx.todayMeals;
+                const eaten = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+                todayMeals.forEach(m => {
+                    eaten.calories += m.calories;
+                    eaten.protein += m.protein;
+                    eaten.carbs += m.carbs;
+                    eaten.fat += m.fat;
+                });
+
+                const remaining = {
+                    calories: Math.max(0, calGoal - eaten.calories),
+                    protein: Math.max(0, protGoal - eaten.protein),
+                    carbs: Math.max(0, carbGoal - eaten.carbs),
+                    fat: Math.max(0, fatGoal - eaten.fat),
+                };
+
+                let html = `<h3>&#x1F37D; What to Eat Now</h3>`;
+
+                if (todayMeals.length === 0) {
+                    html += insightHtml(`You haven't logged any meals today. Here's what you need to hit your full daily targets.`);
+                } else {
+                    html += insightHtml(`You've eaten <strong>${eaten.calories} cal</strong> and <strong>${eaten.protein}g protein</strong> today. Here's what's left.`);
+                }
+
+                // Remaining macros display
+                html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin:12px 0;">`;
+                html += `<div style="background:var(--card);padding:10px;border-radius:8px;text-align:center;">
+                    <div style="font-size:20px;font-weight:700;color:${remaining.calories > 200 ? 'var(--accent)' : '#4ade80'};">${remaining.calories}</div>
+                    <div style="font-size:11px;color:var(--text-muted);">cal left</div></div>`;
+                html += `<div style="background:var(--card);padding:10px;border-radius:8px;text-align:center;">
+                    <div style="font-size:20px;font-weight:700;color:${remaining.protein > 20 ? '#f87171' : '#4ade80'};">${remaining.protein}g</div>
+                    <div style="font-size:11px;color:var(--text-muted);">protein</div></div>`;
+                html += `<div style="background:var(--card);padding:10px;border-radius:8px;text-align:center;">
+                    <div style="font-size:20px;font-weight:700;">${remaining.carbs}g</div>
+                    <div style="font-size:11px;color:var(--text-muted);">carbs</div></div>`;
+                html += `<div style="background:var(--card);padding:10px;border-radius:8px;text-align:center;">
+                    <div style="font-size:20px;font-weight:700;">${remaining.fat}g</div>
+                    <div style="font-size:11px;color:var(--text-muted);">fat</div></div>`;
+                html += `</div>`;
+
+                if (remaining.calories <= 50 && remaining.protein <= 10) {
+                    html += `<p style="color:#4ade80;font-weight:600;">&#x2705; You've hit your targets for today! Great work.</p>`;
+                    html += verseHtml();
+                    return html;
+                }
+
+                // --- Smart food matching from FOOD_DB ---
+                const db = (typeof FOOD_DB !== 'undefined') ? FOOD_DB : [];
+
+                // Score each food by how well it fills the remaining macros
+                function scoreFood(f) {
+                    if (f.calories > remaining.calories + 100) return -1;
+                    let score = 0;
+                    // Prioritize protein if that's the biggest gap
+                    if (remaining.protein > 20) score += (f.protein / Math.max(remaining.protein, 1)) * 40;
+                    // Calorie fit
+                    if (f.calories <= remaining.calories) score += 15;
+                    // Penalize foods that blow the budget
+                    if (f.calories > remaining.calories) score -= 10;
+                    // Bonus for balanced macros
+                    score += Math.min(f.carbs, remaining.carbs) * 0.1;
+                    score += Math.min(f.fat, remaining.fat) * 0.1;
+                    return score;
+                }
+
+                const scored = db.map(f => ({ ...f, score: scoreFood(f) }))
+                    .filter(f => f.score > 0)
+                    .sort((a, b) => b.score - a.score);
+
+                // --- Categorize recommendations ---
+                const highProtein = scored.filter(f => f.protein >= 15).slice(0, 6);
+                const quickSnacks = scored.filter(f => f.calories <= 300).slice(0, 6);
+                const fullMeals = scored.filter(f => f.calories >= 300 && f.calories <= remaining.calories).slice(0, 6);
+
+                // Emoji map for food visualization
+                const foodEmoji = {
+                    'chicken': '&#x1F357;', 'turkey': '&#x1F357;', 'steak': '&#x1F969;', 'beef': '&#x1F969;', 'bison': '&#x1F969;',
+                    'salmon': '&#x1F41F;', 'tuna': '&#x1F41F;', 'tilapia': '&#x1F41F;', 'shrimp': '&#x1F990;', 'cod': '&#x1F41F;',
+                    'egg': '&#x1F95A;', 'yogurt': '&#x1F95B;', 'milk': '&#x1F95B;', 'cheese': '&#x1F9C0;', 'cottage': '&#x1F9C0;',
+                    'rice': '&#x1F35A;', 'oat': '&#x1F35A;', 'pasta': '&#x1F35D;', 'bread': '&#x1F35E;', 'bagel': '&#x1F96F;', 'tortilla': '&#x1FAD3;', 'quinoa': '&#x1F35A;',
+                    'banana': '&#x1F34C;', 'apple': '&#x1F34E;', 'blueberr': '&#x1FAD0;', 'strawberr': '&#x1F353;', 'grape': '&#x1F347;', 'orange': '&#x1F34A;', 'mango': '&#x1F96D;', 'avocado': '&#x1F951;', 'watermelon': '&#x1F349;', 'pineapple': '&#x1F34D;', 'peach': '&#x1F351;',
+                    'broccoli': '&#x1F966;', 'salad': '&#x1F957;', 'lettuce': '&#x1F957;', 'spinach': '&#x1F96C;', 'kale': '&#x1F96C;', 'carrot': '&#x1F955;', 'corn': '&#x1F33D;', 'potato': '&#x1F954;', 'sweet potato': '&#x1F360;',
+                    'peanut': '&#x1F95C;', 'almond': '&#x1F95C;', 'walnut': '&#x1F95C;', 'cashew': '&#x1F95C;', 'nut': '&#x1F95C;',
+                    'protein shake': '&#x1F964;', 'protein bar': '&#x1F36B;', 'whey': '&#x1F964;', 'casein': '&#x1F964;',
+                    'pizza': '&#x1F355;', 'burger': '&#x1F354;', 'taco': '&#x1F32E;', 'burrito': '&#x1F32F;', 'sandwich': '&#x1F96A;', 'wrap': '&#x1F32F;',
+                    'pancake': '&#x1F95E;', 'waffle': '&#x1F9C7;', 'bacon': '&#x1F953;', 'sausage': '&#x1F953;',
+                    'cookie': '&#x1F36A;', 'chocolate': '&#x1F36B;', 'ice cream': '&#x1F368;', 'popcorn': '&#x1F37F;',
+                    'coffee': '&#x2615;', 'latte': '&#x2615;', 'juice': '&#x1F9C3;', 'smoothie': '&#x1F964;', 'beer': '&#x1F37A;', 'wine': '&#x1F377;',
+                    'honey': '&#x1F36F;', 'hummus': '&#x1F958;', 'soup': '&#x1F372;', 'ramen': '&#x1F35C;',
+                };
+
+                function getEmoji(name) {
+                    const lower = name.toLowerCase();
+                    for (const [key, emoji] of Object.entries(foodEmoji)) {
+                        if (lower.includes(key)) return emoji;
+                    }
+                    return '&#x1F374;';
+                }
+
+                function renderFoodCards(foods, sectionTitle) {
+                    if (foods.length === 0) return '';
+                    let s = `<h3>${sectionTitle}</h3>`;
+                    s += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 16px;">`;
+                    foods.forEach(f => {
+                        s += `<div style="background:var(--card);padding:10px;border-radius:8px;border:1px solid var(--border);">`;
+                        s += `<div style="font-size:22px;margin-bottom:4px;">${getEmoji(f.name)}</div>`;
+                        s += `<div style="font-size:13px;font-weight:600;">${f.name}</div>`;
+                        s += `<div style="font-size:11px;color:var(--text-muted);margin:2px 0;">${f.serving}</div>`;
+                        s += `<div style="font-size:12px;margin-top:4px;">`;
+                        s += `<span style="color:var(--accent);">${f.calories} cal</span> &middot; `;
+                        s += `<span style="color:#f87171;">${f.protein}g P</span> &middot; `;
+                        s += `<span>${f.carbs}g C</span> &middot; `;
+                        s += `<span>${f.fat}g F</span>`;
+                        s += `</div></div>`;
+                    });
+                    s += `</div>`;
+                    return s;
+                }
+
+                // Show recommendations based on what they need
+                if (remaining.protein > 20 && highProtein.length > 0) {
+                    html += renderFoodCards(highProtein, '&#x1F4AA; High Protein — You Need ' + remaining.protein + 'g More');
+                }
+
+                if (remaining.calories >= 300 && fullMeals.length > 0) {
+                    html += renderFoodCards(fullMeals, '&#x1F37D; Full Meals That Fit Your Remaining Budget');
+                }
+
+                if (remaining.calories > 0 && remaining.calories < 600 && quickSnacks.length > 0) {
+                    html += renderFoodCards(quickSnacks, '&#x26A1; Quick Snacks to Close the Gap');
+                }
+
+                // --- Combo meal suggestions that add up to fill the gap ---
+                html += `<h3>&#x1F468;&#x200D;&#x1F373; Meal Combos to Fill Your Remaining Macros</h3>`;
+
+                // Build smart combos
+                const combos = [];
+
+                // Helper: find foods in a category
+                function pick(keyword, maxCal) {
+                    return db.filter(f => f.name.toLowerCase().includes(keyword) && f.calories <= maxCal);
+                }
+
+                if (remaining.calories >= 400 && remaining.protein >= 25) {
+                    // High protein meal combo
+                    const proteins = pick('chicken', remaining.calories).concat(pick('salmon', remaining.calories), pick('turkey', remaining.calories), pick('steak', remaining.calories));
+                    const carbs = pick('rice', 300).concat(pick('potato', 300), pick('pasta', 300));
+                    const vegs = pick('broccoli', 100).concat(pick('spinach', 100), pick('asparagus', 100));
+                    if (proteins.length > 0 && carbs.length > 0) {
+                        const p = proteins[Math.floor(Math.random() * proteins.length)];
+                        const c = carbs[Math.floor(Math.random() * carbs.length)];
+                        const v = vegs.length > 0 ? vegs[Math.floor(Math.random() * vegs.length)] : null;
+                        const total = { cal: p.calories + c.calories + (v ? v.calories : 0), prot: p.protein + c.protein + (v ? v.protein : 0) };
+                        combos.push({ name: `${p.name} + ${c.name}${v ? ' + ' + v.name : ''}`, calories: total.cal, protein: total.prot, emoji: getEmoji(p.name),
+                            recipe: `Season ${p.serving} of ${p.name.toLowerCase()} with salt, pepper, and garlic powder. Cook on medium-high heat 4-5 min per side. Serve with ${c.serving} of ${c.name.toLowerCase()}${v ? ' and a side of ' + v.name.toLowerCase() + ' (steamed or roasted at 400°F for 15 min)' : ''}.` });
+                    }
+                }
+
+                if (remaining.calories >= 250 && remaining.protein >= 15) {
+                    // Shake/snack combo
+                    const shakes = pick('protein', 300).concat(pick('whey', 300));
+                    const fruits = pick('banana', 150).concat(pick('blueberr', 150), pick('apple', 150));
+                    const fats = pick('peanut butter', 200).concat(pick('almond butter', 200));
+                    if (shakes.length > 0) {
+                        const s = shakes[Math.floor(Math.random() * shakes.length)];
+                        const fr = fruits.length > 0 ? fruits[Math.floor(Math.random() * fruits.length)] : null;
+                        const fa = fats.length > 0 ? fats[Math.floor(Math.random() * fats.length)] : null;
+                        const total = { cal: s.calories + (fr ? fr.calories : 0) + (fa ? fa.calories : 0), prot: s.protein + (fr ? fr.protein : 0) + (fa ? fa.protein : 0) };
+                        combos.push({ name: `Protein Shake Combo`, calories: total.cal, protein: total.prot, emoji: '&#x1F964;',
+                            recipe: `Blend 1 scoop of whey protein with ${fr ? fr.serving + ' ' + fr.name.toLowerCase() + ', ' : ''}${fa ? fa.serving + ' ' + fa.name.toLowerCase() + ', ' : ''}8oz water or milk, and ice. Blend until smooth. Quick, easy, and packed with protein.` });
+                    }
+                }
+
+                if (remaining.calories >= 300) {
+                    // Egg-based meal
+                    const eggs = db.find(f => f.name === 'Egg (Whole)');
+                    const toast = db.find(f => f.name.toLowerCase().includes('wheat bread') || f.name.toLowerCase().includes('bread'));
+                    const avo = db.find(f => f.name.toLowerCase().includes('avocado'));
+                    if (eggs) {
+                        const eggCount = Math.min(4, Math.floor(remaining.protein / eggs.protein));
+                        const total = { cal: eggs.calories * eggCount + (toast ? toast.calories : 0) + (avo ? Math.round(avo.calories/2) : 0),
+                                        prot: eggs.protein * eggCount + (toast ? toast.protein : 0) + (avo ? Math.round(avo.protein/2) : 0) };
+                        combos.push({ name: `${eggCount} Eggs${toast ? ' + Toast' : ''}${avo ? ' + Avocado' : ''}`, calories: total.cal, protein: total.prot, emoji: '&#x1F95A;',
+                            recipe: `Scramble ${eggCount} eggs with salt and pepper in a non-stick pan over medium heat. ${toast ? 'Toast ' + toast.serving + ' of bread.' : ''} ${avo ? 'Slice half an avocado on top or on the side.' : ''} Simple, fast, and hits your protein.` });
+                    }
+                }
+
+                if (remaining.calories >= 200 && remaining.protein >= 10) {
+                    // Greek yogurt bowl
+                    const yogurt = db.find(f => f.name.toLowerCase().includes('greek yogurt') && f.name.toLowerCase().includes('plain'));
+                    const honey = db.find(f => f.name.toLowerCase().includes('honey'));
+                    const granola = db.find(f => f.name.toLowerCase().includes('granola'));
+                    const berries = db.find(f => f.name.toLowerCase().includes('blueberr') || f.name.toLowerCase().includes('strawberr'));
+                    if (yogurt) {
+                        const total = { cal: yogurt.calories + (honey ? honey.calories : 0) + (berries ? berries.calories : 0),
+                                        prot: yogurt.protein + (berries ? berries.protein : 0) };
+                        combos.push({ name: `Greek Yogurt Bowl`, calories: total.cal, protein: total.prot, emoji: '&#x1F963;',
+                            recipe: `Scoop ${yogurt.serving} plain Greek yogurt into a bowl. Top with ${berries ? berries.serving + ' ' + berries.name.toLowerCase() + ', ' : 'fresh berries, '}${honey ? 'a drizzle of honey, ' : ''}and a sprinkle of granola or nuts. High protein, creamy, and satisfying.` });
+                    }
+                }
+
+                if (combos.length > 0) {
+                    combos.forEach(combo => {
+                        html += `<div style="background:var(--card);padding:12px;border-radius:8px;border:1px solid var(--border);margin:8px 0;">`;
+                        html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">`;
+                        html += `<span style="font-size:26px;">${combo.emoji}</span>`;
+                        html += `<div><div style="font-size:14px;font-weight:700;">${combo.name}</div>`;
+                        html += `<div style="font-size:12px;color:var(--text-muted);">${combo.calories} cal &middot; ${combo.protein}g protein</div></div>`;
+                        html += `</div>`;
+                        html += `<div style="font-size:13px;color:var(--text-secondary);line-height:1.5;border-top:1px solid var(--border);padding-top:8px;margin-top:4px;">${combo.recipe}</div>`;
+                        html += `</div>`;
+                    });
+                } else {
+                    html += `<p>Log some meals first and I'll suggest combos to fill the gap!</p>`;
+                }
+
+                // Tip based on what's missing
+                html += `<h3>&#x1F4A1; Tips</h3><ul>`;
+                if (remaining.protein > 30) {
+                    html += `<li><strong>Protein is your priority.</strong> You're ${remaining.protein}g short — lean meats, Greek yogurt, protein shakes, and eggs are your best friends right now.</li>`;
+                }
+                if (remaining.calories > 0 && remaining.calories < 300) {
+                    html += `<li><strong>Almost there!</strong> A quick snack like a protein bar, Greek yogurt, or handful of nuts will close the gap.</li>`;
+                }
+                if (remaining.fat > 20) {
+                    html += `<li><strong>Healthy fats remaining:</strong> Add avocado, nuts, olive oil, or peanut butter to your next meal.</li>`;
+                }
+                if (remaining.carbs > 50) {
+                    html += `<li><strong>Carbs to fill:</strong> Rice, oats, fruit, or a sweet potato will get you there.</li>`;
+                }
+                html += `<li>Remember: hitting your protein goal matters most for body composition. Calories second, then carbs/fat.</li>`;
+                html += `</ul>`;
+
+                html += verseHtml({ text: "Therefore, whether you eat or drink, or whatever you do, do all to the glory of God.", ref: "1 Corinthians 10:31" });
+                return html;
+            },
+        },
+        {
             id: 'progress',
             keywords: ['progress', 'analyze', 'how am i doing', 'my stats', 'report', 'summary', 'overview', 'review'],
             handler: (ctx) => analyzeProgress(ctx),
@@ -1382,6 +1629,282 @@ const TOPIC_RESPONSES = {
             },
         },
         {
+            id: 'weak_point',
+            keywords: ['weak point', 'weak.?point', 'imbalance', 'lagging', 'underdeveloped', 'asymmetr', 'weak muscle', 'physique.*weak', 'aesthetic.*weak', 'performance.*weak', 'weak.*analysis', 'eliminate.*weak', 'fix.*weak'],
+            handler: (ctx, input) => {
+                // --- Corrective exercise database by muscle group ---
+                const correctiveDB = {
+                    chest: { muscle: 'Chest', exercises: [
+                        { name: 'Low Incline Dumbbell Press (15-30°)', sets: '4×8-10', tempo: '3-1-1-0', cues: 'Set bench to 1-2 clicks. Flare elbows ~60°. Lower to upper chest, drive up and slightly inward.' },
+                        { name: 'Cable Fly (various angles)', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Adjust pulley height to target weak area. Squeeze for 2 seconds at peak contraction.' },
+                        { name: 'Dumbbell Bench Press (deep stretch)', sets: '3×10-12', tempo: '3-0-1-0', cues: 'Go slightly deeper than barbell allows. Slow eccentric builds pec strength through greater ROM.' }
+                    ], timeline: '6-8 weeks for improved fullness; 12-16 weeks for visible change.', markers: 'Press weight increases 10-15%, visible chest development in relaxed pose.' },
+                    back: { muscle: 'Back', exercises: [
+                        { name: 'Wide-Grip Lat Pulldown', sets: '4×10-12', tempo: '2-0-1-2', cues: 'Lean back slightly, pull elbows DOWN and INTO your sides. Think "pull with elbows, not hands."' },
+                        { name: 'Straight-Arm Pulldown', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Isolates lats with zero bicep involvement. Arc the bar from face-height to thighs.' },
+                        { name: 'Chest-Supported Row', sets: '3×10-12', tempo: '2-0-1-2', cues: 'Eliminates momentum. Squeeze shoulder blades together at the top. 2 sec hold.' }
+                    ], timeline: '6-8 weeks for mind-muscle connection; 12-16 weeks for visible V-taper.', markers: 'Pulldown/row weight increases 15%+, visible lat spread in relaxed pose.' },
+                    shoulders: { muscle: 'Shoulders', exercises: [
+                        { name: 'Face Pulls', sets: '4×15-20', tempo: '2-0-1-2', cues: 'Pull to forehead height, externally rotate so thumbs point behind you. Elbows high.' },
+                        { name: 'Cable Lateral Raise', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Constant tension from the cable. Lead with elbows, not hands. Slight lean away.' },
+                        { name: 'Prone Incline Rear Delt Fly', sets: '3×15-20', tempo: '2-0-1-2', cues: 'Lie chest-down on 30° incline. Light dumbbells, lead with pinkies, hold the squeeze.' }
+                    ], timeline: '4-6 weeks for visible rounding; 10-12 weeks for structural change.', markers: 'Shoulder "cap" visible from front, face pull weight increases 20%+.' },
+                    legs: { muscle: 'Legs', exercises: [
+                        { name: 'Romanian Deadlift', sets: '4×8-10', tempo: '3-1-1-0', cues: 'Push hips BACK. Bar glides down thighs. Stop at deep hamstring stretch. Squeeze glutes to return.' },
+                        { name: 'Bulgarian Split Squat', sets: '3×10-12 per leg', tempo: '3-0-1-0', cues: 'Lean torso slightly forward to bias glutes. 3-second eccentric. Deep stretch at bottom.' },
+                        { name: 'Leg Curl (seated or lying)', sets: '4×10-12', tempo: '2-0-1-2', cues: 'Squeeze at full contraction for 2 seconds. Control the eccentric — no dropping.' }
+                    ], timeline: '6-8 weeks for strength gains; 12 weeks for visible development.', markers: 'RDL weight increases 15%+, visible hamstring/quad separation.' },
+                    biceps: { muscle: 'Biceps', exercises: [
+                        { name: 'Incline Dumbbell Curl', sets: '3×10-12', tempo: '2-0-1-2', cues: 'Set bench to 45°. Arms hang straight down. Curl without swinging — targets long head for peak.' },
+                        { name: 'Hammer Curls', sets: '3×10-12', tempo: '2-0-1-1', cues: 'Builds brachialis and forearm thickness. Neutral grip, no swinging.' },
+                        { name: 'Cable Curl (low pulley)', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Constant tension. Squeeze hard at top. Keep elbows pinned.' }
+                    ], timeline: '6-8 weeks for arm fullness; 12 weeks for measurable size.', markers: 'Arm circumference +0.25-0.5 inches, visible peak when flexed.' },
+                    triceps: { muscle: 'Triceps', exercises: [
+                        { name: 'Overhead Cable Tricep Extension', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Stretch hard at the bottom, squeeze at lockout. Elbows stay pointed forward.' },
+                        { name: 'Close-Grip Bench Press', sets: '3×8-10', tempo: '3-0-1-0', cues: 'Hands shoulder-width. Tuck elbows. Builds tricep mass and pressing power.' },
+                        { name: 'Tricep Dips (weighted)', sets: '3×8-12', tempo: '2-0-1-0', cues: 'Lean slightly forward for chest, stay upright for tricep focus. Full lockout at top.' }
+                    ], timeline: '6-8 weeks for visible horseshoe; 12 weeks for measurable size.', markers: 'Tricep horseshoe visible from the side, close-grip bench increases 10%+.' },
+                    core: { muscle: 'Core', exercises: [
+                        { name: 'Hanging Leg Raise', sets: '3×10-15', tempo: '2-0-1-1', cues: 'Curl pelvis up, don\'t just swing legs. Control the descent. Progress to straight legs.' },
+                        { name: 'Cable Crunch', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Crunch ribs toward hips, not just hinge at the hip. Squeeze at the bottom.' },
+                        { name: 'Pallof Press', sets: '3×10-12 per side', tempo: '2-2-2-0', cues: 'Anti-rotation — resist the cable pulling you. Press out, hold 2 sec, return. Builds real core stability.' }
+                    ], timeline: '4-6 weeks for strength; 8-12 weeks with low body fat for visibility.', markers: 'Plank hold time increases, improved brace on compound lifts, reduced lower back fatigue.' }
+                };
+
+                // --- Stagnation corrective database by lift type ---
+                const stagnationDB = {
+                    press: { lift: 'Pressing Movements (Bench/OHP)', cause: 'Weak pecs at full stretch, tricep lockout weakness, or loss of upper back tightness.', exercises: [
+                        { name: 'Spoto Press / Pause Press', sets: '4×4-6 @ 70-80%', tempo: '3-2-1-0', cues: 'Lower to 1 inch above chest, hold 2 seconds. Builds strength at the sticking point.' },
+                        { name: 'Close-Grip Bench Press', sets: '3×6-8', tempo: '3-0-1-0', cues: 'Overloads triceps for lockout strength. Hands shoulder-width.' },
+                        { name: 'Pin Press (at sticking point)', sets: '3×3-5', tempo: '1-1-1-0', cues: 'Set pins at your sticking point. Dead-stop press eliminates momentum.' }
+                    ], timeline: '4-6 weeks for improved bar speed through sticking point; 8-12 weeks for PR.', markers: 'Pause press reaches 85%+ of competition lift, bar speed at sticking point improves visibly.' },
+                    squat: { lift: 'Squat', cause: 'Quad weakness at depth, poor bracing, or hip/ankle mobility limitations.', exercises: [
+                        { name: 'Pause Squat (3-sec pause)', sets: '4×4-6 @ 65-75%', tempo: '3-3-1-0', cues: 'Hold motionless at the bottom for 3 seconds while maintaining brace. No bounce on the way up.' },
+                        { name: 'Front Squat', sets: '3×6-8', tempo: '3-0-1-0', cues: 'Forces upright torso and quad dominance. Fixes forward collapse.' },
+                        { name: 'Goblet Squat to Box', sets: '3×10-12', tempo: '3-1-1-0', cues: 'Sit back to box, pause, drive up. Teaches you to own the bottom position.' }
+                    ], timeline: '4-6 weeks for confidence in the hole; 8-12 weeks for measurable strength gains.', markers: 'Pause squat reaches 80%+ of back squat, no forward lean at the bottom.' },
+                    deadlift: { lift: 'Deadlift', cause: 'Weak glutes/upper back, or hips shooting up too fast leaving the back to finish the lift.', exercises: [
+                        { name: 'Block/Rack Pulls (knee height)', sets: '4×3-5 (heavy)', tempo: '1-0-1-0', cues: 'Overloads the lockout. Go 10-20% heavier than full deadlift. Brace hard.' },
+                        { name: 'Deficit Deadlift', sets: '3×4-6 @ 70-80%', tempo: '2-0-1-0', cues: 'Stand on 1-2 inch platform. Forces better positioning off the floor.' },
+                        { name: 'Barbell Hip Thrust (heavy)', sets: '3×6-8', tempo: '2-0-1-2', cues: 'Builds lockout-specific glute power. Squeeze HARD at top for 2 seconds.' }
+                    ], timeline: '4-6 weeks for smoother lockout; 8-12 weeks for hitch elimination.', markers: 'Rack pull exceeds deadlift by 15%+, no visible hitch on heavy singles.' },
+                    row: { lift: 'Rowing / Pull Movements', cause: 'Weak mid-back, bicep fatigue limiting volume, or poor scapular control.', exercises: [
+                        { name: 'Chest-Supported Row', sets: '4×8-10', tempo: '2-0-1-2', cues: 'Removes momentum. Focus purely on squeezing shoulder blades. 2 sec hold at top.' },
+                        { name: 'Straight-Arm Pulldown', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Isolates lats without bicep fatigue. Great for building the mind-muscle connection.' },
+                        { name: 'Face Pulls', sets: '3×15-20', tempo: '2-0-1-2', cues: 'Builds rear delts and mid-traps. Externally rotate at the end of each rep.' }
+                    ], timeline: '4-6 weeks for improved mind-muscle connection; 8-12 weeks for weight increases.', markers: 'Row weight increases 10-15%, improved upper back tightness on compounds.' },
+                    curl: { lift: 'Curl Movements', cause: 'Momentum compensation, insufficient time under tension, or relying on compounds for bicep growth.', exercises: [
+                        { name: 'Incline Dumbbell Curl', sets: '3×10-12', tempo: '2-0-1-3', cues: 'Set bench to 45°. 3-second eccentric. No swinging — the incline prevents cheating.' },
+                        { name: 'Preacher Curl', sets: '3×10-12', tempo: '2-0-1-2', cues: 'Eliminates momentum completely. Squeeze hard at the top.' },
+                        { name: 'Cable Curl (constant tension)', sets: '3×12-15', tempo: '2-0-1-2', cues: 'Cables keep tension throughout the whole range. Slow and controlled.' }
+                    ], timeline: '4-6 weeks for improved strength; 8-12 weeks for visible growth.', markers: 'Curl weight increases 15%+, visible bicep peak when flexed.' }
+                };
+
+                // Helper: classify an exercise name into a lift category for stagnation fixes
+                function getLiftCategory(exerciseName) {
+                    const n = exerciseName.toLowerCase();
+                    if (n.includes('bench') || n.includes('overhead') || n.includes('ohp') || n.includes('incline press') || n.includes('shoulder press') || n.includes('dumbbell press') || n.includes('machine press') || n.includes('chest press')) return 'press';
+                    if (n.includes('squat') || n.includes('leg press') || n.includes('hack')) return 'squat';
+                    if (n.includes('deadlift') || n.includes('rdl') || n.includes('romanian')) return 'deadlift';
+                    if (n.includes('row') || n.includes('pull-up') || n.includes('pullup') || n.includes('chin-up') || n.includes('pulldown') || n.includes('lat pull')) return 'row';
+                    if (n.includes('curl')) return 'curl';
+                    return null;
+                }
+
+                // =============================================
+                // AUTO-DETECT weak points from user's data
+                // =============================================
+                let html = `<h3>Weak Point Analysis</h3>`;
+                html += `<p style="opacity:0.8;font-style:italic;">Auto-detected from your logged workouts and training history.</p>`;
+
+                const totalWorkouts = ctx.workouts.length;
+                if (totalWorkouts === 0) {
+                    html += `<p>You haven't logged any workouts yet, so I can't auto-detect your weak points. Start logging your exercises and come back — I'll analyze your data to find:</p><ul>`;
+                    html += `<li><strong>Neglected muscle groups</strong> that aren't getting enough volume</li>`;
+                    html += `<li><strong>Stalled lifts</strong> where your weight hasn't increased in 4+ sessions</li>`;
+                    html += `<li><strong>Volume imbalances</strong> between push/pull, upper/lower, etc.</li>`;
+                    html += `</ul>`;
+                    html += `<p>Log at least 2-3 weeks of training for the best analysis.</p>`;
+                    html += verseHtml();
+                    return html;
+                }
+
+                let priority = 1;
+                const findings = { neglected: [], undertrained: [], stagnating: [], imbalanced: [] };
+
+                // --- 1. NEGLECTED muscle groups (zero sets in last 30 days) ---
+                const monthMuscleVolume = {};
+                Object.keys(ctx.muscleMap).forEach(group => { monthMuscleVolume[group] = 0; });
+                ctx.monthWorkouts.forEach(w => {
+                    for (const [group, exercises] of Object.entries(ctx.muscleMap)) {
+                        if (exercises.some(e => w.name.toLowerCase() === e.toLowerCase())) {
+                            monthMuscleVolume[group] += w.sets.length;
+                        }
+                    }
+                });
+
+                const sortedVolume = Object.entries(monthMuscleVolume).sort((a, b) => a[1] - b[1]);
+                const totalSets = sortedVolume.reduce((sum, [, v]) => sum + v, 0);
+                const avgSetsPerGroup = totalSets / sortedVolume.length;
+
+                sortedVolume.forEach(([group, sets]) => {
+                    if (sets === 0) {
+                        findings.neglected.push(group);
+                    } else if (sets < avgSetsPerGroup * 0.4) {
+                        findings.undertrained.push({ group, sets, avg: Math.round(avgSetsPerGroup) });
+                    }
+                });
+
+                // --- 2. STAGNATING lifts (weight hasn't increased in 4+ sessions) ---
+                const stagnatingLifts = [];
+                ctx.stagnant.forEach(name => {
+                    const category = getLiftCategory(name);
+                    stagnatingLifts.push({ name, category });
+                });
+
+                // --- 3. PUSH/PULL and UPPER/LOWER imbalance detection ---
+                const pushVolume = (monthMuscleVolume.chest || 0) + (monthMuscleVolume.shoulders || 0) + (monthMuscleVolume.triceps || 0);
+                const pullVolume = (monthMuscleVolume.back || 0) + (monthMuscleVolume.biceps || 0);
+                const upperVolume = pushVolume + pullVolume;
+                const lowerVolume = (monthMuscleVolume.legs || 0);
+                const pushPullRatio = pullVolume > 0 ? (pushVolume / pullVolume) : 0;
+                const upperLowerRatio = lowerVolume > 0 ? (upperVolume / lowerVolume) : 0;
+
+                if (pushPullRatio > 1.8 && pushVolume > 0 && pullVolume > 0) {
+                    findings.imbalanced.push({ type: 'Push vs Pull', detail: `Your push volume (${pushVolume} sets) is ${pushPullRatio.toFixed(1)}× your pull volume (${pullVolume} sets). This can lead to rounded shoulders and shoulder injuries. Aim for a 1:1 to 1:1.5 push-to-pull ratio.` });
+                } else if (pushPullRatio < 0.55 && pushVolume > 0 && pullVolume > 0) {
+                    findings.imbalanced.push({ type: 'Pull vs Push', detail: `Your pull volume (${pullVolume} sets) far exceeds your push volume (${pushVolume} sets). Add more pressing work for balanced development.` });
+                }
+                if (upperLowerRatio > 2.5 && upperVolume > 0 && lowerVolume > 0) {
+                    findings.imbalanced.push({ type: 'Upper vs Lower', detail: `Your upper body volume (${upperVolume} sets) is ${upperLowerRatio.toFixed(1)}× your lower body volume (${lowerVolume} sets). Don't skip leg day — lower body training drives total-body growth and hormonal response.` });
+                } else if (upperLowerRatio < 0.8 && upperVolume > 0 && lowerVolume > 0) {
+                    findings.imbalanced.push({ type: 'Lower vs Upper', detail: `Your lower body volume (${lowerVolume} sets) significantly exceeds upper body (${upperVolume} sets). Add more upper body pressing and pulling for balanced development.` });
+                }
+
+                // --- BUILD THE REPORT ---
+                const hasFindings = findings.neglected.length > 0 || findings.undertrained.length > 0 || stagnatingLifts.length > 0 || findings.imbalanced.length > 0;
+
+                if (!hasFindings) {
+                    html += insightHtml(`Looking good — no major weak points detected in your training data. Your volume is balanced across muscle groups and none of your lifts are stagnating.`);
+                    html += `<p>Keep training consistently. Come back and check again in a few weeks, or if you feel something is lagging.</p>`;
+                    html += verseHtml({ text: "He gives strength to the weary and increases the power of the weak.", ref: "Isaiah 40:29" });
+                    return html;
+                }
+
+                // Monthly volume overview
+                html += `<h3>Your 30-Day Volume Breakdown</h3>`;
+                html += `<table class="plan-table"><tr><th>Muscle Group</th><th>Total Sets</th><th>Status</th></tr>`;
+                sortedVolume.forEach(([group, sets]) => {
+                    const name = group.charAt(0).toUpperCase() + group.slice(1);
+                    let status = '&#x2705; On Track';
+                    if (sets === 0) status = '&#x1F534; Neglected';
+                    else if (sets < avgSetsPerGroup * 0.4) status = '&#x1F7E1; Undertrained';
+                    html += `<tr><td>${name}</td><td>${sets}</td><td>${status}</td></tr>`;
+                });
+                html += `</table>`;
+
+                // NEGLECTED muscle groups
+                if (findings.neglected.length > 0) {
+                    html += `<h3>Priority #${priority}: Neglected Muscle Groups</h3>`;
+                    html += insightHtml(`These muscles have <strong>ZERO</strong> sets logged in the past 30 days. This is your biggest opportunity for improvement.`);
+                    findings.neglected.forEach(group => {
+                        const fix = correctiveDB[group];
+                        if (!fix) return;
+                        html += `<div style="background:var(--card);padding:1rem;border-radius:8px;margin:0.75rem 0;">`;
+                        html += `<h3>${fix.muscle}</h3>`;
+                        html += `<p><strong>Root Cause:</strong> This group is completely absent from your program — likely a programming gap, not a conscious choice.</p>`;
+                        html += `<table class="plan-table"><tr><th>Exercise</th><th>Sets × Reps</th><th>Tempo</th><th>Coaching Cues</th></tr>`;
+                        fix.exercises.forEach(ex => {
+                            html += `<tr><td>${ex.name}</td><td>${ex.sets}</td><td>${ex.tempo}</td><td>${ex.cues}</td></tr>`;
+                        });
+                        html += `</table>`;
+                        html += `<p><strong>Timeline:</strong> ${fix.timeline}</p>`;
+                        html += `<p><strong>Measurable Markers:</strong> ${fix.markers}</p>`;
+                        html += `</div>`;
+                    });
+                    priority++;
+                }
+
+                // UNDERTRAINED muscle groups
+                if (findings.undertrained.length > 0) {
+                    html += `<h3>Priority #${priority}: Undertrained Muscle Groups</h3>`;
+                    html += insightHtml(`These muscles are getting some work but significantly less than your other groups (avg: ${Math.round(avgSetsPerGroup)} sets/month).`);
+                    findings.undertrained.forEach(({ group, sets, avg }) => {
+                        const fix = correctiveDB[group];
+                        if (!fix) return;
+                        const name = group.charAt(0).toUpperCase() + group.slice(1);
+                        html += `<div style="background:var(--card);padding:1rem;border-radius:8px;margin:0.75rem 0;">`;
+                        html += `<h3>${fix.muscle} — ${sets} sets vs ${avg} avg</h3>`;
+                        html += `<p><strong>Root Cause:</strong> Volume imbalance — ${name} is getting less than half the attention of your other muscle groups. This will show up as a visual weak point over time.</p>`;
+                        html += `<p><strong>Quick Fix:</strong> Add ${Math.max(2, Math.round((avg - sets) / 4))} more sets of ${name} work per week. Here are the best exercises to add:</p>`;
+                        html += `<table class="plan-table"><tr><th>Exercise</th><th>Sets × Reps</th><th>Tempo</th><th>Coaching Cues</th></tr>`;
+                        fix.exercises.slice(0, 2).forEach(ex => {
+                            html += `<tr><td>${ex.name}</td><td>${ex.sets}</td><td>${ex.tempo}</td><td>${ex.cues}</td></tr>`;
+                        });
+                        html += `</table>`;
+                        html += `</div>`;
+                    });
+                    priority++;
+                }
+
+                // STAGNATING lifts
+                if (stagnatingLifts.length > 0) {
+                    html += `<h3>Priority #${priority}: Stalled Lifts</h3>`;
+                    html += insightHtml(`These exercises haven't increased in weight over your last 4+ sessions — you've hit a plateau.`);
+                    const processedCategories = new Set();
+                    stagnatingLifts.forEach(({ name, category }) => {
+                        html += `<div style="background:var(--card);padding:1rem;border-radius:8px;margin:0.75rem 0;">`;
+                        html += `<h3>${name} — Stalled</h3>`;
+                        const maxWeight = ctx.exercisePRs[name] || 0;
+                        const unit = ctx.profile.unit === 'metric' ? 'kg' : 'lbs';
+                        if (maxWeight > 0) {
+                            html += `<p>Current best: <strong>${maxWeight} ${unit}</strong> (unchanged for 4+ sessions)</p>`;
+                        }
+                        if (category && stagnationDB[category] && !processedCategories.has(category)) {
+                            processedCategories.add(category);
+                            const fix = stagnationDB[category];
+                            html += `<p><strong>Root Cause:</strong> ${fix.cause}</p>`;
+                            html += `<table class="plan-table"><tr><th>Exercise</th><th>Sets × Reps</th><th>Tempo</th><th>Coaching Cues</th></tr>`;
+                            fix.exercises.forEach(ex => {
+                                html += `<tr><td>${ex.name}</td><td>${ex.sets}</td><td>${ex.tempo}</td><td>${ex.cues}</td></tr>`;
+                            });
+                            html += `</table>`;
+                            html += `<p><strong>Timeline:</strong> ${fix.timeline}</p>`;
+                            html += `<p><strong>Measurable Markers:</strong> ${fix.markers}</p>`;
+                        } else if (!category) {
+                            html += `<p><strong>General Fix:</strong> Drop weight by 10%, increase reps to 10-12, build back up over 3-4 weeks. Or try a close variation of this exercise.</p>`;
+                        }
+                        html += `</div>`;
+                    });
+                    priority++;
+                }
+
+                // VOLUME IMBALANCES
+                if (findings.imbalanced.length > 0) {
+                    html += `<h3>Priority #${priority}: Volume Imbalances</h3>`;
+                    findings.imbalanced.forEach(({ type, detail }) => {
+                        html += `<div style="background:var(--card);padding:1rem;border-radius:8px;margin:0.75rem 0;">`;
+                        html += `<h3>${type} Imbalance</h3>`;
+                        html += `<p>${detail}</p>`;
+                        html += `</div>`;
+                    });
+                    priority++;
+                }
+
+                // Integration advice
+                html += `<h3>Your Action Plan — Start This Week</h3><ul>`;
+                html += `<li><strong>Add, don't replace:</strong> Slot corrective exercises at the END of the relevant training day.</li>`;
+                html += `<li><strong>2-3 exercises per weak point, 2× per week:</strong> Frequency beats volume. Spread the work across the week.</li>`;
+                html += `<li><strong>Fatigue management:</strong> Keep corrective work at RPE 7-8 (2-3 reps in reserve). These are builders, not grinders.</li>`;
+                html += `<li><strong>Track everything:</strong> Log these corrective exercises here in Iron Faith so you can see progression over time.</li>`;
+                html += `<li><strong>Reassess in 8 weeks:</strong> Come back to this analysis and compare. Take progress photos now so you have a baseline.</li>`;
+                html += `</ul>`;
+
+                html += verseHtml({ text: "He gives strength to the weary and increases the power of the weak.", ref: "Isaiah 40:29" });
+                return html;
+            },
+        },
+        {
             id: 'greeting',
             keywords: ['hello', 'hi', 'hey', 'sup', 'what\'s up', 'good morning', 'good evening', 'howdy'],
             handler: (ctx) => {
@@ -1436,6 +1959,8 @@ const TOPIC_RESPONSES = {
         html += `<li><strong>"My streak"</strong> — consistency and attendance tracking</li>`;
         html += `<li><strong>"Cardio guide"</strong> — HIIT vs LISS, what's right for you</li>`;
         html += `<li><strong>"Pre/post workout meal"</strong> — nutrient timing tips</li>`;
+        html += `<li><strong>"What should I eat?"</strong> — smart food recs based on your remaining macros today</li>`;
+        html += `<li><strong>"Weak point analysis"</strong> — identify and fix lagging muscles & lift sticking points</li>`;
         html += `</ul>`;
         html += verseHtml();
         return html;
