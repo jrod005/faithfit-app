@@ -2236,6 +2236,41 @@ canvas {
 }
 .post-like-btn.liked { color: #ef4444; border-color: rgba(239,68,68,0.3); }
 .post-like-btn:hover { border-color: var(--text-muted); }
+.strength-progress-controls {
+    margin-bottom: 12px;
+}
+.strength-progress-controls select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 14px;
+}
+.strength-pr-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+.strength-pr-summary b { color: var(--text-primary); }
+.strength-pr-summary .pr-up { color: var(--success); font-weight: 600; }
+.strength-pr-summary .pr-down { color: #ef4444; font-weight: 600; }
+.chart-caption {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
 .post-comment-btn {
     background: none;
     border: 1px solid var(--border);

@@ -751,6 +751,274 @@ function drawWeightChart() {
     }
 }
 
+// --- Progress Charts ---
+// Epley 1RM estimate: weight * (1 + reps/30)
+function estimate1RM(weight, reps) {
+    if (reps <= 0) return 0;
+    if (reps === 1) return weight;
+    return weight * (1 + reps / 30);
+}
+
+function getStrengthSeries(exerciseName) {
+    const workouts = DB.get('workouts', []).filter(w => w.name === exerciseName);
+    // group by date, take max e1RM per day
+    const byDate = {};
+    workouts.forEach(w => {
+        const top = w.sets.reduce((mx, s) => Math.max(mx, estimate1RM(s.weight, s.reps)), 0);
+        if (!byDate[w.date] || top > byDate[w.date]) byDate[w.date] = top;
+    });
+    return Object.entries(byDate)
+        .map(([date, e1rm]) => ({ date, e1rm }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function populateStrengthSelect() {
+    const sel = document.getElementById('strength-exercise-select');
+    if (!sel) return;
+    const workouts = DB.get('workouts', []);
+    // Count occurrences to sort by most-logged
+    const counts = {};
+    workouts.forEach(w => { counts[w.name] = (counts[w.name] || 0) + 1; });
+    const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    if (names.length === 0) {
+        sel.innerHTML = '<option value="">No exercises logged yet</option>';
+        return;
+    }
+    const prev = sel.value;
+    sel.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+    if (prev && names.includes(prev)) sel.value = prev;
+    sel.onchange = drawStrengthChart;
+}
+
+function drawStrengthChart() {
+    const canvas = document.getElementById('strength-chart');
+    const summary = document.getElementById('strength-pr-summary');
+    if (!canvas) return;
+    const sel = document.getElementById('strength-exercise-select');
+    const name = sel && sel.value;
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = canvas.offsetWidth * 2;
+    canvas.height = 400;
+    ctx.scale(2, 2);
+    const w = canvas.offsetWidth;
+    const h = 200;
+    ctx.clearRect(0, 0, w, h);
+
+    if (!name) {
+        ctx.fillStyle = '#64748B';
+        ctx.font = '14px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Log a workout to see strength progress', w / 2, h / 2);
+        if (summary) summary.innerHTML = '';
+        return;
+    }
+
+    const series = getStrengthSeries(name);
+    if (series.length < 2) {
+        ctx.fillStyle = '#64748B';
+        ctx.font = '14px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Log this exercise at least twice to see a trend', w / 2, h / 2);
+        if (summary && series.length === 1) {
+            const e = series[0];
+            summary.innerHTML = `<span>Best e1RM: <b>${lbsToDisplay(e.e1rm)} ${wu()}</b></span>`;
+        } else if (summary) summary.innerHTML = '';
+        return;
+    }
+
+    const values = series.map(s => parseFloat(lbsToDisplay(s.e1rm)));
+    const min = Math.min(...values) - 2;
+    const max = Math.max(...values) + 2;
+    const range = max - min || 1;
+
+    const padTop = 20, padBot = 40, padLeft = 45, padRight = 15;
+    const chartW = w - padLeft - padRight;
+    const chartH = h - padTop - padBot;
+
+    // Grid
+    ctx.strokeStyle = '#E2E8F0';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 4; i++) {
+        const y = padTop + (chartH / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, y);
+        ctx.lineTo(w - padRight, y);
+        ctx.stroke();
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = '11px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText((max - (range / 4) * i).toFixed(0), padLeft - 8, y + 4);
+    }
+
+    // Filled area
+    ctx.beginPath();
+    values.forEach((val, i) => {
+        const x = padLeft + (chartW / (values.length - 1)) * i;
+        const y = padTop + chartH - ((val - min) / range) * chartH;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.lineTo(padLeft + chartW, padTop + chartH);
+    ctx.lineTo(padLeft, padTop + chartH);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(192, 192, 192, 0.15)';
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    ctx.strokeStyle = '#C0C0C0';
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    values.forEach((val, i) => {
+        const x = padLeft + (chartW / (values.length - 1)) * i;
+        const y = padTop + chartH - ((val - min) / range) * chartH;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Dots
+    values.forEach((val, i) => {
+        const x = padLeft + (chartW / (values.length - 1)) * i;
+        const y = padTop + chartH - ((val - min) / range) * chartH;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#C0C0C0';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.fillStyle = 'white';
+        ctx.fill();
+    });
+
+    // Date labels
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '10px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    const labelCount = Math.min(series.length, 6);
+    for (let i = 0; i < labelCount; i++) {
+        const idx = Math.round(i * (series.length - 1) / (labelCount - 1));
+        const x = padLeft + (chartW / (series.length - 1)) * idx;
+        ctx.fillText(series[idx].date.slice(5), x, h - 8);
+    }
+
+    if (summary) {
+        const first = values[0];
+        const last = values[values.length - 1];
+        const delta = last - first;
+        const pct = first > 0 ? ((delta / first) * 100).toFixed(1) : '0';
+        const arrow = delta >= 0 ? '&#x25B2;' : '&#x25BC;';
+        const cls = delta >= 0 ? 'pr-up' : 'pr-down';
+        summary.innerHTML = `
+            <span>Current e1RM: <b>${last.toFixed(1)} ${wu()}</b></span>
+            <span class="${cls}">${arrow} ${Math.abs(delta).toFixed(1)} ${wu()} (${pct}%)</span>
+        `;
+    }
+}
+
+function getWeeklyVolume(weeks = 12) {
+    const workouts = DB.get('workouts', []);
+    const buckets = [];
+    const now = new Date();
+    // Start of this week (Sunday)
+    const startOfThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+    for (let i = weeks - 1; i >= 0; i--) {
+        const start = new Date(startOfThisWeek);
+        start.setDate(start.getDate() - i * 7);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 7);
+        buckets.push({ start, end, volume: 0, label: `${start.getMonth() + 1}/${start.getDate()}` });
+    }
+    workouts.forEach(w => {
+        const ts = w.timestamp ? new Date(w.timestamp) : new Date(w.date);
+        for (const b of buckets) {
+            if (ts >= b.start && ts < b.end) {
+                w.sets.forEach(s => { b.volume += (s.weight || 0) * (s.reps || 0); });
+                break;
+            }
+        }
+    });
+    return buckets;
+}
+
+function drawVolumeChart() {
+    const canvas = document.getElementById('volume-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth * 2;
+    canvas.height = 400;
+    ctx.scale(2, 2);
+    const w = canvas.offsetWidth;
+    const h = 200;
+    ctx.clearRect(0, 0, w, h);
+
+    const buckets = getWeeklyVolume(12);
+    const values = buckets.map(b => parseFloat(lbsToDisplay(b.volume)));
+    const max = Math.max(...values, 1);
+    const totalVol = values.reduce((a, b) => a + b, 0);
+    const avgVol = totalVol / values.length;
+
+    const caption = document.getElementById('volume-caption');
+    if (caption) {
+        if (totalVol === 0) {
+            caption.textContent = 'No workouts logged in this window yet.';
+        } else {
+            caption.innerHTML = `12-week avg: <b>${avgVol.toFixed(0)} ${wu()}</b> per week`;
+        }
+    }
+
+    const padTop = 20, padBot = 30, padLeft = 45, padRight = 15;
+    const chartW = w - padLeft - padRight;
+    const chartH = h - padTop - padBot;
+
+    // Y grid + labels
+    ctx.strokeStyle = '#E2E8F0';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 4; i++) {
+        const y = padTop + (chartH / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, y);
+        ctx.lineTo(w - padRight, y);
+        ctx.stroke();
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = '11px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(((max / 4) * (4 - i)).toFixed(0), padLeft - 8, y + 4);
+    }
+
+    // Bars
+    const barGap = 4;
+    const barW = (chartW / values.length) - barGap;
+    values.forEach((v, i) => {
+        const barH = max > 0 ? (v / max) * chartH : 0;
+        const x = padLeft + i * (barW + barGap) + barGap / 2;
+        const y = padTop + chartH - barH;
+        const grad = ctx.createLinearGradient(0, y, 0, y + barH);
+        grad.addColorStop(0, '#C0C0C0');
+        grad.addColorStop(1, 'rgba(192,192,192,0.3)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, barW, barH);
+    });
+
+    // X labels (every other)
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '10px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    buckets.forEach((b, i) => {
+        if (i % 2 === 0 || i === buckets.length - 1) {
+            const x = padLeft + i * (barW + barGap) + barW / 2 + barGap / 2;
+            ctx.fillText(b.label, x, h - 8);
+        }
+    });
+}
+
+function renderProgressCharts() {
+    populateStrengthSelect();
+    drawStrengthChart();
+    drawVolumeChart();
+}
+
 // --- Workout Logging ---
 let setCount = 1;
 
@@ -1471,6 +1739,7 @@ function updateDashboard() {
 
     updateStreak();
     updateRecentWorkouts();
+    renderProgressCharts();
     renderCalendarHeatmap();
     renderMuscleHeatmap();
     renderAchievements();
