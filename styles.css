@@ -2754,3 +2754,64 @@ canvas {
     font-size: 13px;
     min-width: 0;
 }
+
+/* Onboarding choice grid */
+.ob-choice-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.ob-choice {
+    text-align: left;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: all 0.15s;
+}
+.ob-choice:hover { border-color: var(--text-muted); }
+.ob-choice.selected {
+    background: rgba(74, 222, 128, 0.1);
+    border-color: var(--success);
+}
+.ob-choice strong { font-size: 14px; }
+.ob-choice span { font-size: 12px; color: var(--text-muted); }
+
+.ob-routine-suggestion {
+    margin: 14px 0;
+    padding: 14px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(74, 222, 128, 0.12), rgba(74, 222, 128, 0.04));
+    border: 1px solid rgba(74, 222, 128, 0.3);
+    text-align: left;
+}
+.ob-routine-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--success);
+    font-weight: 700;
+}
+.ob-routine-name {
+    font-size: 17px;
+    font-weight: 800;
+    margin-top: 4px;
+}
+.ob-routine-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    line-height: 1.4;
+}
+.ob-routine-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+}

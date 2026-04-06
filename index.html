@@ -22,6 +22,8 @@
                 <span class="step-dot"></span>
                 <span class="step-dot"></span>
                 <span class="step-dot"></span>
+                <span class="step-dot"></span>
+                <span class="step-dot"></span>
             </div>
             <div class="onboarding-slide active" data-step="1">
                 <div class="onboarding-icon">&#x2694;</div>
@@ -47,9 +49,55 @@
                 <button class="btn btn-primary btn-full" onclick="nextOnboardingStep()">Continue</button>
             </div>
             <div class="onboarding-slide" data-step="4">
+                <h2>Your Training</h2>
+                <p class="onboarding-sub">Pick what fits you best</p>
+                <div class="form-group">
+                    <label>Experience Level</label>
+                    <div class="ob-choice-grid">
+                        <button class="ob-choice" data-ob="experience" data-val="beginner" onclick="obSelectChoice('experience','beginner')">
+                            <strong>Beginner</strong>
+                            <span>New to lifting or under 1 year</span>
+                        </button>
+                        <button class="ob-choice" data-ob="experience" data-val="intermediate" onclick="obSelectChoice('experience','intermediate')">
+                            <strong>Intermediate</strong>
+                            <span>1-3 years consistent training</span>
+                        </button>
+                        <button class="ob-choice" data-ob="experience" data-val="advanced" onclick="obSelectChoice('experience','advanced')">
+                            <strong>Advanced</strong>
+                            <span>3+ years, know your numbers</span>
+                        </button>
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-full" onclick="nextOnboardingStep()">Continue</button>
+            </div>
+            <div class="onboarding-slide" data-step="5">
+                <h2>Where Do You Train?</h2>
+                <p class="onboarding-sub">We'll match a routine to your equipment</p>
+                <div class="ob-choice-grid">
+                    <button class="ob-choice" data-ob="equipment" data-val="gym" onclick="obSelectChoice('equipment','gym')">
+                        <strong>Full Gym</strong>
+                        <span>Barbells, machines, cables</span>
+                    </button>
+                    <button class="ob-choice" data-ob="equipment" data-val="dumbbell" onclick="obSelectChoice('equipment','dumbbell')">
+                        <strong>Dumbbells Only</strong>
+                        <span>Home gym essentials</span>
+                    </button>
+                    <button class="ob-choice" data-ob="equipment" data-val="bodyweight" onclick="obSelectChoice('equipment','bodyweight')">
+                        <strong>Bodyweight</strong>
+                        <span>No equipment needed</span>
+                    </button>
+                    <button class="ob-choice" data-ob="equipment" data-val="band" onclick="obSelectChoice('equipment','band')">
+                        <strong>Resistance Bands</strong>
+                        <span>Travel friendly</span>
+                    </button>
+                </div>
+                <button class="btn btn-primary btn-full" onclick="nextOnboardingStep()">Continue</button>
+            </div>
+            <div class="onboarding-slide" data-step="6">
                 <div class="onboarding-icon">&#x1F4AA;</div>
                 <h2>You're All Set!</h2>
                 <div id="ob-summary" class="ob-summary"></div>
+                <div id="ob-routine-suggestion" class="ob-routine-suggestion"></div>
                 <p class="onboarding-verse">"For physical training is of some value, but godliness has value for all things." &mdash; 1 Timothy 4:8</p>
                 <button class="btn btn-primary btn-full" onclick="completeOnboarding()">Start Training</button>
             </div>

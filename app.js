@@ -3374,11 +3374,31 @@ function finishChallenge() {
 
 let obGender = 'male';
 let obStep = 1;
+let obExperience = null;
+let obEquipment = null;
 
 function obSetGender(g) {
     obGender = g;
     document.getElementById('ob-male').classList.toggle('active', g === 'male');
     document.getElementById('ob-female').classList.toggle('active', g === 'female');
+}
+
+function obSelectChoice(field, value) {
+    if (field === 'experience') obExperience = value;
+    if (field === 'equipment') obEquipment = value;
+    document.querySelectorAll(`.ob-choice[data-ob="${field}"]`).forEach(el => {
+        el.classList.toggle('selected', el.dataset.val === value);
+    });
+}
+
+function suggestRoutineForUser() {
+    if (typeof IRON_FAITH_ROUTINES === 'undefined') return null;
+    // Match by category first, then by experience level
+    let candidates = IRON_FAITH_ROUTINES.filter(r => r.category === obEquipment);
+    if (candidates.length === 0) candidates = IRON_FAITH_ROUTINES.filter(r => r.category === 'gym');
+    // Prefer matching level
+    const exact = candidates.find(r => r.level === obExperience);
+    return exact || candidates[0];
 }
 
 function nextOnboardingStep() {
@@ -3387,8 +3407,16 @@ function nextOnboardingStep() {
         const name = document.getElementById('ob-name').value.trim();
         if (!name) { alert('Please enter your name.'); return; }
     }
-    if (obStep === 3) {
-        // Build summary for step 4
+    if (obStep === 4 && !obExperience) {
+        alert('Pick your experience level.');
+        return;
+    }
+    if (obStep === 5 && !obEquipment) {
+        alert('Pick where you train.');
+        return;
+    }
+    if (obStep === 5) {
+        // Build summary + routine suggestion for final step
         const name = document.getElementById('ob-name').value.trim();
         const weight = document.getElementById('ob-weight').value;
         const goal = document.getElementById('ob-goal').value;
@@ -3417,6 +3445,17 @@ function nextOnboardingStep() {
             ${tdee > 500 ? `<div class="ob-summary-item"><span>Daily Calories</span><strong>${tdee} kcal</strong></div>` : ''}
             ${proteinGoal > 30 ? `<div class="ob-summary-item"><span>Protein Target</span><strong>${proteinGoal}g</strong></div>` : ''}
         `;
+
+        const routine = suggestRoutineForUser();
+        const suggBox = document.getElementById('ob-routine-suggestion');
+        if (routine && suggBox) {
+            suggBox.innerHTML = `
+                <div class="ob-routine-label">Your Recommended Routine</div>
+                <div class="ob-routine-name">${escapeHtml(routine.name)}</div>
+                <div class="ob-routine-desc">${escapeHtml(routine.description)}</div>
+                <div class="ob-routine-meta">${routine.days.length} days &middot; ${routine.type}</div>
+            `;
+        }
     }
 
     obStep++;
@@ -3464,6 +3503,19 @@ function completeOnboarding() {
     }
 
     DB.set('onboarded', true);
+
+    // Save suggested routine to My Routines
+    const suggested = suggestRoutineForUser();
+    if (suggested) {
+        const my = DB.get('myRoutines', []);
+        if (!my.some(r => r.id === suggested.id)) {
+            my.push(JSON.parse(JSON.stringify(suggested)));
+            DB.set('myRoutines', my);
+        }
+    }
+    DB.set('experience', obExperience);
+    DB.set('equipment', obEquipment);
+
     document.getElementById('onboarding').classList.add('hidden');
 
     // Refresh everything
@@ -3473,6 +3525,7 @@ function completeOnboarding() {
     drawWeightChart();
     updateNutritionBars();
     checkAchievements();
+    if (typeof renderTodaysWorkoutBanner === 'function') renderTodaysWorkoutBanner();
 }
 
 function showOnboarding() {
