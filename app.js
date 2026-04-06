@@ -751,6 +751,36 @@ function drawWeightChart() {
     }
 }
 
+// --- Haptics ---
+function isHapticsEnabled() {
+    return DB.get('hapticsEnabled', true) !== false;
+}
+
+function haptic(pattern) {
+    if (!isHapticsEnabled()) return;
+    if (navigator.vibrate) {
+        try { navigator.vibrate(pattern); } catch (e) {}
+    }
+}
+
+function setHaptics(enabled) {
+    DB.set('hapticsEnabled', !!enabled);
+    const onBtn = document.getElementById('haptics-on');
+    const offBtn = document.getElementById('haptics-off');
+    if (onBtn) onBtn.classList.toggle('active', !!enabled);
+    if (offBtn) offBtn.classList.toggle('active', !enabled);
+    if (enabled) haptic(20);
+    showToast(enabled ? 'Haptics on' : 'Haptics off', 'success');
+}
+
+function loadHapticsToggle() {
+    const enabled = isHapticsEnabled();
+    const onBtn = document.getElementById('haptics-on');
+    const offBtn = document.getElementById('haptics-off');
+    if (onBtn) onBtn.classList.toggle('active', enabled);
+    if (offBtn) offBtn.classList.toggle('active', !enabled);
+}
+
 // --- Visual: count-up animation ---
 function animateCount(el, target, opts) {
     if (!el) return;
@@ -2979,7 +3009,7 @@ function onRestTimerComplete() {
     document.getElementById('stop-timer-btn').style.display = 'none';
     document.getElementById('rest-timer-mini').classList.add('hidden');
     // Vibrate
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    haptic([200, 100, 200]);
     // Beep via Web Audio API
     try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -4687,7 +4717,7 @@ function completeSet(exIdx, sIdx) {
             const btn = row.querySelector('.active-done-btn');
             if (btn) {
                 btn.classList.add('checked');
-                if (navigator.vibrate) navigator.vibrate(20);
+                haptic(20);
             }
         }
     }
@@ -4721,8 +4751,8 @@ function startRestTimer(seconds) {
         if (remaining === 0) {
             clearInterval(activeRestTimer);
             el.classList.add('hidden');
-            try { navigator.vibrate && navigator.vibrate(300); } catch (e) {}
-            showToast('Rest done — go!');
+            haptic(300);
+            showToast('Rest done — go!', 'success');
         }
     };
     update();
@@ -4869,6 +4899,7 @@ function init() {
     displayDailyVerse();
     loadProfile();
     loadUnits();
+    loadHapticsToggle();
     updateDashboard();
     updateTodaysExercises();
     updateOverloadDropdown();
