@@ -751,6 +751,58 @@ function drawWeightChart() {
     }
 }
 
+// --- Exercise Info Modal ---
+function showExerciseInfo(rawName) {
+    const modal = document.getElementById('exercise-info-modal');
+    const nameEl = document.getElementById('exercise-info-name');
+    const body = document.getElementById('exercise-info-body');
+    if (!modal || !nameEl || !body) return;
+
+    const info = (typeof lookupExerciseInfo === 'function') ? lookupExerciseInfo(rawName) : null;
+    nameEl.textContent = rawName;
+
+    if (!info) {
+        body.innerHTML = `
+            <p class="exercise-info-empty">No instructions found for this exercise yet.</p>
+            <p class="exercise-info-empty-sub">We have form cues for ~45 common lifts. If this is a custom exercise, the info isn't in our database.</p>
+        `;
+    } else {
+        body.innerHTML = `
+            <div class="exercise-info-section">
+                <span class="exercise-info-label">Targets</span>
+                <div class="exercise-info-tags">
+                    ${info.muscles.map(m => `<span class="exercise-info-tag">${escapeHtml(m)}</span>`).join('')}
+                </div>
+            </div>
+            <div class="exercise-info-section">
+                <span class="exercise-info-label">Equipment</span>
+                <p class="exercise-info-text">${escapeHtml(info.equipment)}</p>
+            </div>
+            <div class="exercise-info-section">
+                <span class="exercise-info-label">How To</span>
+                <ol class="exercise-info-list">
+                    ${info.cues.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
+                </ol>
+            </div>
+            <div class="exercise-info-section">
+                <span class="exercise-info-label">Common Mistakes</span>
+                <ul class="exercise-info-list exercise-info-mistakes">
+                    ${info.mistakes.map(m => `<li>${escapeHtml(m)}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    modal.classList.remove('hidden');
+}
+
+function closeExerciseInfo(event) {
+    if (event && event.target && event.target.id !== 'exercise-info-modal' && event.type === 'click') {
+        if (event.currentTarget !== event.target) return;
+    }
+    const modal = document.getElementById('exercise-info-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
 // --- Prayer Journal ---
 function getPrayerEntries() {
     return DB.get('prayerEntries', []);
@@ -1812,10 +1864,11 @@ function updateRecentWorkouts() {
         const totalVol = w.sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
         const bestSet = w.sets.reduce((best, s) => s.weight > best.weight ? s : best, w.sets[0]);
         const ts = w.timestamp || 0;
+        const safeName = escapeHtml(w.name).replace(/'/g, '&#39;');
         return `
             <div class="workout-item">
-                <div class="workout-item-main">
-                    <h4>${escapeHtml(w.name)}</h4>
+                <div class="workout-item-main info-tappable" onclick="showExerciseInfo('${safeName}')">
+                    <h4>${escapeHtml(w.name)} <span class="info-icon">&#9432;</span></h4>
                     <p>${w.date} &middot; ${w.sets.length} sets &middot; Best: ${lbsToDisplay(bestSet.weight)}${wu()} x ${bestSet.reps}</p>
                 </div>
                 <div class="workout-item-actions">
@@ -4261,12 +4314,14 @@ function openRoutineDetail(routineId, source) {
                 <button class="btn btn-primary btn-sm" onclick="startActiveWorkoutFromDetail('${escapeHtml(day.name)}')">Start</button>
             </div>
             <div class="routine-day-exercises">
-                ${day.exercises.map(e => `
-                    <div class="routine-day-ex">
-                        <span>${escapeHtml(e.name)}</span>
+                ${day.exercises.map(e => {
+                    const safe = escapeHtml(e.name).replace(/'/g, '&#39;');
+                    return `
+                    <div class="routine-day-ex info-tappable" onclick="showExerciseInfo('${safe}')">
+                        <span>${escapeHtml(e.name)} <span class="info-icon">&#9432;</span></span>
                         <span class="routine-day-ex-meta">${e.sets} &times; ${e.reps}</span>
                     </div>
-                `).join('')}
+                `;}).join('')}
             </div>
         </div>
     `).join('');
@@ -4364,9 +4419,10 @@ function renderActiveWorkout() {
             ? `<div class="active-prev">Last: ${prev.map(s => `${lbsToDisplay(s.weight)}${wu()}&times;${s.reps}`).join(', ')}</div>`
             : `<div class="active-prev">No history yet</div>`;
 
+        const safeExName = escapeHtml(ex.name).replace(/'/g, '&#39;');
         html += `<div class="active-ex">
             <div class="active-ex-header">
-                <strong>${escapeHtml(ex.name)}</strong>
+                <strong class="info-tappable" onclick="showExerciseInfo('${safeExName}')">${escapeHtml(ex.name)} <span class="info-icon">&#9432;</span></strong>
                 <span class="active-ex-target">${ex.targetSets} &times; ${ex.targetReps}</span>
             </div>
             ${prevHtml}

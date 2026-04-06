@@ -941,6 +941,15 @@
     </div>
 
     <!-- Share Progress Modal -->
+    <!-- Exercise Info Modal -->
+    <div id="exercise-info-modal" class="exercise-info-modal hidden" onclick="closeExerciseInfo(event)">
+        <div class="exercise-info-content" onclick="event.stopPropagation()">
+            <button class="exercise-info-close" onclick="closeExerciseInfo()">&times;</button>
+            <h2 id="exercise-info-name"></h2>
+            <div id="exercise-info-body"></div>
+        </div>
+    </div>
+
     <div id="share-modal" class="share-modal hidden">
         <div class="share-modal-content">
             <button class="share-modal-close" onclick="closeShareModal()">&times;</button>
@@ -961,6 +970,7 @@
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="food-db.js"></script>
     <script src="routines.js"></script>
+    <script src="exercise-info.js"></script>
     <script src="app.js"></script>
     <script src="photos.js"></script>
     <script src="coach.js"></script>
