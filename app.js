@@ -751,40 +751,6 @@ function drawWeightChart() {
     }
 }
 
-// --- Daily Verse ---
-function getDailyVerse() {
-    const verses = (typeof BIBLE_VERSES !== 'undefined' && BIBLE_VERSES.length > 0)
-        ? BIBLE_VERSES
-        : [{ ref: 'Philippians 4:13', text: 'I can do all things through Christ who strengthens me.' }];
-    const stored = DB.get('dailyVerse', null);
-    const todayStr = today();
-    if (stored && stored.date === todayStr && typeof stored.idx === 'number' && stored.idx < verses.length) {
-        return { ...verses[stored.idx], idx: stored.idx };
-    }
-    // Deterministic pick by date so it's stable across reloads
-    const seed = todayStr.split('-').reduce((a, p) => a + parseInt(p, 10), 0);
-    const idx = seed % verses.length;
-    DB.set('dailyVerse', { date: todayStr, idx });
-    return { ...verses[idx], idx };
-}
-
-function renderDailyVerse() {
-    const txt = document.getElementById('daily-verse-text');
-    const ref = document.getElementById('daily-verse-ref');
-    if (!txt || !ref) return;
-    const v = getDailyVerse();
-    txt.textContent = `"${v.text}"`;
-    ref.textContent = `— ${v.ref}`;
-}
-
-function rotateDailyVerse() {
-    if (typeof BIBLE_VERSES === 'undefined' || BIBLE_VERSES.length === 0) return;
-    const stored = DB.get('dailyVerse', { idx: 0 });
-    const next = (stored.idx + 1) % BIBLE_VERSES.length;
-    DB.set('dailyVerse', { date: today(), idx: next });
-    renderDailyVerse();
-}
-
 // --- Prayer Journal ---
 function getPrayerEntries() {
     return DB.get('prayerEntries', []);
@@ -1824,7 +1790,6 @@ function updateDashboard() {
         document.getElementById('current-weight').textContent = `${lbsToDisplay(weights[weights.length - 1].weight)} ${wu()}`;
     }
 
-    renderDailyVerse();
     updateStreak();
     updateRecentWorkouts();
     renderProgressCharts();

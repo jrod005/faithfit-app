@@ -2236,49 +2236,6 @@ canvas {
 }
 .post-like-btn.liked { color: #ef4444; border-color: rgba(239,68,68,0.3); }
 .post-like-btn:hover { border-color: var(--text-muted); }
-.daily-verse-card {
-    background: linear-gradient(135deg, rgba(192,192,192,0.08), rgba(192,192,192,0.02));
-    border-left: 3px solid var(--accent, #C0C0C0);
-}
-.daily-verse-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-}
-.daily-verse-label {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-muted);
-}
-.daily-verse-refresh {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: 16px;
-    line-height: 1;
-}
-.daily-verse-refresh:hover { color: var(--text-primary); border-color: var(--text-muted); }
-.daily-verse-text {
-    font-size: 16px;
-    line-height: 1.6;
-    color: var(--text-primary);
-    font-style: italic;
-    margin: 0 0 8px 0;
-}
-.daily-verse-ref {
-    font-size: 13px;
-    color: var(--text-muted);
-    text-align: right;
-    margin: 0;
-}
-
 .prayer-journal-card textarea {
     width: 100%;
     background: var(--bg);
