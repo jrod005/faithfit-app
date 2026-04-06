@@ -3704,6 +3704,500 @@ function renderWeeklyReport() {
 // =============================================
 
 // --- Initialize ---
+// =============================================
+// WORKOUT HUB - Routines, Explore, Active Workout
+// =============================================
+
+let currentDetailRoutine = null;
+let activeWorkout = null; // { routineName, dayName, exercises: [{name,sets,reps,rest,logged:[{w,r}]}], startedAt, restEndsAt }
+let activeWorkoutTimer = null;
+let activeRestTimer = null;
+
+function getMyRoutines() { return DB.get('myRoutines', []); }
+function setMyRoutines(r) { DB.set('myRoutines', r); }
+
+function showHubView(view) {
+    document.querySelectorAll('.hub-view').forEach(v => v.classList.add('hidden'));
+    document.getElementById('workout-hub-card').classList.add('hidden');
+
+    if (view === 'routines') {
+        document.getElementById('hub-routines').classList.remove('hidden');
+        renderMyRoutines();
+    } else if (view === 'explore') {
+        document.getElementById('hub-explore').classList.remove('hidden');
+        populateExploreFilters();
+        renderExplore();
+    } else if (view === 'builder') {
+        document.getElementById('hub-builder').classList.remove('hidden');
+        builderReset();
+    } else if (view === 'empty') {
+        startEmptyWorkout();
+    }
+}
+
+function hideHubView() {
+    document.querySelectorAll('.hub-view').forEach(v => v.classList.add('hidden'));
+    document.getElementById('workout-hub-card').classList.remove('hidden');
+}
+
+function renderTodaysWorkoutBanner() {
+    const banner = document.getElementById('todays-workout-banner');
+    if (!banner) return;
+    const day = new Date().getDay();
+    const recommended = DAY_RECOMMENDATIONS[day];
+    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+    // Find a matching day in any of user's routines first, else from preset
+    const myRoutines = getMyRoutines();
+    let suggestion = null;
+    for (const r of myRoutines) {
+        const match = r.days && r.days.find(d => d.dayType === recommended);
+        if (match) { suggestion = { routine: r, day: match, source: 'mine' }; break; }
+    }
+    if (!suggestion && recommended !== 'rest') {
+        for (const r of IRON_FAITH_ROUTINES) {
+            const match = r.days.find(d => d.dayType === recommended);
+            if (match) { suggestion = { routine: r, day: match, source: 'preset' }; break; }
+        }
+    }
+
+    if (recommended === 'rest') {
+        banner.innerHTML = `<div class="todays-workout">
+            <div class="todays-workout-label">${dayNames[day]} &middot; Rest Day</div>
+            <div class="todays-workout-name">Recover &amp; reflect</div>
+            <p class="todays-workout-verse">"Come to me, all you who are weary and burdened, and I will give you rest." — Matthew 11:28</p>
+        </div>`;
+        return;
+    }
+
+    if (suggestion) {
+        banner.innerHTML = `<div class="todays-workout">
+            <div class="todays-workout-label">${dayNames[day]} &middot; ${recommended.toUpperCase()} day</div>
+            <div class="todays-workout-name">${escapeHtml(suggestion.day.name)}</div>
+            <div class="todays-workout-sub">${escapeHtml(suggestion.routine.name)} &middot; ${suggestion.day.exercises.length} exercises</div>
+            <button class="btn btn-primary btn-full" style="margin-top:10px" onclick="startWorkoutFromSuggestion('${suggestion.routine.id}','${escapeHtml(suggestion.day.name)}','${suggestion.source}')">Start Today's Workout</button>
+        </div>`;
+    } else {
+        banner.innerHTML = `<div class="todays-workout">
+            <div class="todays-workout-label">${dayNames[day]} &middot; ${recommended.toUpperCase()} day</div>
+            <div class="todays-workout-name">No routine yet</div>
+            <div class="todays-workout-sub">Pick a routine from Explore to get started</div>
+        </div>`;
+    }
+}
+
+function startWorkoutFromSuggestion(routineId, dayName, source) {
+    const list = source === 'mine' ? getMyRoutines() : IRON_FAITH_ROUTINES;
+    const routine = list.find(r => r.id === routineId);
+    if (!routine) return showToast('Routine not found');
+    const day = routine.days.find(d => d.name === dayName);
+    if (!day) return showToast('Day not found');
+    startActiveWorkout(routine, day);
+}
+
+function renderMyRoutines() {
+    const container = document.getElementById('my-routines-list');
+    const routines = getMyRoutines();
+    if (routines.length === 0) {
+        container.innerHTML = '<p class="empty-state">No saved routines. Browse Explore to add one, or build your own!</p>';
+        return;
+    }
+    container.innerHTML = routines.map(r => `
+        <div class="routine-card" onclick="openRoutineDetail('${r.id}','mine')">
+            <div class="routine-card-main">
+                <div class="routine-card-name">${escapeHtml(r.name)}</div>
+                <div class="routine-card-meta">${r.days.length} days &middot; ${r.type || 'Custom'}</div>
+            </div>
+            <span class="routine-card-arrow">&#x203A;</span>
+        </div>
+    `).join('');
+}
+
+function populateExploreFilters() {
+    const cat = document.getElementById('filter-category');
+    if (cat.options.length <= 1) {
+        CATEGORIES.forEach(c => {
+            cat.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+    }
+}
+
+function renderExplore() {
+    const container = document.getElementById('explore-routines-list');
+    const cat = document.getElementById('filter-category').value;
+    const lvl = document.getElementById('filter-level').value;
+
+    let filtered = IRON_FAITH_ROUTINES;
+    if (cat) filtered = filtered.filter(r => r.category === cat);
+    if (lvl) filtered = filtered.filter(r => r.level === lvl);
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<p class="empty-state">No routines match those filters.</p>';
+        return;
+    }
+
+    container.innerHTML = filtered.map(r => `
+        <div class="routine-card" onclick="openRoutineDetail('${r.id}','preset')">
+            <div class="routine-card-main">
+                <div class="routine-card-name">${escapeHtml(r.name)}</div>
+                <div class="routine-card-meta">
+                    <span class="routine-tag tag-${r.level}">${r.level}</span>
+                    <span class="routine-tag">${r.type}</span>
+                    <span>${r.days.length} days</span>
+                </div>
+                <div class="routine-card-desc">${escapeHtml(r.description)}</div>
+            </div>
+            <span class="routine-card-arrow">&#x203A;</span>
+        </div>
+    `).join('');
+}
+
+function openRoutineDetail(routineId, source) {
+    const list = source === 'mine' ? getMyRoutines() : IRON_FAITH_ROUTINES;
+    const routine = list.find(r => r.id === routineId);
+    if (!routine) return;
+    currentDetailRoutine = { routine, source };
+
+    document.querySelectorAll('.hub-view').forEach(v => v.classList.add('hidden'));
+    document.getElementById('hub-routine-detail').classList.remove('hidden');
+
+    document.getElementById('routine-detail-title').textContent = routine.name;
+    document.getElementById('routine-detail-desc').textContent = routine.description || '';
+
+    const daysHtml = routine.days.map(day => `
+        <div class="routine-day-card">
+            <div class="routine-day-header">
+                <strong>${escapeHtml(day.name)}</strong>
+                <button class="btn btn-primary btn-sm" onclick="startActiveWorkoutFromDetail('${escapeHtml(day.name)}')">Start</button>
+            </div>
+            <div class="routine-day-exercises">
+                ${day.exercises.map(e => `
+                    <div class="routine-day-ex">
+                        <span>${escapeHtml(e.name)}</span>
+                        <span class="routine-day-ex-meta">${e.sets} &times; ${e.reps}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `).join('');
+    document.getElementById('routine-detail-days').innerHTML = daysHtml;
+
+    const saveBtn = document.getElementById('save-routine-btn');
+    if (source === 'preset') {
+        const exists = getMyRoutines().some(r => r.id === routineId);
+        saveBtn.style.display = exists ? 'none' : 'block';
+    } else {
+        saveBtn.style.display = 'none';
+    }
+}
+
+function backToRoutineList() {
+    if (!currentDetailRoutine) { hideHubView(); return; }
+    document.getElementById('hub-routine-detail').classList.add('hidden');
+    if (currentDetailRoutine.source === 'mine') {
+        document.getElementById('hub-routines').classList.remove('hidden');
+    } else {
+        document.getElementById('hub-explore').classList.remove('hidden');
+    }
+}
+
+function saveRoutineToMine() {
+    if (!currentDetailRoutine) return;
+    const my = getMyRoutines();
+    if (my.some(r => r.id === currentDetailRoutine.routine.id)) return showToast('Already saved');
+    my.push(JSON.parse(JSON.stringify(currentDetailRoutine.routine)));
+    setMyRoutines(my);
+    showToast('Saved to My Routines');
+    document.getElementById('save-routine-btn').style.display = 'none';
+    renderTodaysWorkoutBanner();
+}
+
+function startActiveWorkoutFromDetail(dayName) {
+    if (!currentDetailRoutine) return;
+    const day = currentDetailRoutine.routine.days.find(d => d.name === dayName);
+    if (!day) return;
+    startActiveWorkout(currentDetailRoutine.routine, day);
+}
+
+// ===== Active Workout =====
+
+function getPreviousWorkoutData(exerciseName) {
+    const workouts = DB.get('workouts', []).filter(w => w.name === exerciseName);
+    if (workouts.length === 0) return null;
+    const last = workouts.sort((a, b) => b.timestamp - a.timestamp)[0];
+    return last.sets;
+}
+
+function startActiveWorkout(routine, day) {
+    activeWorkout = {
+        routineName: routine.name,
+        dayName: day.name,
+        startedAt: Date.now(),
+        exercises: day.exercises.map(e => ({
+            name: e.name,
+            targetSets: e.sets,
+            targetReps: e.reps,
+            rest: e.rest || 90,
+            logged: Array.from({ length: e.sets }, () => ({ w: '', r: '' }))
+        }))
+    };
+    document.querySelectorAll('.hub-view').forEach(v => v.classList.add('hidden'));
+    document.getElementById('workout-hub-card').classList.add('hidden');
+    document.getElementById('active-workout').classList.remove('hidden');
+    document.getElementById('active-workout-title').textContent = day.name;
+    renderActiveWorkout();
+    startWorkoutTimer();
+}
+
+function startEmptyWorkout() {
+    activeWorkout = {
+        routineName: 'Empty Workout',
+        dayName: 'Free Session',
+        startedAt: Date.now(),
+        exercises: []
+    };
+    document.getElementById('workout-hub-card').classList.add('hidden');
+    document.getElementById('active-workout').classList.remove('hidden');
+    document.getElementById('active-workout-title').textContent = 'Free Session';
+    renderActiveWorkout();
+    startWorkoutTimer();
+}
+
+function renderActiveWorkout() {
+    if (!activeWorkout) return;
+    const container = document.getElementById('active-exercises');
+    let html = '';
+
+    activeWorkout.exercises.forEach((ex, exIdx) => {
+        const prev = getPreviousWorkoutData(ex.name);
+        const prevHtml = prev
+            ? `<div class="active-prev">Last: ${prev.map(s => `${lbsToDisplay(s.weight)}${wu()}&times;${s.reps}`).join(', ')}</div>`
+            : `<div class="active-prev">No history yet</div>`;
+
+        html += `<div class="active-ex">
+            <div class="active-ex-header">
+                <strong>${escapeHtml(ex.name)}</strong>
+                <span class="active-ex-target">${ex.targetSets} &times; ${ex.targetReps}</span>
+            </div>
+            ${prevHtml}
+            <div class="active-sets">`;
+
+        ex.logged.forEach((s, sIdx) => {
+            html += `<div class="active-set-row">
+                <span class="active-set-label">Set ${sIdx + 1}</span>
+                <input type="number" placeholder="Weight" value="${s.w}" oninput="updateActiveSet(${exIdx},${sIdx},'w',this.value)" step="2.5">
+                <span>&times;</span>
+                <input type="number" placeholder="Reps" value="${s.r}" oninput="updateActiveSet(${exIdx},${sIdx},'r',this.value)">
+                <button class="active-done-btn" onclick="completeSet(${exIdx},${sIdx})">&#x2713;</button>
+            </div>`;
+        });
+
+        html += `</div>
+            <button class="btn btn-secondary btn-sm" onclick="addSetToActive(${exIdx})">+ Add Set</button>
+        </div>`;
+    });
+
+    if (activeWorkout.exercises.length === 0) {
+        html += '<p class="empty-state">No exercises yet. Add one below.</p>';
+    }
+
+    html += `<div class="active-add-ex">
+        <input type="text" id="active-add-name" placeholder="Add exercise..." list="exercise-suggestions">
+        <button class="btn btn-secondary" onclick="addExerciseToActive()">+ Add</button>
+    </div>`;
+
+    container.innerHTML = html;
+}
+
+function updateActiveSet(exIdx, sIdx, field, value) {
+    if (!activeWorkout) return;
+    activeWorkout.exercises[exIdx].logged[sIdx][field] = value;
+}
+
+function addSetToActive(exIdx) {
+    activeWorkout.exercises[exIdx].logged.push({ w: '', r: '' });
+    renderActiveWorkout();
+}
+
+function addExerciseToActive() {
+    const input = document.getElementById('active-add-name');
+    const name = input.value.trim();
+    if (!name) return;
+    activeWorkout.exercises.push({
+        name,
+        targetSets: 3,
+        targetReps: '8-12',
+        rest: 90,
+        logged: [{ w: '', r: '' }, { w: '', r: '' }, { w: '', r: '' }]
+    });
+    renderActiveWorkout();
+}
+
+function completeSet(exIdx, sIdx) {
+    const ex = activeWorkout.exercises[exIdx];
+    const set = ex.logged[sIdx];
+    if (!set.w || !set.r) return showToast('Enter weight and reps');
+    startRestTimer(ex.rest || 90);
+}
+
+function startWorkoutTimer() {
+    if (activeWorkoutTimer) clearInterval(activeWorkoutTimer);
+    const update = () => {
+        if (!activeWorkout) return;
+        const sec = Math.floor((Date.now() - activeWorkout.startedAt) / 1000);
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        const el = document.getElementById('active-workout-time');
+        if (el) el.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+    };
+    update();
+    activeWorkoutTimer = setInterval(update, 1000);
+}
+
+function startRestTimer(seconds) {
+    if (activeRestTimer) clearInterval(activeRestTimer);
+    const endsAt = Date.now() + seconds * 1000;
+    const el = document.getElementById('active-rest-timer');
+    el.classList.remove('hidden');
+    const update = () => {
+        const remaining = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+        const m = Math.floor(remaining / 60);
+        const s = remaining % 60;
+        document.getElementById('rest-timer-text').textContent = `Rest: ${m}:${s.toString().padStart(2,'0')}`;
+        if (remaining === 0) {
+            clearInterval(activeRestTimer);
+            el.classList.add('hidden');
+            try { navigator.vibrate && navigator.vibrate(300); } catch (e) {}
+            showToast('Rest done — go!');
+        }
+    };
+    update();
+    activeRestTimer = setInterval(update, 500);
+}
+
+function skipRest() {
+    if (activeRestTimer) clearInterval(activeRestTimer);
+    document.getElementById('active-rest-timer').classList.add('hidden');
+}
+
+function endActiveWorkout() {
+    if (!confirm('End workout without saving?')) return;
+    activeWorkout = null;
+    if (activeWorkoutTimer) clearInterval(activeWorkoutTimer);
+    if (activeRestTimer) clearInterval(activeRestTimer);
+    document.getElementById('active-workout').classList.add('hidden');
+    document.getElementById('workout-hub-card').classList.remove('hidden');
+}
+
+function finishActiveWorkout() {
+    if (!activeWorkout) return;
+    let saved = 0;
+    const workouts = DB.get('workouts', []);
+    activeWorkout.exercises.forEach(ex => {
+        const validSets = ex.logged
+            .filter(s => s.w && s.r)
+            .map(s => ({ weight: parseFloat(s.w), reps: parseInt(s.r) }));
+        if (validSets.length === 0) return;
+        const realWeights = validSets.map(s => ({
+            weight: getCurrentUnits() === 'metric' ? s.weight * 2.20462 : s.weight,
+            reps: s.reps
+        }));
+        workouts.push({
+            name: ex.name,
+            sets: realWeights,
+            date: today(),
+            timestamp: Date.now()
+        });
+        saved++;
+    });
+    DB.set('workouts', workouts);
+    activeWorkout = null;
+    if (activeWorkoutTimer) clearInterval(activeWorkoutTimer);
+    if (activeRestTimer) clearInterval(activeRestTimer);
+    document.getElementById('active-workout').classList.add('hidden');
+    document.getElementById('workout-hub-card').classList.remove('hidden');
+    updateDashboard();
+    updateTodaysExercises();
+    renderTodaysWorkoutBanner();
+    checkAchievements();
+    showToast(`Saved ${saved} exercise${saved !== 1 ? 's' : ''}!`);
+}
+
+// ===== Routine Builder =====
+
+let builderDays = [];
+
+function builderReset() {
+    builderDays = [{ name: 'Day 1', dayType: 'full', exercises: [] }];
+    document.getElementById('builder-name').value = '';
+    renderBuilder();
+}
+
+function renderBuilder() {
+    const container = document.getElementById('builder-days');
+    container.innerHTML = builderDays.map((d, i) => `
+        <div class="builder-day">
+            <div class="builder-day-header">
+                <input type="text" value="${escapeHtml(d.name)}" oninput="builderUpdateDayName(${i},this.value)" placeholder="Day name">
+                <button class="delete-btn" onclick="builderRemoveDay(${i})">&times;</button>
+            </div>
+            ${d.exercises.map((e, ei) => `
+                <div class="builder-ex-row">
+                    <input type="text" value="${escapeHtml(e.name)}" oninput="builderUpdateEx(${i},${ei},'name',this.value)" placeholder="Exercise" list="exercise-suggestions" style="flex:2">
+                    <input type="number" value="${e.sets}" oninput="builderUpdateEx(${i},${ei},'sets',this.value)" placeholder="Sets" style="width:55px">
+                    <input type="text" value="${escapeHtml(e.reps)}" oninput="builderUpdateEx(${i},${ei},'reps',this.value)" placeholder="Reps" style="width:70px">
+                    <button class="delete-btn" onclick="builderRemoveEx(${i},${ei})">&times;</button>
+                </div>
+            `).join('')}
+            <button class="btn btn-secondary btn-sm" onclick="builderAddEx(${i})" style="margin-top:6px">+ Exercise</button>
+        </div>
+    `).join('');
+}
+
+function builderAddDay() {
+    builderDays.push({ name: 'Day ' + (builderDays.length + 1), dayType: 'full', exercises: [] });
+    renderBuilder();
+}
+function builderRemoveDay(i) { builderDays.splice(i, 1); renderBuilder(); }
+function builderUpdateDayName(i, v) { builderDays[i].name = v; }
+function builderAddEx(i) {
+    builderDays[i].exercises.push({ name: '', sets: 3, reps: '8-12', rest: 90 });
+    renderBuilder();
+}
+function builderRemoveEx(i, ei) { builderDays[i].exercises.splice(ei, 1); renderBuilder(); }
+function builderUpdateEx(i, ei, field, v) {
+    builderDays[i].exercises[ei][field] = field === 'sets' ? parseInt(v) || 0 : v;
+}
+
+function saveBuiltRoutine() {
+    const name = document.getElementById('builder-name').value.trim();
+    if (!name) return showToast('Give your routine a name');
+    if (builderDays.length === 0) return showToast('Add at least one day');
+    const cleanDays = builderDays
+        .map(d => ({ ...d, exercises: d.exercises.filter(e => e.name.trim()) }))
+        .filter(d => d.exercises.length > 0);
+    if (cleanDays.length === 0) return showToast('Add at least one exercise');
+
+    const my = getMyRoutines();
+    my.push({
+        id: 'custom_' + Date.now(),
+        name,
+        type: 'Custom',
+        level: 'custom',
+        category: 'custom',
+        description: 'Custom routine',
+        days: cleanDays
+    });
+    setMyRoutines(my);
+    showToast('Routine saved!');
+    hideHubView();
+    renderTodaysWorkoutBanner();
+}
+
+function getCurrentUnits() {
+    return DB.get('units', 'imperial');
+}
+
 function init() {
     loadBibleVersion();
     displayDailyVerse();
@@ -3720,6 +4214,7 @@ function init() {
     renderMuscleHeatmap();
     scheduleMidnightReset();
     renderRoutinesList();
+    renderTodaysWorkoutBanner();
     updateSaveTemplateBtn();
     updateRestTimerVisibility();
     renderChallenges();

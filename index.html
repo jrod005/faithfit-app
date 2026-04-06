@@ -185,15 +185,110 @@
 
         <!-- Workout Tab -->
         <section id="workout" class="tab-content">
-            <!-- My Routines -->
-            <div class="card">
-                <h2>My Routines</h2>
-                <div id="routines-list" class="routines-list">
-                    <p class="empty-state">No routines saved yet. Complete a session and save it as a routine!</p>
+            <!-- Workout Hub -->
+            <div class="card workout-hub" id="workout-hub-card">
+                <div id="todays-workout-banner"></div>
+                <div class="hub-grid">
+                    <button class="hub-btn" onclick="showHubView('routines')">
+                        <span class="hub-icon">&#x1F4D6;</span>
+                        <span class="hub-label">My Routines</span>
+                    </button>
+                    <button class="hub-btn" onclick="showHubView('explore')">
+                        <span class="hub-icon">&#x1F50D;</span>
+                        <span class="hub-label">Explore</span>
+                    </button>
+                    <button class="hub-btn" onclick="showHubView('builder')">
+                        <span class="hub-icon">&#x270F;</span>
+                        <span class="hub-label">Build Routine</span>
+                    </button>
+                    <button class="hub-btn hub-btn-empty" onclick="showHubView('empty')">
+                        <span class="hub-icon">&#x1F4AA;</span>
+                        <span class="hub-label">Empty Workout</span>
+                    </button>
                 </div>
             </div>
 
-            <!-- Template Session (hidden by default) -->
+            <!-- Hub: My Routines -->
+            <div id="hub-routines" class="hub-view hidden">
+                <div class="card">
+                    <div class="hub-view-header">
+                        <h2>My Routines</h2>
+                        <button class="btn btn-secondary btn-sm" onclick="hideHubView()">Back</button>
+                    </div>
+                    <div id="my-routines-list"></div>
+                </div>
+            </div>
+
+            <!-- Hub: Explore -->
+            <div id="hub-explore" class="hub-view hidden">
+                <div class="card">
+                    <div class="hub-view-header">
+                        <h2>Explore Routines</h2>
+                        <button class="btn btn-secondary btn-sm" onclick="hideHubView()">Back</button>
+                    </div>
+                    <div class="explore-filters">
+                        <select id="filter-category" onchange="renderExplore()">
+                            <option value="">All Categories</option>
+                        </select>
+                        <select id="filter-level" onchange="renderExplore()">
+                            <option value="">All Levels</option>
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate">Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                        </select>
+                    </div>
+                    <div id="explore-routines-list"></div>
+                </div>
+            </div>
+
+            <!-- Hub: Routine Detail -->
+            <div id="hub-routine-detail" class="hub-view hidden">
+                <div class="card">
+                    <div class="hub-view-header">
+                        <h2 id="routine-detail-title">Routine</h2>
+                        <button class="btn btn-secondary btn-sm" onclick="backToRoutineList()">Back</button>
+                    </div>
+                    <p id="routine-detail-desc" class="routine-detail-desc"></p>
+                    <div id="routine-detail-days"></div>
+                    <button class="btn btn-secondary btn-full" id="save-routine-btn" style="margin-top:12px;display:none" onclick="saveRoutineToMine()">+ Save to My Routines</button>
+                </div>
+            </div>
+
+            <!-- Hub: Builder -->
+            <div id="hub-builder" class="hub-view hidden">
+                <div class="card">
+                    <div class="hub-view-header">
+                        <h2>Build Your Own Routine</h2>
+                        <button class="btn btn-secondary btn-sm" onclick="hideHubView()">Back</button>
+                    </div>
+                    <div class="form-group">
+                        <label>Routine Name</label>
+                        <input type="text" id="builder-name" placeholder="My Custom Routine">
+                    </div>
+                    <div id="builder-days"></div>
+                    <button class="btn btn-secondary btn-full" onclick="builderAddDay()" style="margin-top:8px">+ Add Day</button>
+                    <button class="btn btn-primary btn-full" onclick="saveBuiltRoutine()" style="margin-top:8px">Save Routine</button>
+                </div>
+            </div>
+
+            <!-- Active Workout Session -->
+            <div id="active-workout" class="card hidden">
+                <div class="active-workout-header">
+                    <div>
+                        <h2 id="active-workout-title">Workout</h2>
+                        <span class="active-workout-time" id="active-workout-time">0:00</span>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="endActiveWorkout()">End</button>
+                </div>
+                <div id="active-rest-timer" class="rest-timer hidden">
+                    <span id="rest-timer-text">Rest: 0:00</span>
+                    <button class="btn btn-secondary btn-sm" onclick="skipRest()">Skip</button>
+                </div>
+                <div id="active-exercises"></div>
+                <button class="btn btn-primary btn-full" onclick="finishActiveWorkout()" style="margin-top:14px">Finish Workout</button>
+            </div>
+
+            <!-- Template Session (legacy, hidden) -->
             <div id="template-session" class="card hidden">
                 <div class="template-session-header">
                     <h2 id="template-session-title">Routine Session</h2>
@@ -794,6 +889,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="food-db.js"></script>
+    <script src="routines.js"></script>
     <script src="app.js"></script>
     <script src="photos.js"></script>
     <script src="coach.js"></script>
