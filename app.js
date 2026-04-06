@@ -127,6 +127,464 @@ function loadUnits() {
     updateUnitUI();
 }
 
+// --- Bible Version Preference ---
+function getBibleVersion() {
+    return localStorage.getItem('faithfit_bible') || 'NIV';
+}
+
+function setBibleVersion(version) {
+    localStorage.setItem('faithfit_bible', version);
+    document.getElementById('bible-version').value = version;
+    displayDailyVerse();
+}
+
+function loadBibleVersion() {
+    const v = getBibleVersion();
+    const sel = document.getElementById('bible-version');
+    if (sel) sel.value = v;
+}
+
+// Translation lookup: keyed by reference, each has text per version.
+// NIV is the default/fallback stored in the VERSES arrays.
+const BIBLE_TRANSLATIONS = {
+    "1 Corinthians 6:19": {
+        KJV: "What? know ye not that your body is the temple of the Holy Ghost which is in you, which ye have of God, and ye are not your own?",
+        ESV: "Or do you not know that your body is a temple of the Holy Spirit within you, whom you have from God? You are not your own.",
+        NKJV: "Or do you not know that your body is the temple of the Holy Spirit who is in you, whom you have from God, and you are not your own?",
+        NLT: "Don't you realize that your body is the temple of the Holy Spirit, who lives in you and was given to you by God? You do not belong to yourself.",
+        NASB: "Or do you not know that your body is a temple of the Holy Spirit within you, whom you have from God, and that you are not your own?"
+    },
+    "Philippians 4:13": {
+        KJV: "I can do all things through Christ which strengtheneth me.",
+        ESV: "I can do all things through him who strengthens me.",
+        NKJV: "I can do all things through Christ who strengthens me.",
+        NLT: "For I can do everything through Christ, who gives me strength.",
+        NASB: "I can do all things through Him who strengthens me."
+    },
+    "Isaiah 40:31": {
+        KJV: "But they that wait upon the LORD shall renew their strength; they shall mount up with wings as eagles.",
+        ESV: "But they who wait for the LORD shall renew their strength; they shall mount up with wings like eagles.",
+        NKJV: "But those who wait on the LORD shall renew their strength; they shall mount up with wings like eagles.",
+        NLT: "But those who trust in the LORD will find new strength. They will soar high on wings like eagles.",
+        NASB: "Yet those who wait for the LORD will gain new strength; they will mount up with wings like eagles."
+    },
+    "1 Timothy 4:8": {
+        KJV: "For bodily exercise profiteth little: but godliness is profitable unto all things.",
+        ESV: "For while bodily training is of some value, godliness is of value in every way.",
+        NKJV: "For bodily exercise profits a little, but godliness is profitable for all things.",
+        NLT: "Physical training is good, but training for godliness is much better, promising benefits in this life and in the life to come.",
+        NASB: "For bodily training is only of little profit, but godliness is profitable for all things."
+    },
+    "Proverbs 31:17": {
+        KJV: "She girdeth her loins with strength, and strengtheneth her arms.",
+        ESV: "She dresses herself with strength and makes her arms strong.",
+        NKJV: "She girds herself with strength, and strengthens her arms.",
+        NLT: "She is energetic and strong, a hard worker.",
+        NASB: "She girds herself with strength and makes her arms strong."
+    },
+    "Psalm 28:7": {
+        KJV: "The LORD is my strength and my shield; my heart trusted in him, and I am helped.",
+        ESV: "The LORD is my strength and my shield; in him my heart trusts, and I am helped.",
+        NKJV: "The LORD is my strength and my shield; my heart trusted in Him, and I am helped.",
+        NLT: "The LORD is my strength and shield. I trust him with all my heart. He helps me, and my heart is filled with joy.",
+        NASB: "The LORD is my strength and my shield; my heart trusts in Him, and I am helped."
+    },
+    "Joshua 1:9": {
+        KJV: "Have not I commanded thee? Be strong and of a good courage; be not afraid, neither be thou dismayed: for the LORD thy God is with thee whithersoever thou goest.",
+        ESV: "Have I not commanded you? Be strong and courageous. Do not be frightened, and do not be dismayed, for the LORD your God is with you wherever you go.",
+        NKJV: "Have I not commanded you? Be strong and of good courage; do not be afraid, nor be dismayed, for the LORD your God is with you wherever you go.",
+        NLT: "This is my command—be strong and courageous! Do not be afraid or discouraged. For the LORD your God is with you wherever you go.",
+        NASB: "Have I not commanded you? Be strong and courageous! Do not be terrified nor dismayed, for the LORD your God is with you wherever you go."
+    },
+    "Proverbs 16:3": {
+        KJV: "Commit thy works unto the LORD, and thy thoughts shall be established.",
+        ESV: "Commit your work to the LORD, and your plans will be established.",
+        NKJV: "Commit your works to the LORD, and your thoughts will be established.",
+        NLT: "Commit your actions to the LORD, and your plans will succeed.",
+        NASB: "Commit your works to the LORD and your plans will be established."
+    },
+    "Isaiah 40:29": {
+        KJV: "He giveth power to the faint; and to them that have no might he increaseth strength.",
+        ESV: "He gives power to the faint, and to him who has no might he increases strength.",
+        NKJV: "He gives power to the weak, and to those who have no might He increases strength.",
+        NLT: "He gives power to the weak and strength to the powerless.",
+        NASB: "He gives strength to the weary, and to the one who lacks might He increases power."
+    },
+    "1 Corinthians 10:31": {
+        KJV: "Whether therefore ye eat, or drink, or whatsoever ye do, do all to the glory of God.",
+        ESV: "So, whether you eat or drink, or whatever you do, do all to the glory of God.",
+        NKJV: "Therefore, whether you eat or drink, or whatever you do, do all to the glory of God.",
+        NLT: "So whether you eat or drink, or whatever you do, do it all for the glory of God.",
+        NASB: "Whether, then, you eat or drink, or whatever you do, do all things for the glory of God."
+    },
+    "Nehemiah 8:10": {
+        KJV: "The joy of the LORD is your strength.",
+        ESV: "The joy of the LORD is your strength.",
+        NKJV: "The joy of the LORD is your strength.",
+        NLT: "The joy of the LORD is your strength!",
+        NASB: "The joy of the LORD is your strength."
+    },
+    "Hebrews 12:11": {
+        KJV: "Now no chastening for the present seemeth to be joyous, but grievous: nevertheless afterward it yieldeth the peaceable fruit of righteousness.",
+        ESV: "For the moment all discipline seems painful rather than pleasant, but later it yields the peaceful fruit of righteousness to those who have been trained by it.",
+        NKJV: "Now no chastening seems to be joyful for the present, but painful; nevertheless, afterward it yields the peaceable fruit of righteousness.",
+        NLT: "No discipline is enjoyable while it is happening—it's painful! But afterward there will be a peaceful harvest of right living for those who are trained in this way.",
+        NASB: "All discipline for the moment seems not to be joyful, but sorrowful; yet to those who have been trained by it, afterwards it yields the peaceful fruit of righteousness."
+    },
+    "Philippians 4:6": {
+        KJV: "Be careful for nothing; but in every thing by prayer and supplication with thanksgiving let your requests be made known unto God.",
+        ESV: "Do not be anxious about anything, but in everything by prayer and supplication with thanksgiving let your requests be made known to God.",
+        NKJV: "Be anxious for nothing, but in everything by prayer and supplication, with thanksgiving, let your requests be made known to God.",
+        NLT: "Don't worry about anything; instead, pray about everything. Tell God what you need, and thank him for all he has done.",
+        NASB: "Do not be anxious about anything, but in everything by prayer and pleading with thanksgiving let your requests be made known to God."
+    },
+    "Hebrews 12:1-2": {
+        KJV: "Let us run with patience the race that is set before us, looking unto Jesus the author and finisher of our faith.",
+        ESV: "Let us run with endurance the race that is set before us, looking to Jesus, the founder and perfecter of our faith.",
+        NKJV: "Let us run with endurance the race that is set before us, looking unto Jesus, the author and finisher of our faith.",
+        NLT: "Let us run with endurance the race God has set before us. We do this by keeping our eyes on Jesus, the champion who initiates and perfects our faith.",
+        NASB: "Let us run with endurance the race that is set before us, looking only at Jesus, the originator and perfecter of the faith."
+    },
+    "Psalm 73:26": {
+        KJV: "My flesh and my heart faileth: but God is the strength of my heart, and my portion for ever.",
+        ESV: "My flesh and my heart may fail, but God is the strength of my heart and my portion forever.",
+        NKJV: "My flesh and my heart fail; but God is the strength of my heart and my portion forever.",
+        NLT: "My health may fail, and my spirit may grow weak, but God remains the strength of my heart; he is mine forever.",
+        NASB: "My flesh and my heart may fail, but God is the strength of my heart and my portion forever."
+    },
+    "Zephaniah 3:17": {
+        KJV: "The LORD thy God in the midst of thee is mighty; he will save, he will rejoice over thee with joy.",
+        ESV: "The LORD your God is in your midst, a mighty one who will save; he will rejoice over you with gladness.",
+        NKJV: "The LORD your God in your midst, the Mighty One, will save; He will rejoice over you with gladness.",
+        NLT: "For the LORD your God is living among you. He is a mighty savior. He will take delight in you with gladness.",
+        NASB: "The LORD your God is in your midst, a victorious warrior. He will rejoice over you with joy."
+    },
+    "1 Corinthians 16:13": {
+        KJV: "Watch ye, stand fast in the faith, quit you like men, be strong.",
+        ESV: "Be watchful, stand firm in the faith, act like men, be strong.",
+        NKJV: "Watch, stand fast in the faith, be brave, be strong.",
+        NLT: "Be on guard. Stand firm in the faith. Be courageous. Be strong.",
+        NASB: "Be on the alert, stand firm in the faith, act like men, be strong."
+    },
+    "Psalm 46:1": {
+        KJV: "God is our refuge and strength, a very present help in trouble.",
+        ESV: "God is our refuge and strength, a very present help in trouble.",
+        NKJV: "God is our refuge and strength, a very present help in trouble.",
+        NLT: "God is our refuge and strength, always ready to help in times of trouble.",
+        NASB: "God is our refuge and strength, a very ready help in trouble."
+    },
+    "Colossians 3:23": {
+        KJV: "And whatsoever ye do, do it heartily, as to the Lord, and not unto men.",
+        ESV: "Whatever you do, work heartily, as for the Lord and not for men.",
+        NKJV: "And whatever you do, do it heartily, as to the Lord and not to men.",
+        NLT: "Work willingly at whatever you do, as though you were working for the Lord rather than for people.",
+        NASB: "Whatever you do, do your work heartily, as for the Lord and not for people."
+    },
+    "Psalm 27:1": {
+        KJV: "The LORD is my light and my salvation; whom shall I fear?",
+        ESV: "The LORD is my light and my salvation; whom shall I fear?",
+        NKJV: "The LORD is my light and my salvation; whom shall I fear?",
+        NLT: "The LORD is my light and my salvation—so why should I be afraid?",
+        NASB: "The LORD is my light and my salvation; whom should I fear?"
+    },
+    "2 Timothy 1:7": {
+        KJV: "For God hath not given us the spirit of fear; but of power, and of love, and of a sound mind.",
+        ESV: "For God gave us a spirit not of fear but of power and love and self-control.",
+        NKJV: "For God has not given us a spirit of fear, but of power and of love and of a sound mind.",
+        NLT: "For God has not given us a spirit of fear and timidity, but of power, love, and self-discipline.",
+        NASB: "For God has not given us a spirit of timidity, but of power and love and discipline."
+    },
+    "Proverbs 3:5": {
+        KJV: "Trust in the LORD with all thine heart; and lean not unto thine own understanding.",
+        ESV: "Trust in the LORD with all your heart, and do not lean on your own understanding.",
+        NKJV: "Trust in the LORD with all your heart, and lean not on your own understanding.",
+        NLT: "Trust in the LORD with all your heart; do not depend on your own understanding.",
+        NASB: "Trust in the LORD with all your heart and do not lean on your own understanding."
+    },
+    "James 1:12": {
+        KJV: "Blessed is the man that endureth temptation: for when he is tried, he shall receive the crown of life.",
+        ESV: "Blessed is the man who remains steadfast under trial, for when he has stood the test he will receive the crown of life.",
+        NKJV: "Blessed is the man who endures temptation; for when he has been approved, he will receive the crown of life.",
+        NLT: "God blesses those who patiently endure testing and temptation. Afterward they will receive the crown of life.",
+        NASB: "Blessed is the man who perseveres under trial; for once he has been approved, he will receive the crown of life."
+    },
+    "Galatians 5:22-23": {
+        KJV: "But the fruit of the Spirit is love, joy, peace, longsuffering, gentleness, goodness, faith, meekness, temperance.",
+        ESV: "But the fruit of the Spirit is love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, self-control.",
+        NKJV: "But the fruit of the Spirit is love, joy, peace, longsuffering, kindness, goodness, faithfulness, gentleness, self-control.",
+        NLT: "But the Holy Spirit produces this kind of fruit in our lives: love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, and self-control.",
+        NASB: "But the fruit of the Spirit is love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, self-control."
+    },
+    "Psalm 51:10": {
+        KJV: "Create in me a clean heart, O God; and renew a right spirit within me.",
+        ESV: "Create in me a clean heart, O God, and renew a right spirit within me.",
+        NKJV: "Create in me a clean heart, O God, and renew a steadfast spirit within me.",
+        NLT: "Create in me a clean heart, O God. Renew a loyal spirit within me.",
+        NASB: "Create in me a clean heart, O God, and renew a steadfast spirit within me."
+    },
+    "Romans 8:28": {
+        KJV: "And we know that all things work together for good to them that love God.",
+        ESV: "And we know that for those who love God all things work together for good.",
+        NKJV: "And we know that all things work together for good to those who love God.",
+        NLT: "And we know that God causes everything to work together for the good of those who love God.",
+        NASB: "And we know that God causes all things to work together for good to those who love God."
+    },
+    "Galatians 6:9": {
+        KJV: "And let us not be weary in well doing: for in due season we shall reap, if we faint not.",
+        ESV: "And let us not grow weary of doing good, for in due season we will reap, if we do not give up.",
+        NKJV: "And let us not grow weary while doing good, for in due season we shall reap if we do not lose heart.",
+        NLT: "So let's not get tired of doing what is good. At just the right time we will reap a harvest of blessing if we don't give up.",
+        NASB: "Let us not lose heart in doing good, for in due time we will reap, if we do not grow weary."
+    },
+    "Philippians 3:14": {
+        KJV: "I press toward the mark for the prize of the high calling of God in Christ Jesus.",
+        ESV: "I press on toward the goal for the prize of the upward call of God in Christ Jesus.",
+        NKJV: "I press toward the goal for the prize of the upward call of God in Christ Jesus.",
+        NLT: "I press on to reach the end of the race and receive the heavenly prize for which God, through Christ Jesus, is calling us.",
+        NASB: "I press on toward the goal for the prize of the upward call of God in Christ Jesus."
+    },
+    "Proverbs 18:10": {
+        KJV: "The name of the LORD is a strong tower: the righteous runneth into it, and is safe.",
+        ESV: "The name of the LORD is a strong tower; the righteous man runs into it and is safe.",
+        NKJV: "The name of the LORD is a strong tower; the righteous run to it and are safe.",
+        NLT: "The name of the LORD is a strong fortress; the godly run to him and are safe.",
+        NASB: "The name of the LORD is a strong tower; the righteous runs into it and is safe."
+    },
+    "Psalm 37:4": {
+        KJV: "Delight thyself also in the LORD; and he shall give thee the desires of thine heart.",
+        ESV: "Delight yourself in the LORD, and he will give you the desires of your heart.",
+        NKJV: "Delight yourself also in the LORD, and He shall give you the desires of your heart.",
+        NLT: "Take delight in the LORD, and he will give you your heart's desires.",
+        NASB: "Delight yourself in the LORD; and He will give you the desires of your heart."
+    },
+    "Matthew 11:28": {
+        KJV: "Come unto me, all ye that labour and are heavy laden, and I will give you rest.",
+        ESV: "Come to me, all who labor and are heavy laden, and I will give you rest.",
+        NKJV: "Come to Me, all you who labor and are heavy laden, and I will give you rest.",
+        NLT: "Then Jesus said, 'Come to me, all of you who are weary and carry heavy burdens, and I will give you rest.'",
+        NASB: "Come to Me, all who are weary and burdened, and I will give you rest."
+    },
+    "Hebrews 12:1": {
+        KJV: "Let us run with patience the race that is set before us.",
+        ESV: "Let us run with endurance the race that is set before us.",
+        NKJV: "Let us run with endurance the race that is set before us.",
+        NLT: "Let us run with endurance the race God has set before us.",
+        NASB: "Let us run with endurance the race that is set before us."
+    },
+    "2 Timothy 4:7": {
+        KJV: "I have fought a good fight, I have finished my course, I have kept the faith.",
+        ESV: "I have fought the good fight, I have finished the race, I have kept the faith.",
+        NKJV: "I have fought the good fight, I have finished the race, I have kept the faith.",
+        NLT: "I have fought the good fight, I have finished the race, and I have remained faithful.",
+        NASB: "I have fought the good fight, I have finished the course, I have kept the faith."
+    },
+    "Matthew 25:21": {
+        KJV: "Well done, thou good and faithful servant.",
+        ESV: "Well done, good and faithful servant.",
+        NKJV: "Well done, good and faithful servant.",
+        NLT: "Well done, my good and faithful servant.",
+        NASB: "Well done, good and faithful servant."
+    },
+    "Romans 8:31": {
+        KJV: "If God be for us, who can be against us?",
+        ESV: "If God is for us, who can be against us?",
+        NKJV: "If God is for us, who can be against us?",
+        NLT: "If God is for us, who can ever be against us?",
+        NASB: "If God is for us, who is against us?"
+    },
+    "Proverbs 27:17": {
+        KJV: "Iron sharpeneth iron; so a man sharpeneth the countenance of his friend.",
+        ESV: "Iron sharpens iron, and one man sharpens another.",
+        NKJV: "As iron sharpens iron, so a man sharpens the countenance of his friend.",
+        NLT: "As iron sharpens iron, so a friend sharpens a friend.",
+        NASB: "As iron sharpens iron, so one person sharpens another."
+    },
+    "Philippians 3:13-14": {
+        KJV: "Forgetting those things which are behind, and reaching forth unto those things which are before, I press toward the mark.",
+        ESV: "Forgetting what lies behind and straining forward to what lies ahead, I press on toward the goal.",
+        NKJV: "Forgetting those things which are behind and reaching forward to those things which are ahead, I press toward the goal.",
+        NLT: "Forgetting the past and looking forward to what lies ahead, I press on to reach the end of the race.",
+        NASB: "Forgetting what lies behind and reaching forward to what lies ahead, I press on toward the goal."
+    },
+    "Psalm 18:33": {
+        KJV: "He maketh my feet like hinds' feet, and setteth me upon my high places.",
+        ESV: "He made my feet like the feet of a deer and set me secure on the heights.",
+        NKJV: "He makes my feet like the feet of deer, and sets me on my high places.",
+        NLT: "He makes me as surefooted as a deer, enabling me to stand on mountain heights.",
+        NASB: "He makes my feet like hinds' feet, and sets me upon my high places."
+    },
+    "Psalm 84:7": {
+        KJV: "They go from strength to strength, every one of them in Zion appeareth before God.",
+        ESV: "They go from strength to strength; each one appears before God in Zion.",
+        NKJV: "They go from strength to strength; each one appears before God in Zion.",
+        NLT: "They will continue to grow stronger, and each of them will appear before God in Jerusalem.",
+        NASB: "They go from strength to strength; every one of them appears before God in Zion."
+    },
+    "Deuteronomy 28:13": {
+        KJV: "And the LORD shall make thee the head, and not the tail.",
+        ESV: "And the LORD will make you the head and not the tail.",
+        NKJV: "And the LORD will make you the head and not the tail.",
+        NLT: "The LORD will make you the head and not the tail.",
+        NASB: "The LORD will make you the head and not the tail."
+    },
+    "1 Corinthians 12:4": {
+        KJV: "Now there are diversities of gifts, but the same Spirit.",
+        ESV: "Now there are varieties of gifts, but the same Spirit.",
+        NKJV: "There are diversities of gifts, but the same Spirit.",
+        NLT: "There are different kinds of spiritual gifts, but the same Spirit is the source of them all.",
+        NASB: "Now there are varieties of gifts, but the same Spirit."
+    },
+    "1 Corinthians 9:22": {
+        KJV: "I am made all things to all men, that I might by all means save some.",
+        ESV: "I have become all things to all people, that by all means I might save some.",
+        NKJV: "I have become all things to all men, that I might by all means save some.",
+        NLT: "Yes, I try to find common ground with everyone, doing everything I can to save some.",
+        NASB: "I have become all things to all people, so that I may by all means save some."
+    },
+    "Ephesians 6:11": {
+        KJV: "Put on the whole armour of God, that ye may be able to stand against the wiles of the devil.",
+        ESV: "Put on the whole armor of God, that you may be able to stand against the schemes of the devil.",
+        NKJV: "Put on the whole armor of God, that you may be able to stand against the wiles of the devil.",
+        NLT: "Put on all of God's armor so that you will be able to stand firm against all strategies of the devil.",
+        NASB: "Put on the full armor of God, so that you will be able to stand firm against the schemes of the devil."
+    },
+    "Ecclesiastes 9:10": {
+        KJV: "Whatsoever thy hand findeth to do, do it with thy might.",
+        ESV: "Whatever your hand finds to do, do it with your might.",
+        NKJV: "Whatever your hand finds to do, do it with your might.",
+        NLT: "Whatever you do, do well.",
+        NASB: "Whatever your hand finds to do, do it with all your might."
+    },
+    "Proverbs 11:1": {
+        KJV: "A false balance is abomination to the LORD: but a just weight is his delight.",
+        ESV: "A false balance is an abomination to the LORD, but a just weight is his delight.",
+        NKJV: "Dishonest scales are an abomination to the LORD, but a just weight is His delight.",
+        NLT: "The LORD detests the use of dishonest scales, but he delights in accurate weights.",
+        NASB: "A false balance is an abomination to the LORD, but a just weight is His delight."
+    },
+    "Proverbs 21:5": {
+        KJV: "The thoughts of the diligent tend only to plenteousness.",
+        ESV: "The plans of the diligent lead surely to abundance.",
+        NKJV: "The plans of the diligent lead surely to plenty.",
+        NLT: "Good planning and hard work lead to prosperity.",
+        NASB: "The plans of the diligent lead certainly to advantage."
+    },
+    "Luke 14:28": {
+        KJV: "For which of you, intending to build a tower, sitteth not down first, and counteth the cost?",
+        ESV: "For which of you, desiring to build a tower, does not first sit down and count the cost?",
+        NKJV: "For which of you, intending to build a tower, does not sit down first and count the cost?",
+        NLT: "But don't begin until you count the cost. For who would begin construction of a building without first calculating the cost?",
+        NASB: "For which one of you, when he wants to build a tower, does not first sit down and calculate the cost?"
+    },
+    "Matthew 6:11": {
+        KJV: "Give us this day our daily bread.",
+        ESV: "Give us this day our daily bread.",
+        NKJV: "Give us this day our daily bread.",
+        NLT: "Give us today the food we need.",
+        NASB: "Give us this day our daily bread."
+    },
+    "Ecclesiastes 4:12": {
+        KJV: "A threefold cord is not quickly broken.",
+        ESV: "A threefold cord is not quickly broken.",
+        NKJV: "A threefold cord is not quickly broken.",
+        NLT: "A triple-braided cord is not easily broken.",
+        NASB: "A cord of three strands is not quickly torn apart."
+    },
+    "Genesis 2:2": {
+        KJV: "And on the seventh day God ended his work which he had made.",
+        ESV: "And on the seventh day God finished his work that he had done.",
+        NKJV: "And on the seventh day God ended His work which He had done.",
+        NLT: "On the seventh day God had finished his work of creation.",
+        NASB: "By the seventh day God completed His work which He had done."
+    },
+    "Exodus 20:9": {
+        KJV: "Six days shalt thou labour, and do all thy work.",
+        ESV: "Six days you shall labor, and do all your work.",
+        NKJV: "Six days you shall labor and do all your work.",
+        NLT: "You have six days each week for your ordinary work.",
+        NASB: "For six days you shall labor and do all your work."
+    },
+    "Mark 1:35": {
+        KJV: "And in the morning, rising up a great while before day, he went out, and departed into a solitary place, and there prayed.",
+        ESV: "And rising very early in the morning, while it was still dark, he departed and went out to a desolate place, and there he prayed.",
+        NKJV: "Now in the morning, having risen a long while before daylight, He went out and departed to a solitary place; and there He prayed.",
+        NLT: "Before daybreak the next morning, Jesus got up and went out to an isolated place to pray.",
+        NASB: "In the early morning, while it was still dark, Jesus got up, left the house, and went away to a secluded place, and prayed there."
+    },
+    "Song of Solomon 3:1": {
+        KJV: "By night on my bed I sought him whom my soul loveth.",
+        ESV: "On my bed by night I sought him whom my soul loves.",
+        NKJV: "By night on my bed I sought the one I love.",
+        NLT: "One night as I lay in bed, I yearned for my lover.",
+        NASB: "On my bed night after night I sought him whom my soul loves."
+    },
+    "Jeremiah 29:11": {
+        KJV: "For I know the thoughts that I think toward you, saith the LORD, thoughts of peace, and not of evil, to give you an expected end.",
+        ESV: "For I know the plans I have for you, declares the LORD, plans for welfare and not for evil, to give you a future and a hope.",
+        NKJV: "For I know the thoughts that I think toward you, says the LORD, thoughts of peace and not of evil, to give you a future and a hope.",
+        NLT: "For I know the plans I have for you, says the LORD. They are plans for good and not for disaster, to give you a future and a hope.",
+        NASB: "'For I know the plans that I have for you,' declares the LORD, 'plans for prosperity and not for disaster, to give you a future and a hope.'"
+    },
+    "Proverbs 15:22": {
+        KJV: "Without counsel purposes are disappointed: but in the multitude of counsellors they are established.",
+        ESV: "Without counsel plans fail, but with many advisers they succeed.",
+        NKJV: "Without counsel, plans go awry, but in the multitude of counselors they are established.",
+        NLT: "Plans go wrong for lack of advice; many advisers bring success.",
+        NASB: "Without consultation, plans are frustrated, but with many counselors they succeed."
+    },
+    "Proverbs 12:24": {
+        KJV: "The hand of the diligent shall bear rule.",
+        ESV: "The hand of the diligent will rule.",
+        NKJV: "The hand of the diligent will rule.",
+        NLT: "Work hard and become a leader.",
+        NASB: "The hand of the diligent will rule."
+    },
+    "1 Corinthians 12:14": {
+        KJV: "For the body is not one member, but many.",
+        ESV: "For the body does not consist of one member but of many.",
+        NKJV: "For in fact the body is not one member but many.",
+        NLT: "Yes, the body has many different parts, not just one part.",
+        NASB: "For the body is not one member, but many."
+    },
+    "Matthew 19:26": {
+        KJV: "With men this is impossible; but with God all things are possible.",
+        ESV: "With man this is impossible, but with God all things are possible.",
+        NKJV: "With men this is impossible, but with God all things are possible.",
+        NLT: "Humanly speaking, it is impossible. But with God everything is possible.",
+        NASB: "With people this is impossible, but with God all things are possible."
+    },
+    "Psalm 18:2": {
+        KJV: "The LORD is my rock, and my fortress, and my deliverer.",
+        ESV: "The LORD is my rock and my fortress and my deliverer.",
+        NKJV: "The LORD is my rock and my fortress and my deliverer.",
+        NLT: "The LORD is my rock, my fortress, and my savior.",
+        NASB: "The LORD is my rock and my fortress and my deliverer."
+    },
+    "Psalm 145:3": {
+        KJV: "Great is the LORD, and greatly to be praised; and his greatness is unsearchable.",
+        ESV: "Great is the LORD, and greatly to be praised, and his greatness is unsearchable.",
+        NKJV: "Great is the LORD, and greatly to be praised; and His greatness is unsearchable.",
+        NLT: "Great is the LORD! He is most worthy of praise! No one can measure his greatness.",
+        NASB: "Great is the LORD, and highly to be praised, and His greatness is unsearchable."
+    },
+    "Psalm 121:1": {
+        KJV: "I will lift up mine eyes unto the hills, from whence cometh my help.",
+        ESV: "I lift up my eyes to the hills. From where does my help come?",
+        NKJV: "I will lift up my eyes to the hills—from whence comes my help?",
+        NLT: "I look up to the mountains—does my help come from there?",
+        NASB: "I will raise my eyes to the mountains; from where will my help come?"
+    },
+};
+
+// Look up a verse in the selected Bible translation
+function getTranslatedVerse(ref, nivText) {
+    const version = getBibleVersion();
+    if (version === 'NIV') return nivText;
+    const entry = BIBLE_TRANSLATIONS[ref];
+    if (entry && entry[version]) return entry[version];
+    return nivText; // fallback to NIV
+}
+
 // --- Bible Verses ---
 const VERSES = [
     { text: "Do you not know that your bodies are temples of the Holy Spirit, who is in you, whom you have received from God?", ref: "1 Corinthians 6:19" },
@@ -169,8 +627,10 @@ function getDailyVerse() {
 
 function displayDailyVerse() {
     const verse = getDailyVerse();
-    document.getElementById('daily-verse').textContent = `"${verse.text}"`;
-    document.getElementById('verse-ref').textContent = `— ${verse.ref}`;
+    const text = getTranslatedVerse(verse.ref, verse.text);
+    const version = getBibleVersion();
+    document.getElementById('daily-verse').textContent = `"${text}"`;
+    document.getElementById('verse-ref').textContent = `— ${verse.ref} (${version})`;
 }
 
 // --- Tab Navigation ---
@@ -180,6 +640,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById(btn.dataset.tab).classList.add('active');
+        updateRestTimerVisibility();
     });
 });
 
@@ -389,6 +850,7 @@ function updateTodaysExercises() {
             </div>
         `;
     }).join('');
+    updateSaveTemplateBtn();
 }
 
 // --- Progressive Overload ---
@@ -564,6 +1026,10 @@ function logMeal() {
     document.getElementById('meal-protein').value = '';
     document.getElementById('meal-carbs').value = '';
     document.getElementById('meal-fat').value = '';
+    selectedFood = null;
+    currentServings = 1;
+    document.getElementById('servings-group').style.display = 'none';
+    document.getElementById('serving-count').textContent = '1';
 
     updateMealsList();
     updateNutritionBars();
@@ -806,6 +1272,7 @@ function updateDashboard() {
     renderCalendarHeatmap();
     renderMuscleHeatmap();
     renderAchievements();
+    renderWeeklyReport();
 }
 
 function updateRecentWorkouts() {
@@ -906,59 +1373,7 @@ if ('serviceWorker' in navigator) {
 
 // --- Sharing ---
 function shareProgress() {
-    const profile = DB.get('profile', {});
-    const workouts = DB.get('workouts', []);
-    const meals = DB.get('meals', []).filter(m => m.date === today());
-    const weights = DB.get('weights', []);
-    const todayWorkouts = workouts.filter(w => w.date === today());
-
-    // Calculate streak
-    const dates = [...new Set(workouts.map(w => w.date))].sort().reverse();
-    let streak = 0;
-    if (dates.includes(today())) {
-        streak = 1;
-        const checkDate = new Date();
-        for (let i = 1; i < 365; i++) {
-            checkDate.setDate(checkDate.getDate() - 1);
-            if (dates.includes(checkDate.toISOString().split('T')[0])) streak++;
-            else break;
-        }
-    }
-
-    const totalCalories = meals.reduce((sum, m) => sum + m.calories, 0);
-    const currentWeight = weights.length > 0 ? `${lbsToDisplay(weights[weights.length - 1].weight)} ${wu()}` : 'Not tracked';
-    const name = profile.name || 'An Iron Faith user';
-
-    const verse = getDailyVerse();
-
-    let text = `💪 ${name}'s Iron Faith Progress\n`;
-    text += `📅 ${today()}\n\n`;
-    text += `🏋️ Workouts today: ${todayWorkouts.length}\n`;
-    text += `🔥 Current streak: ${streak} day${streak !== 1 ? 's' : ''}\n`;
-    text += `🍽️ Calories today: ${totalCalories}\n`;
-    text += `⚖️ Weight: ${currentWeight}\n`;
-
-    if (todayWorkouts.length > 0) {
-        text += `\nToday's exercises:\n`;
-        todayWorkouts.forEach(w => {
-            const bestSet = w.sets.reduce((best, s) => s.weight > best.weight ? s : best, w.sets[0]);
-            text += `  • ${w.name}: ${lbsToDisplay(bestSet.weight)}${wu()} x ${bestSet.reps}\n`;
-        });
-    }
-
-    text += `\n✨ "${verse.text}" — ${verse.ref}\n`;
-    text += `\n📲 Track your fitness journey with Iron Faith!`;
-
-    const shareData = {
-        title: 'My Iron Faith Progress',
-        text: text
-    };
-
-    if (navigator.share) {
-        navigator.share(shareData).catch(() => {});
-    } else {
-        copyToClipboard(text, 'Progress copied to clipboard! Paste it anywhere to share.');
-    }
+    openShareModal();
 }
 
 function copyToClipboard(text, message) {
@@ -1100,60 +1515,60 @@ function showPRToast(exercise, prs) {
 // --- Achievement Badges ---
 const ACHIEVEMENTS = [
     // Workout milestones
-    { id: 'first_workout', name: 'First Rep', desc: 'Log your first workout', icon: '&#x1F4AA;', check: ctx => ctx.total >= 1 },
-    { id: 'ten_workouts', name: 'Getting Serious', desc: 'Log 10 workouts', icon: '&#x1F525;', check: ctx => ctx.total >= 10 },
-    { id: 'twentyfive_workouts', name: 'Quarter Century', desc: 'Log 25 workouts', icon: '&#x1F4AB;', check: ctx => ctx.total >= 25 },
-    { id: 'fifty_workouts', name: 'Iron Regular', desc: 'Log 50 workouts', icon: '&#x2B50;', check: ctx => ctx.total >= 50 },
-    { id: 'hundred_workouts', name: 'Centurion', desc: 'Log 100 workouts', icon: '&#x1F451;', check: ctx => ctx.total >= 100 },
-    { id: 'twofifty_workouts', name: 'Iron Disciple', desc: 'Log 250 workouts', icon: '&#x1F5E1;', check: ctx => ctx.total >= 250 },
-    { id: 'five_hundred', name: 'Legend', desc: 'Log 500 workouts', icon: '&#x1F48E;', check: ctx => ctx.total >= 500 },
-    { id: 'thousand_workouts', name: 'Walking Temple', desc: 'Log 1000 workouts', icon: '&#x26EA;', check: ctx => ctx.total >= 1000 },
+    { id: 'first_workout', name: 'First Rep', desc: 'Log your first workout', icon: '&#x1F4AA;', verse: 'The journey of a thousand miles begins with a single step. — Proverbs 4:26', check: ctx => ctx.total >= 1, progress: ctx => ({ cur: ctx.total, goal: 1 }) },
+    { id: 'ten_workouts', name: 'Getting Serious', desc: 'Log 10 workouts', icon: '&#x1F525;', verse: 'Whatever you do, work at it with all your heart. — Colossians 3:23', check: ctx => ctx.total >= 10, progress: ctx => ({ cur: ctx.total, goal: 10 }) },
+    { id: 'twentyfive_workouts', name: 'Quarter Century', desc: 'Log 25 workouts', icon: '&#x1F4AB;', verse: 'Commit to the LORD whatever you do, and he will establish your plans. — Proverbs 16:3', check: ctx => ctx.total >= 25, progress: ctx => ({ cur: ctx.total, goal: 25 }) },
+    { id: 'fifty_workouts', name: 'Iron Regular', desc: 'Log 50 workouts', icon: '&#x2B50;', verse: 'She sets about her work vigorously; her arms are strong for her tasks. — Proverbs 31:17', check: ctx => ctx.total >= 50, progress: ctx => ({ cur: ctx.total, goal: 50 }) },
+    { id: 'hundred_workouts', name: 'Centurion', desc: 'Log 100 workouts', icon: '&#x1F451;', verse: 'I have fought the good fight, I have finished the race, I have kept the faith. — 2 Timothy 4:7', check: ctx => ctx.total >= 100, progress: ctx => ({ cur: ctx.total, goal: 100 }) },
+    { id: 'twofifty_workouts', name: 'Iron Disciple', desc: 'Log 250 workouts', icon: '&#x1F5E1;', verse: 'No discipline seems pleasant at the time, but later it produces a harvest of righteousness. — Hebrews 12:11', check: ctx => ctx.total >= 250, progress: ctx => ({ cur: ctx.total, goal: 250 }) },
+    { id: 'five_hundred', name: 'Legend', desc: 'Log 500 workouts', icon: '&#x1F48E;', verse: 'Well done, good and faithful servant. — Matthew 25:21', check: ctx => ctx.total >= 500, progress: ctx => ({ cur: ctx.total, goal: 500 }) },
+    { id: 'thousand_workouts', name: 'Walking Temple', desc: 'Log 1000 workouts', icon: '&#x26EA;', verse: 'Do you not know that your bodies are temples of the Holy Spirit? — 1 Corinthians 6:19', check: ctx => ctx.total >= 1000, progress: ctx => ({ cur: ctx.total, goal: 1000 }) },
     // Streaks
-    { id: 'three_streak', name: 'Momentum', desc: '3-day workout streak', icon: '&#x26A1;', check: ctx => ctx.streak >= 3 },
-    { id: 'week_streak', name: '7-Day Warrior', desc: '7-day workout streak', icon: '&#x1F4A5;', check: ctx => ctx.streak >= 7 },
-    { id: 'two_week_streak', name: 'Unstoppable', desc: '14-day workout streak', icon: '&#x1F30A;', check: ctx => ctx.streak >= 14 },
-    { id: 'month_streak', name: '30-Day Beast', desc: '30-day workout streak', icon: '&#x1F981;', check: ctx => ctx.streak >= 30 },
-    { id: 'sixty_streak', name: 'Iron Will', desc: '60-day workout streak', icon: '&#x1F9CA;', check: ctx => ctx.streak >= 60 },
-    { id: 'hundred_streak', name: 'Unbreakable', desc: '100-day workout streak', icon: '&#x1F6E1;', check: ctx => ctx.streak >= 100 },
+    { id: 'three_streak', name: 'Momentum', desc: '3-day workout streak', icon: '&#x26A1;', verse: 'A cord of three strands is not quickly broken. — Ecclesiastes 4:12', check: ctx => ctx.streak >= 3, progress: ctx => ({ cur: ctx.streak, goal: 3 }) },
+    { id: 'week_streak', name: '7-Day Warrior', desc: '7-day workout streak', icon: '&#x1F4A5;', verse: 'On the seventh day God had finished his work. — Genesis 2:2', check: ctx => ctx.streak >= 7, progress: ctx => ({ cur: ctx.streak, goal: 7 }) },
+    { id: 'two_week_streak', name: 'Unstoppable', desc: '14-day workout streak', icon: '&#x1F30A;', verse: 'If God is for us, who can be against us? — Romans 8:31', check: ctx => ctx.streak >= 14, progress: ctx => ({ cur: ctx.streak, goal: 14 }) },
+    { id: 'month_streak', name: '30-Day Beast', desc: '30-day workout streak', icon: '&#x1F981;', verse: 'Be strong and courageous. Do not be afraid. — Joshua 1:9', check: ctx => ctx.streak >= 30, progress: ctx => ({ cur: ctx.streak, goal: 30 }) },
+    { id: 'sixty_streak', name: 'Iron Will', desc: '60-day workout streak', icon: '&#x1F9CA;', verse: 'As iron sharpens iron, so one person sharpens another. — Proverbs 27:17', check: ctx => ctx.streak >= 60, progress: ctx => ({ cur: ctx.streak, goal: 60 }) },
+    { id: 'hundred_streak', name: 'Unbreakable', desc: '100-day workout streak', icon: '&#x1F6E1;', verse: 'I can do all things through Christ who strengthens me. — Philippians 4:13', check: ctx => ctx.streak >= 100, progress: ctx => ({ cur: ctx.streak, goal: 100 }) },
     // PRs
-    { id: 'first_pr', name: 'Record Breaker', desc: 'Hit your first PR', icon: '&#x1F3C6;', check: ctx => ctx.prCount >= 1 },
-    { id: 'five_prs', name: 'Climbing', desc: 'Hit 5 personal records', icon: '&#x1F4C8;', check: ctx => ctx.prCount >= 5 },
-    { id: 'ten_prs', name: 'PR Machine', desc: 'Hit 10 personal records', icon: '&#x1F3C5;', check: ctx => ctx.prCount >= 10 },
-    { id: 'twentyfive_prs', name: 'Relentless', desc: 'Hit 25 personal records', icon: '&#x1F525;', check: ctx => ctx.prCount >= 25 },
-    { id: 'fifty_prs', name: 'Elite', desc: 'Hit 50 personal records', icon: '&#x1F396;', check: ctx => ctx.prCount >= 50 },
+    { id: 'first_pr', name: 'Record Breaker', desc: 'Hit your first PR', icon: '&#x1F3C6;', verse: 'Forgetting what is behind, I press on toward the goal. — Philippians 3:13-14', check: ctx => ctx.prCount >= 1, progress: ctx => ({ cur: ctx.prCount, goal: 1 }) },
+    { id: 'five_prs', name: 'Climbing', desc: 'Hit 5 personal records', icon: '&#x1F4C8;', verse: 'He makes my feet like the feet of a deer and sets me on the heights. — Psalm 18:33', check: ctx => ctx.prCount >= 5, progress: ctx => ({ cur: ctx.prCount, goal: 5 }) },
+    { id: 'ten_prs', name: 'PR Machine', desc: 'Hit 10 personal records', icon: '&#x1F3C5;', verse: 'From strength to strength, each one appears before God. — Psalm 84:7', check: ctx => ctx.prCount >= 10, progress: ctx => ({ cur: ctx.prCount, goal: 10 }) },
+    { id: 'twentyfive_prs', name: 'Relentless', desc: 'Hit 25 personal records', icon: '&#x1F525;', verse: 'Let us run with perseverance the race marked out for us. — Hebrews 12:1', check: ctx => ctx.prCount >= 25, progress: ctx => ({ cur: ctx.prCount, goal: 25 }) },
+    { id: 'fifty_prs', name: 'Elite', desc: 'Hit 50 personal records', icon: '&#x1F396;', verse: 'The LORD will make you the head, not the tail. — Deuteronomy 28:13', check: ctx => ctx.prCount >= 50, progress: ctx => ({ cur: ctx.prCount, goal: 50 }) },
     // Exercise variety
-    { id: 'five_exercises', name: 'Well Rounded', desc: 'Log 5 different exercises', icon: '&#x1F504;', check: ctx => ctx.uniqueExercises >= 5 },
-    { id: 'ten_exercises', name: 'Versatile', desc: 'Log 10 different exercises', icon: '&#x1F3AF;', check: ctx => ctx.uniqueExercises >= 10 },
-    { id: 'fifteen_exercises', name: 'Arsenal', desc: 'Log 15 different exercises', icon: '&#x2694;', check: ctx => ctx.uniqueExercises >= 15 },
-    { id: 'twentyfive_exercises', name: 'Master of All', desc: 'Log 25 different exercises', icon: '&#x1F9E0;', check: ctx => ctx.uniqueExercises >= 25 },
+    { id: 'five_exercises', name: 'Well Rounded', desc: 'Log 5 different exercises', icon: '&#x1F504;', verse: 'There are different kinds of gifts, but the same Spirit distributes them. — 1 Corinthians 12:4', check: ctx => ctx.uniqueExercises >= 5, progress: ctx => ({ cur: ctx.uniqueExercises, goal: 5 }) },
+    { id: 'ten_exercises', name: 'Versatile', desc: 'Log 10 different exercises', icon: '&#x1F3AF;', verse: 'I have become all things to all people so that I might save some. — 1 Corinthians 9:22', check: ctx => ctx.uniqueExercises >= 10, progress: ctx => ({ cur: ctx.uniqueExercises, goal: 10 }) },
+    { id: 'fifteen_exercises', name: 'Arsenal', desc: 'Log 15 different exercises', icon: '&#x2694;', verse: 'Put on the full armor of God. — Ephesians 6:11', check: ctx => ctx.uniqueExercises >= 15, progress: ctx => ({ cur: ctx.uniqueExercises, goal: 15 }) },
+    { id: 'twentyfive_exercises', name: 'Master of All', desc: 'Log 25 different exercises', icon: '&#x1F9E0;', verse: 'Whatever your hand finds to do, do it with all your might. — Ecclesiastes 9:10', check: ctx => ctx.uniqueExercises >= 25, progress: ctx => ({ cur: ctx.uniqueExercises, goal: 25 }) },
     // Weight tracking
-    { id: 'logged_weight', name: 'Accountable', desc: 'Log your body weight', icon: '&#x2696;', check: ctx => ctx.weighIns >= 1 },
-    { id: 'ten_weigh_ins', name: 'Consistent Tracker', desc: 'Log body weight 10 times', icon: '&#x1F4CA;', check: ctx => ctx.weighIns >= 10 },
-    { id: 'fifty_weigh_ins', name: 'Data Driven', desc: 'Log body weight 50 times', icon: '&#x1F4C9;', check: ctx => ctx.weighIns >= 50 },
+    { id: 'logged_weight', name: 'Accountable', desc: 'Log your body weight', icon: '&#x2696;', verse: 'A just balance is a delight to the LORD. — Proverbs 11:1', check: ctx => ctx.weighIns >= 1, progress: ctx => ({ cur: ctx.weighIns, goal: 1 }) },
+    { id: 'ten_weigh_ins', name: 'Consistent Tracker', desc: 'Log body weight 10 times', icon: '&#x1F4CA;', verse: 'The plans of the diligent lead surely to abundance. — Proverbs 21:5', check: ctx => ctx.weighIns >= 10, progress: ctx => ({ cur: ctx.weighIns, goal: 10 }) },
+    { id: 'fifty_weigh_ins', name: 'Data Driven', desc: 'Log body weight 50 times', icon: '&#x1F4C9;', verse: 'For which of you, desiring to build a tower, does not first count the cost? — Luke 14:28', check: ctx => ctx.weighIns >= 50, progress: ctx => ({ cur: ctx.weighIns, goal: 50 }) },
     // Nutrition
-    { id: 'logged_meal', name: 'Fuel Up', desc: 'Log your first meal', icon: '&#x1F372;', check: ctx => ctx.meals >= 1 },
-    { id: 'fifty_meals', name: 'Meal Prepper', desc: 'Log 50 meals', icon: '&#x1F957;', check: ctx => ctx.meals >= 50 },
-    { id: 'hundred_meals', name: 'Nutrition Nerd', desc: 'Log 100 meals', icon: '&#x1F468;', check: ctx => ctx.meals >= 100 },
-    // Volume milestones (total lbs lifted all time)
-    { id: 'ten_k_volume', name: 'Heavy Lifter', desc: 'Lift 10,000 lbs total', icon: '&#x1F3CB;', check: ctx => ctx.totalVolume >= 10000 },
-    { id: 'fifty_k_volume', name: 'Iron Mountain', desc: 'Lift 50,000 lbs total', icon: '&#x26F0;', check: ctx => ctx.totalVolume >= 50000 },
-    { id: 'hundred_k_volume', name: 'Titan', desc: 'Lift 100,000 lbs total', icon: '&#x1F30D;', check: ctx => ctx.totalVolume >= 100000 },
-    { id: 'half_mil_volume', name: 'Demigod', desc: 'Lift 500,000 lbs total', icon: '&#x1FA90;', check: ctx => ctx.totalVolume >= 500000 },
-    { id: 'mil_volume', name: 'Million Pound Club', desc: 'Lift 1,000,000 lbs total', icon: '&#x1F4A0;', check: ctx => ctx.totalVolume >= 1000000 },
+    { id: 'logged_meal', name: 'Fuel Up', desc: 'Log your first meal', icon: '&#x1F372;', verse: 'Whether you eat or drink, do all to the glory of God. — 1 Corinthians 10:31', check: ctx => ctx.meals >= 1, progress: ctx => ({ cur: ctx.meals, goal: 1 }) },
+    { id: 'fifty_meals', name: 'Meal Prepper', desc: 'Log 50 meals', icon: '&#x1F957;', verse: 'Give us this day our daily bread. — Matthew 6:11', check: ctx => ctx.meals >= 50, progress: ctx => ({ cur: ctx.meals, goal: 50 }) },
+    { id: 'hundred_meals', name: 'Nutrition Nerd', desc: 'Log 100 meals', icon: '&#x1F468;', verse: 'So whether you eat or drink, do it all for the glory of God. — 1 Corinthians 10:31', check: ctx => ctx.meals >= 100, progress: ctx => ({ cur: ctx.meals, goal: 100 }) },
+    // Volume milestones
+    { id: 'ten_k_volume', name: 'Heavy Lifter', desc: 'Lift 10,000 lbs total', icon: '&#x1F3CB;', verse: 'He gives strength to the weary and increases the power of the weak. — Isaiah 40:29', check: ctx => ctx.totalVolume >= 10000, progress: ctx => ({ cur: ctx.totalVolume, goal: 10000, fmt: true }) },
+    { id: 'fifty_k_volume', name: 'Iron Mountain', desc: 'Lift 50,000 lbs total', icon: '&#x26F0;', verse: 'I lift up my eyes to the mountains — where does my help come from? — Psalm 121:1', check: ctx => ctx.totalVolume >= 50000, progress: ctx => ({ cur: ctx.totalVolume, goal: 50000, fmt: true }) },
+    { id: 'hundred_k_volume', name: 'Titan', desc: 'Lift 100,000 lbs total', icon: '&#x1F30D;', verse: 'With God all things are possible. — Matthew 19:26', check: ctx => ctx.totalVolume >= 100000, progress: ctx => ({ cur: ctx.totalVolume, goal: 100000, fmt: true }) },
+    { id: 'half_mil_volume', name: 'Demigod', desc: 'Lift 500,000 lbs total', icon: '&#x1FA90;', verse: 'The LORD is my rock, my fortress, and my deliverer. — Psalm 18:2', check: ctx => ctx.totalVolume >= 500000, progress: ctx => ({ cur: ctx.totalVolume, goal: 500000, fmt: true }) },
+    { id: 'mil_volume', name: 'Million Pound Club', desc: 'Lift 1,000,000 lbs total', icon: '&#x1F4A0;', verse: 'Great is the LORD and most worthy of praise; his greatness no one can fathom. — Psalm 145:3', check: ctx => ctx.totalVolume >= 1000000, progress: ctx => ({ cur: ctx.totalVolume, goal: 1000000, fmt: true }) },
     // Big three
-    { id: 'thousand_club', name: '1000lb Club', desc: 'Bench+Squat+Deadlift total 1000+ lbs', icon: '&#x1F947;', check: ctx => ctx.bigThreeTotal >= 1000 },
+    { id: 'thousand_club', name: '1000lb Club', desc: 'Bench+Squat+Deadlift total 1000+ lbs', icon: '&#x1F947;', verse: 'The LORD is my strength and my shield; my heart trusts in him. — Psalm 28:7', check: ctx => ctx.bigThreeTotal >= 1000, progress: ctx => ({ cur: ctx.bigThreeTotal, goal: 1000, fmt: true }) },
     // Muscle coverage
-    { id: 'full_body_week', name: 'No Weak Links', desc: 'Hit all 7 muscle groups in one week', icon: '&#x1F9BE;', check: ctx => ctx.muscleGroupsHit >= 7 },
+    { id: 'full_body_week', name: 'No Weak Links', desc: 'Hit all 7 muscle groups in one week', icon: '&#x1F9BE;', verse: 'The body is not made up of one part but of many. — 1 Corinthians 12:14', check: ctx => ctx.muscleGroupsHit >= 7, progress: ctx => ({ cur: ctx.muscleGroupsHit, goal: 7 }) },
     // Training days in a single week
-    { id: 'five_day_week', name: 'Grinder', desc: 'Train 5 days in a single week', icon: '&#x23F1;', check: ctx => ctx.bestWeekDays >= 5 },
-    { id: 'six_day_week', name: 'No Days Off', desc: 'Train 6+ days in a single week', icon: '&#x1F608;', check: ctx => ctx.bestWeekDays >= 6 },
+    { id: 'five_day_week', name: 'Grinder', desc: 'Train 5 days in a single week', icon: '&#x23F1;', verse: 'The hand of the diligent will rule. — Proverbs 12:24', check: ctx => ctx.bestWeekDays >= 5, progress: ctx => ({ cur: ctx.bestWeekDays, goal: 5 }) },
+    { id: 'six_day_week', name: 'No Days Off', desc: 'Train 6+ days in a single week', icon: '&#x1F608;', verse: 'Six days you shall labor and do all your work. — Exodus 20:9', check: ctx => ctx.bestWeekDays >= 6, progress: ctx => ({ cur: ctx.bestWeekDays, goal: 6 }) },
     // Early bird / night owl
-    { id: 'early_bird', name: 'Early Bird', desc: 'Log a workout before 7am', icon: '&#x1F305;', check: ctx => ctx.earlyWorkout },
-    { id: 'night_owl', name: 'Night Owl', desc: 'Log a workout after 9pm', icon: '&#x1F319;', check: ctx => ctx.lateWorkout },
+    { id: 'early_bird', name: 'Early Bird', desc: 'Log a workout before 7am', icon: '&#x1F305;', verse: 'Very early in the morning, while it was still dark, Jesus got up and prayed. — Mark 1:35', check: ctx => ctx.earlyWorkout },
+    { id: 'night_owl', name: 'Night Owl', desc: 'Log a workout after 9pm', icon: '&#x1F319;', verse: 'By night I sought him whom my soul loveth. — Song of Solomon 3:1', check: ctx => ctx.lateWorkout },
     // Profile setup
-    { id: 'profile_complete', name: 'Locked In', desc: 'Complete your profile', icon: '&#x1F512;', check: ctx => ctx.profileComplete },
+    { id: 'profile_complete', name: 'Locked In', desc: 'Complete your profile', icon: '&#x1F512;', verse: 'For I know the plans I have for you, declares the LORD. — Jeremiah 29:11', check: ctx => ctx.profileComplete },
     // Coach interaction
-    { id: 'used_coach', name: 'Coachable', desc: 'Ask the coach a question', icon: '&#x1F4AC;', check: ctx => ctx.coachUsed },
+    { id: 'used_coach', name: 'Coachable', desc: 'Ask the coach a question', icon: '&#x1F4AC;', verse: 'Plans fail for lack of counsel, but with many advisers they succeed. — Proverbs 15:22', check: ctx => ctx.coachUsed },
 ];
 
 function getAchievementContext() {
@@ -1193,16 +1608,8 @@ function getAchievementContext() {
     weekAgo.setDate(weekAgo.getDate() - 7);
     const weekStr = weekAgo.toISOString().split('T')[0];
     const weekWorkouts = workouts.filter(w => w.date >= weekStr);
-    const muscleMap = {
-        chest: ['Bench Press','Incline Bench Press','Decline Bench Press','Dumbbell Bench Press','Incline Dumbbell Press','Dumbbell Fly','Cable Fly','Chest Dips','Push-ups','Machine Chest Press'],
-        back: ['Deadlift','Romanian Deadlift','Barbell Row','Dumbbell Row','Lat Pulldown','Pull-ups','Chin-ups','Seated Cable Row','T-Bar Row'],
-        shoulders: ['Overhead Press','Seated Dumbbell Press','Arnold Press','Lateral Raises','Front Raises','Rear Delt Fly','Face Pulls'],
-        legs: ['Squat','Front Squat','Leg Press','Lunges','Walking Lunges','Leg Extension','Leg Curl','Hip Thrust','Calf Raises'],
-        biceps: ['Bicep Curls','Hammer Curls','Preacher Curls','EZ Bar Curl','Cable Curl'],
-        triceps: ['Tricep Pushdown','Overhead Tricep Extension','Skull Crushers','Close Grip Bench Press','Tricep Dips'],
-        core: ['Plank','Crunches','Hanging Leg Raise','Cable Crunch','Ab Wheel Rollout','Russian Twist','Leg Raises'],
-    };
-    const muscleGroupsHit = Object.entries(muscleMap).filter(([, exercises]) =>
+    const achMuscleMap = getFullMuscleMap();
+    const muscleGroupsHit = Object.entries(achMuscleMap).filter(([, exercises]) =>
         weekWorkouts.some(w => exercises.some(e => w.name.toLowerCase() === e.toLowerCase()))
     ).length;
 
@@ -1272,12 +1679,27 @@ function renderAchievements() {
     const container = document.getElementById('achievements-grid');
     if (!container) return;
     const unlocked = DB.get('achievements', []);
+    const ctx = getAchievementContext();
 
     container.innerHTML = ACHIEVEMENTS.map(a => {
         const earned = unlocked.includes(a.id);
+        let progressHtml = '';
+        if (!earned && a.progress) {
+            const p = a.progress(ctx);
+            const cur = Math.min(p.cur, p.goal);
+            const pct = Math.round((cur / p.goal) * 100);
+            const curStr = p.fmt ? cur.toLocaleString() : cur;
+            const goalStr = p.fmt ? p.goal.toLocaleString() : p.goal;
+            progressHtml = `<span class="badge-progress">${curStr} / ${goalStr}</span>
+                <div class="badge-progress-bar"><div class="badge-progress-fill" style="width:${pct}%"></div></div>`;
+        }
+        if (earned) {
+            progressHtml = '<span class="badge-progress badge-done">Complete</span>';
+        }
         return `<div class="badge ${earned ? 'earned' : 'locked'}" title="${a.desc}">
             <span class="badge-icon">${a.icon}</span>
             <span class="badge-name">${a.name}</span>
+            ${progressHtml}
         </div>`;
     }).join('');
 }
@@ -1361,15 +1783,7 @@ function renderMuscleHeatmap() {
     const weekStr = weekAgo.toISOString().split('T')[0];
     const weekWorkouts = workouts.filter(w => w.date >= weekStr);
 
-    const muscleMap = {
-        chest: ['Bench Press','Incline Bench Press','Decline Bench Press','Dumbbell Bench Press','Incline Dumbbell Press','Dumbbell Fly','Cable Fly','Chest Dips','Push-ups','Machine Chest Press','Pec Deck'],
-        back: ['Deadlift','Romanian Deadlift','Sumo Deadlift','Barbell Row','Dumbbell Row','Pendlay Row','T-Bar Row','Seated Cable Row','Lat Pulldown','Pull-ups','Chin-ups','Straight Arm Pulldown','Hyperextensions','Good Mornings'],
-        shoulders: ['Overhead Press','Seated Dumbbell Press','Arnold Press','Lateral Raises','Front Raises','Rear Delt Fly','Cable Lateral Raise','Upright Row','Shrugs','Barbell Shrugs','Face Pulls','Machine Shoulder Press'],
-        legs: ['Squat','Front Squat','Goblet Squat','Bulgarian Split Squat','Hack Squat','Leg Press','Lunges','Walking Lunges','Reverse Lunges','Leg Extension','Leg Curl','Seated Leg Curl','Hip Thrust','Glute Bridge','Calf Raises','Seated Calf Raise','Step-ups','Box Jumps'],
-        biceps: ['Bicep Curls','Hammer Curls','Preacher Curls','Concentration Curls','Incline Dumbbell Curl','EZ Bar Curl','Cable Curl','Spider Curls'],
-        triceps: ['Tricep Pushdown','Overhead Tricep Extension','Skull Crushers','Close Grip Bench Press','Tricep Dips','Tricep Kickbacks','Cable Overhead Extension','Diamond Push-ups'],
-        core: ['Plank','Crunches','Hanging Leg Raise','Cable Crunch','Ab Wheel Rollout','Russian Twist','Bicycle Crunches','Leg Raises','Woodchoppers','Pallof Press','Dead Bug','Mountain Climbers'],
-    };
+    const muscleMap = getFullMuscleMap();
 
     const volume = {};
     Object.keys(muscleMap).forEach(g => volume[g] = 0);
@@ -1417,8 +1831,1513 @@ function renderMuscleHeatmap() {
     container.innerHTML = html;
 }
 
+// =============================================
+// FEATURE: Workout Templates / Routines
+// =============================================
+
+function getTemplates() { return DB.get('templates', []); }
+function saveTemplates(t) { DB.set('templates', t); }
+
+function renderRoutinesList() {
+    const container = document.getElementById('routines-list');
+    const templates = getTemplates();
+    if (templates.length === 0) {
+        container.innerHTML = '<p class="empty-state">No routines saved yet. Complete a session and save it as a routine!</p>';
+        return;
+    }
+    container.innerHTML = templates.map((t, i) => `
+        <div class="routine-item">
+            <div class="routine-info">
+                <h4>${escapeHtml(t.name)}</h4>
+                <p>${t.exercises.length} exercises${t.lastUsed ? ' &middot; Last: ' + t.lastUsed : ''}</p>
+            </div>
+            <div class="routine-actions">
+                <button class="btn btn-primary btn-sm" onclick="startTemplate(${i})">Start</button>
+                <button class="btn btn-secondary btn-sm" onclick="renameTemplate(${i})">Rename</button>
+                <button class="delete-btn" onclick="deleteTemplate(${i})" title="Delete">&times;</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function saveAsTemplate() {
+    const workouts = DB.get('workouts', []).filter(w => w.date === today());
+    if (workouts.length === 0) return;
+    const name = prompt('Name this routine (e.g., "Push Day", "Full Body A"):');
+    if (!name || !name.trim()) return;
+    const templates = getTemplates();
+    templates.push({
+        id: Date.now(),
+        name: name.trim(),
+        exercises: workouts.map(w => ({ name: w.name, sets: w.sets.map(s => ({ weight: s.weight, reps: s.reps })) })),
+        created: today(),
+        lastUsed: null
+    });
+    saveTemplates(templates);
+    renderRoutinesList();
+    showToast('Routine saved!');
+}
+
+function startTemplate(index) {
+    const templates = getTemplates();
+    const tmpl = templates[index];
+    if (!tmpl) return;
+
+    // Get last logged weights for each exercise
+    const allWorkouts = DB.get('workouts', []);
+    const container = document.getElementById('template-exercises');
+    container.innerHTML = tmpl.exercises.map((ex, ei) => {
+        const lastLog = [...allWorkouts].reverse().find(w => w.name === ex.name);
+        const sets = lastLog ? lastLog.sets : ex.sets;
+        return `
+            <div class="template-exercise-block" data-exercise="${escapeHtml(ex.name)}">
+                <h4>${escapeHtml(ex.name)}</h4>
+                ${sets.map((s, si) => `
+                    <div class="template-set-row">
+                        <span class="set-label">Set ${si + 1}</span>
+                        <input type="number" class="tmpl-weight" value="${isMetric() ? (s.weight * 0.453592).toFixed(1) : s.weight}" step="2.5" placeholder="${wu()}">
+                        <span class="x-label">x</span>
+                        <input type="number" class="tmpl-reps" value="${s.reps}" placeholder="Reps">
+                    </div>
+                `).join('')}
+                <div class="btn-row"><button class="btn btn-secondary btn-sm" onclick="addTemplateSet(this)">+ Set</button></div>
+            </div>`;
+    }).join('');
+
+    document.getElementById('template-session').classList.remove('hidden');
+    document.getElementById('template-session-title').textContent = tmpl.name;
+    document.getElementById('template-session').dataset.templateIndex = index;
+    document.getElementById('log-workout-card').classList.add('hidden');
+
+    templates[index].lastUsed = today();
+    saveTemplates(templates);
+    renderRoutinesList();
+}
+
+function addTemplateSet(btn) {
+    const block = btn.closest('.template-exercise-block');
+    const rows = block.querySelectorAll('.template-set-row');
+    const num = rows.length + 1;
+    const div = document.createElement('div');
+    div.className = 'template-set-row';
+    div.innerHTML = `<span class="set-label">Set ${num}</span><input type="number" class="tmpl-weight" step="2.5" placeholder="${wu()}"><span class="x-label">x</span><input type="number" class="tmpl-reps" placeholder="Reps">`;
+    btn.closest('.btn-row').before(div);
+}
+
+function cancelTemplateSession() {
+    document.getElementById('template-session').classList.add('hidden');
+    document.getElementById('log-workout-card').classList.remove('hidden');
+}
+
+function finishTemplateSession() {
+    const blocks = document.querySelectorAll('.template-exercise-block');
+    const workouts = DB.get('workouts', []);
+    let count = 0;
+    blocks.forEach(block => {
+        const name = block.dataset.exercise;
+        const sets = [];
+        block.querySelectorAll('.template-set-row').forEach(row => {
+            const rawW = parseFloat(row.querySelector('.tmpl-weight').value) || 0;
+            const weight = isMetric() ? rawW / 0.453592 : rawW;
+            const reps = parseInt(row.querySelector('.tmpl-reps').value) || 0;
+            if (reps > 0) sets.push({ weight, reps });
+        });
+        if (sets.length > 0) {
+            workouts.push({ date: today(), name, sets, timestamp: Date.now() });
+            count++;
+        }
+    });
+    DB.set('workouts', workouts);
+    document.getElementById('template-session').classList.add('hidden');
+    document.getElementById('log-workout-card').classList.remove('hidden');
+    updateTodaysExercises();
+    updateOverloadDropdown();
+    updateDashboard();
+    updateStreak();
+    checkAchievements();
+    showToast(`${count} exercises logged!`);
+}
+
+function renameTemplate(index) {
+    const templates = getTemplates();
+    const newName = prompt('Rename routine:', templates[index].name);
+    if (!newName || !newName.trim()) return;
+    templates[index].name = newName.trim();
+    saveTemplates(templates);
+    renderRoutinesList();
+}
+
+function deleteTemplate(index) {
+    if (!confirm('Delete this routine?')) return;
+    const templates = getTemplates();
+    templates.splice(index, 1);
+    saveTemplates(templates);
+    renderRoutinesList();
+}
+
+function updateSaveTemplateBtn() {
+    const btn = document.getElementById('save-template-btn');
+    const workouts = DB.get('workouts', []).filter(w => w.date === today());
+    btn.style.display = workouts.length > 0 ? 'block' : 'none';
+}
+
+// =============================================
+// FEATURE: Rest Timer
+// =============================================
+
+let restTimerInterval = null;
+let restTimerTotal = 0;
+let restTimerRemaining = 0;
+let restTimerPanelOpen = false;
+
+function toggleRestTimer() {
+    const panel = document.querySelector('.rest-timer-panel');
+    restTimerPanelOpen = !restTimerPanelOpen;
+    panel.classList.toggle('hidden', !restTimerPanelOpen);
+}
+
+function startRestTimer(seconds) {
+    if (restTimerInterval) clearInterval(restTimerInterval);
+    restTimerTotal = seconds;
+    restTimerRemaining = seconds;
+    document.getElementById('stop-timer-btn').style.display = 'block';
+    document.getElementById('rest-timer-mini').classList.remove('hidden');
+    updateRestTimerDisplay();
+    restTimerInterval = setInterval(() => {
+        restTimerRemaining--;
+        if (restTimerRemaining <= 0) {
+            restTimerRemaining = 0;
+            clearInterval(restTimerInterval);
+            restTimerInterval = null;
+            onRestTimerComplete();
+        }
+        updateRestTimerDisplay();
+    }, 1000);
+}
+
+function stopRestTimer() {
+    if (restTimerInterval) clearInterval(restTimerInterval);
+    restTimerInterval = null;
+    restTimerRemaining = 0;
+    restTimerTotal = 0;
+    document.getElementById('timer-time').textContent = '0:00';
+    document.getElementById('rest-timer-mini').classList.add('hidden');
+    document.getElementById('rest-timer-mini').textContent = '';
+    document.getElementById('stop-timer-btn').style.display = 'none';
+    const ring = document.getElementById('timer-ring-progress');
+    ring.style.strokeDashoffset = 282.74;
+}
+
+function updateRestTimerDisplay() {
+    const m = Math.floor(restTimerRemaining / 60);
+    const s = restTimerRemaining % 60;
+    const str = `${m}:${s.toString().padStart(2, '0')}`;
+    document.getElementById('timer-time').textContent = str;
+    document.getElementById('rest-timer-mini').textContent = str;
+    const ring = document.getElementById('timer-ring-progress');
+    const circumference = 282.74;
+    const progress = restTimerTotal > 0 ? restTimerRemaining / restTimerTotal : 0;
+    ring.style.strokeDashoffset = circumference * (1 - progress);
+}
+
+function onRestTimerComplete() {
+    document.getElementById('stop-timer-btn').style.display = 'none';
+    document.getElementById('rest-timer-mini').classList.add('hidden');
+    // Vibrate
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    // Beep via Web Audio API
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [0, 0.25, 0.5].forEach(delay => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 880;
+            gain.gain.value = 0.3;
+            osc.start(ctx.currentTime + delay);
+            osc.stop(ctx.currentTime + delay + 0.15);
+        });
+    } catch (e) {}
+    showToast('Rest complete! Time to lift!');
+}
+
+function updateRestTimerVisibility() {
+    const el = document.getElementById('rest-timer');
+    const workoutActive = document.getElementById('workout').classList.contains('active');
+    el.style.display = workoutActive ? 'block' : 'none';
+}
+
+// =============================================
+// FEATURE: Food Search Database
+// =============================================
+
+let currentServings = 1;
+let selectedFood = null;
+
+function searchFood(query) {
+    const results = document.getElementById('food-search-results');
+    if (!query || query.length < 2 || typeof FOOD_DB === 'undefined') {
+        results.classList.add('hidden');
+        return;
+    }
+    const q = query.toLowerCase();
+    const matches = FOOD_DB.filter(f => f.name.toLowerCase().includes(q)).slice(0, 10);
+    if (matches.length === 0) {
+        results.classList.add('hidden');
+        return;
+    }
+    results.innerHTML = matches.map((f, i) => `
+        <div class="food-result" onclick="selectFood(${FOOD_DB.indexOf(f)})">
+            <span class="food-result-name">${escapeHtml(f.name)}</span>
+            <span class="food-result-info">${f.serving} &middot; ${f.calories} cal</span>
+        </div>
+    `).join('');
+    results.classList.remove('hidden');
+}
+
+function selectFood(index) {
+    const food = FOOD_DB[index];
+    selectedFood = food;
+    currentServings = 1;
+    document.getElementById('meal-name').value = food.name;
+    document.getElementById('meal-calories').value = food.calories;
+    document.getElementById('meal-protein').value = food.protein;
+    document.getElementById('meal-carbs').value = food.carbs;
+    document.getElementById('meal-fat').value = food.fat;
+    document.getElementById('food-search-results').classList.add('hidden');
+    document.getElementById('servings-group').style.display = 'block';
+    document.getElementById('serving-count').textContent = '1';
+    document.getElementById('serving-desc').textContent = food.serving;
+}
+
+function adjustServings(delta) {
+    if (!selectedFood) return;
+    currentServings = Math.max(0.5, currentServings + delta);
+    document.getElementById('serving-count').textContent = currentServings;
+    document.getElementById('meal-calories').value = Math.round(selectedFood.calories * currentServings);
+    document.getElementById('meal-protein').value = Math.round(selectedFood.protein * currentServings);
+    document.getElementById('meal-carbs').value = Math.round(selectedFood.carbs * currentServings);
+    document.getElementById('meal-fat').value = Math.round(selectedFood.fat * currentServings);
+}
+
+// Close food search on outside click
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.food-search-wrap')) {
+        const r = document.getElementById('food-search-results');
+        if (r) r.classList.add('hidden');
+    }
+});
+
+// =============================================
+// FEATURE: Shareable Progress Cards
+// =============================================
+
+function generateProgressCard() {
+    const canvas = document.getElementById('progress-card-canvas');
+    const ctx = canvas.getContext('2d');
+    const w = 600, h = 800;
+    canvas.width = w; canvas.height = h;
+
+    // Background gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#0a0a0a');
+    grad.addColorStop(1, '#1a1a2e');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Border
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(20, 20, w - 40, h - 40);
+
+    // Title
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 36px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('IRON FAITH', w / 2, 80);
+
+    // Tagline
+    ctx.fillStyle = '#666';
+    ctx.font = '14px Inter, sans-serif';
+    ctx.fillText('Forge your body. Strengthen your spirit.', w / 2, 105);
+
+    // Date
+    ctx.fillStyle = '#888';
+    ctx.font = '16px Inter, sans-serif';
+    ctx.fillText(today(), w / 2, 135);
+
+    // Divider
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(60, 155); ctx.lineTo(w - 60, 155); ctx.stroke();
+
+    // Stats
+    const profile = DB.get('profile', {});
+    const workouts = DB.get('workouts', []);
+    const meals = DB.get('meals', []).filter(m => m.date === today());
+    const weights = DB.get('weights', []);
+    const todayWorkouts = workouts.filter(w => w.date === today());
+    const totalCal = meals.reduce((s, m) => s + m.calories, 0);
+    const dates = [...new Set(workouts.map(w => w.date))].sort().reverse();
+    let streak = 0;
+    if (dates.includes(today())) {
+        streak = 1;
+        const d = new Date();
+        for (let i = 1; i < 365; i++) { d.setDate(d.getDate() - 1); if (dates.includes(d.toISOString().split('T')[0])) streak++; else break; }
+    }
+    const currentWeight = weights.length > 0 ? `${lbsToDisplay(weights[weights.length - 1].weight)} ${wu()}` : '--';
+
+    const stats = [
+        { label: 'WORKOUTS', value: `${todayWorkouts.length}`, y: 195 },
+        { label: 'STREAK', value: `${streak} days`, y: 195 },
+        { label: 'CALORIES', value: `${totalCal}`, y: 305 },
+        { label: 'WEIGHT', value: currentWeight, y: 305 }
+    ];
+
+    // Draw stat boxes
+    const boxW = 230, boxH = 80, gap = 20;
+    const startX = (w - boxW * 2 - gap) / 2;
+    stats.forEach((stat, i) => {
+        const col = i % 2, row = Math.floor(i / 2);
+        const x = startX + col * (boxW + gap);
+        const y = stat.y;
+        ctx.fillStyle = '#141414';
+        ctx.beginPath();
+        ctx.roundRect(x, y, boxW, boxH, 12);
+        ctx.fill();
+        ctx.strokeStyle = '#2a2a2a';
+        ctx.stroke();
+        ctx.fillStyle = '#666';
+        ctx.font = '11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(stat.label, x + boxW / 2, y + 28);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 28px Inter, sans-serif';
+        ctx.fillText(stat.value, x + boxW / 2, y + 60);
+    });
+
+    // Today's exercises
+    let yPos = 410;
+    if (todayWorkouts.length > 0) {
+        ctx.fillStyle = '#888';
+        ctx.font = '11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText("TODAY'S TRAINING", w / 2, yPos);
+        yPos += 20;
+        ctx.textAlign = 'left';
+        ctx.font = '15px Inter, sans-serif';
+        todayWorkouts.slice(0, 6).forEach(wo => {
+            const best = wo.sets.reduce((b, s) => s.weight > b.weight ? s : b, wo.sets[0]);
+            ctx.fillStyle = '#ccc';
+            ctx.fillText(`${wo.name}`, 80, yPos);
+            ctx.fillStyle = '#666';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${lbsToDisplay(best.weight)}${wu()} x ${best.reps}`, w - 80, yPos);
+            ctx.textAlign = 'left';
+            yPos += 28;
+        });
+    }
+
+    // Verse
+    const verse = getDailyVerse();
+    yPos = Math.max(yPos + 30, 620);
+    ctx.strokeStyle = '#333';
+    ctx.beginPath(); ctx.moveTo(60, yPos - 15); ctx.lineTo(w - 60, yPos - 15); ctx.stroke();
+    ctx.fillStyle = '#888';
+    ctx.font = 'italic 14px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    // Word wrap the verse
+    const verseText = getTranslatedVerse(verse.ref, verse.text);
+    const words = verseText.split(' ');
+    let line = '';
+    const lines = [];
+    words.forEach(word => {
+        const test = line + word + ' ';
+        if (ctx.measureText(test).width > w - 120) { lines.push(line.trim()); line = word + ' '; }
+        else line = test;
+    });
+    if (line.trim()) lines.push(line.trim());
+    lines.forEach((l, i) => {
+        ctx.fillText(`"${i === 0 ? '' : ''}${l}${i === lines.length - 1 ? '"' : ''}`, w / 2, yPos + i * 22);
+    });
+    yPos += lines.length * 22 + 10;
+    ctx.fillStyle = '#555';
+    ctx.font = 'bold 12px Inter, sans-serif';
+    ctx.fillText(`— ${verse.ref}`, w / 2, yPos);
+
+    // Footer
+    ctx.fillStyle = '#444';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.fillText('ironfa.it', w / 2, h - 40);
+}
+
+function openShareModal() {
+    generateProgressCard();
+    document.getElementById('share-modal').classList.remove('hidden');
+}
+
+function closeShareModal() {
+    document.getElementById('share-modal').classList.add('hidden');
+}
+
+function shareCardImage() {
+    const canvas = document.getElementById('progress-card-canvas');
+    canvas.toBlob(blob => {
+        if (navigator.share && navigator.canShare) {
+            const file = new File([blob], 'iron-faith-progress.png', { type: 'image/png' });
+            const shareData = { files: [file], title: 'My Iron Faith Progress' };
+            if (navigator.canShare(shareData)) {
+                navigator.share(shareData).catch(() => {});
+                return;
+            }
+        }
+        downloadCard();
+    }, 'image/png');
+}
+
+function downloadCard() {
+    const canvas = document.getElementById('progress-card-canvas');
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `iron-faith-${today()}.png`;
+    a.click();
+    showToast('Progress card downloaded!');
+}
+
+// =============================================
+// FEATURE: 30-Day Faith + Fitness Challenges
+// =============================================
+
+// Each challenge has 30 days. Each day is either a workout session or a rest/active-recovery day.
+// Workouts follow a real training split with progressive volume across the 4 weeks.
+// Day format: { focus: 'Label', exercises: [...] } or { focus: 'Rest', rest: true }
+
+const CHALLENGE_DAYS = {
+    // ─── IRON FOUNDATIONS: Beginner bodyweight, 4 days on / 1 rest / 2 on / 1 rest ───
+    foundations: [
+        // WEEK 1 — Learn the movements, low volume
+        { focus: 'Full Body A', exercises: [
+            { name: 'Push-ups (Knees OK)', sets: 2, reps: 8, note: 'Chest to floor, push through palms' },
+            { name: 'Bodyweight Squat', sets: 2, reps: 12, note: 'Sit back, knees track toes' },
+            { name: 'Plank', sets: 2, reps: '20s', note: 'Tight core, flat back' },
+            { name: 'Glute Bridge', sets: 2, reps: 12, note: 'Squeeze glutes at top 2 sec' },
+        ]},
+        { focus: 'Cardio + Core', exercises: [
+            { name: 'Jumping Jacks', sets: 3, reps: 30, note: 'Light and rhythmic' },
+            { name: 'Mountain Climbers', sets: 2, reps: 16, note: 'Controlled pace' },
+            { name: 'Dead Bug', sets: 2, reps: '8/side', note: 'Press lower back into floor' },
+            { name: 'Bird Dog', sets: 2, reps: '8/side', note: 'Extend opposite arm and leg' },
+        ]},
+        { focus: 'Full Body B', exercises: [
+            { name: 'Incline Push-ups (Counter)', sets: 2, reps: 10, note: 'Hands on counter or bench' },
+            { name: 'Reverse Lunges', sets: 2, reps: '8/leg', note: 'Step back, front knee 90 degrees' },
+            { name: 'Superman Hold', sets: 2, reps: '15s', note: 'Squeeze glutes and upper back' },
+            { name: 'Wall Sit', sets: 2, reps: '20s', note: 'Thighs parallel to floor' },
+        ]},
+        { focus: 'Rest & Reflect', rest: true },
+        { focus: 'Upper Body Focus', exercises: [
+            { name: 'Push-ups', sets: 3, reps: 8, note: 'Full range of motion' },
+            { name: 'Doorway Rows (Towel)', sets: 2, reps: 10, note: 'Lean back, pull chest to hands' },
+            { name: 'Pike Push-ups', sets: 2, reps: 6, note: 'Hips high, head toward floor' },
+            { name: 'Plank Shoulder Taps', sets: 2, reps: '8/side', note: 'Keep hips square' },
+        ]},
+        { focus: 'Lower Body Focus', exercises: [
+            { name: 'Bodyweight Squat', sets: 3, reps: 15, note: 'Controlled 3-sec descent' },
+            { name: 'Glute Bridge', sets: 3, reps: 15, note: 'Pause at top' },
+            { name: 'Step-ups (Stair/Chair)', sets: 2, reps: '10/leg', note: 'Drive through the heel' },
+            { name: 'Calf Raises', sets: 2, reps: 20, note: 'Slow up, slow down' },
+        ]},
+        { focus: 'Rest & Reflect', rest: true },
+        // WEEK 2 — Add volume
+        { focus: 'Full Body A', exercises: [
+            { name: 'Push-ups', sets: 3, reps: 10, note: 'Add 2 reps from week 1' },
+            { name: 'Bodyweight Squat', sets: 3, reps: 15, note: 'Deeper this week' },
+            { name: 'Plank', sets: 3, reps: '30s', note: '10 sec more than week 1' },
+            { name: 'Glute Bridge', sets: 3, reps: 15, note: 'Single-leg if too easy' },
+        ]},
+        { focus: 'Cardio + Core', exercises: [
+            { name: 'Burpees', sets: 3, reps: 6, note: 'Full extension at top' },
+            { name: 'High Knees', sets: 3, reps: 30, note: '15 per leg' },
+            { name: 'Bicycle Crunches', sets: 3, reps: 20, note: 'Elbow to opposite knee' },
+            { name: 'Plank', sets: 2, reps: '30s', note: 'Tight everything' },
+        ]},
+        { focus: 'Full Body B', exercises: [
+            { name: 'Diamond Push-ups', sets: 2, reps: 6, note: 'Hands close together' },
+            { name: 'Bulgarian Split Squat', sets: 2, reps: '8/leg', note: 'Rear foot on chair' },
+            { name: 'Superman Raises', sets: 3, reps: 10, note: 'Lift and lower with control' },
+            { name: 'Reverse Lunges', sets: 3, reps: '10/leg', note: 'Longer step for more glute' },
+        ]},
+        { focus: 'Rest & Reflect', rest: true },
+        { focus: 'Push Day', exercises: [
+            { name: 'Push-ups', sets: 3, reps: 12, note: 'Chest to floor every rep' },
+            { name: 'Pike Push-ups', sets: 3, reps: 8, note: 'Shoulders burning = working' },
+            { name: 'Tricep Dips (Chair)', sets: 3, reps: 10, note: 'Elbows back, not flared' },
+            { name: 'Plank to Push-up', sets: 2, reps: 8, note: 'Forearm to hand position' },
+        ]},
+        { focus: 'Leg Day', exercises: [
+            { name: 'Jump Squats', sets: 3, reps: 10, note: 'Land soft, explode up' },
+            { name: 'Walking Lunges', sets: 3, reps: '10/leg', note: 'Long stride' },
+            { name: 'Single-Leg Glute Bridge', sets: 3, reps: '8/leg', note: 'Level hips' },
+            { name: 'Wall Sit', sets: 3, reps: '30s', note: 'Challenge: 40s if you can' },
+        ]},
+        { focus: 'Rest & Reflect', rest: true },
+        // WEEK 3 — Intensity increases
+        { focus: 'Full Body Strength', exercises: [
+            { name: 'Push-ups', sets: 3, reps: 15, note: 'Can you hit all 15 unbroken?' },
+            { name: 'Bodyweight Squat', sets: 3, reps: 20, note: '3-sec pause at bottom' },
+            { name: 'Plank', sets: 3, reps: '40s', note: 'Breathe steadily' },
+            { name: 'Reverse Lunges', sets: 3, reps: '12/leg', note: 'Add a jump if ready' },
+        ]},
+        { focus: 'HIIT Circuit', exercises: [
+            { name: 'Burpees', sets: 4, reps: 8, note: '30 sec rest between sets' },
+            { name: 'Mountain Climbers', sets: 4, reps: 24, note: 'Fast pace' },
+            { name: 'Squat Jumps', sets: 4, reps: 10, note: 'Full depth before jump' },
+            { name: 'Plank', sets: 2, reps: '45s', note: 'Finisher — hold strong' },
+        ]},
+        { focus: 'Upper Body Push + Pull', exercises: [
+            { name: 'Push-ups (Slow Negative)', sets: 3, reps: 8, note: '4 sec down, explode up' },
+            { name: 'Doorway Rows', sets: 3, reps: 12, note: 'Squeeze for 2 sec at top' },
+            { name: 'Pike Push-ups', sets: 3, reps: 10, note: 'Aim for forehead to floor' },
+            { name: 'Plank Shoulder Taps', sets: 3, reps: '12/side', note: 'Slow and controlled' },
+        ]},
+        { focus: 'Rest & Reflect', rest: true },
+        { focus: 'Lower Body Power', exercises: [
+            { name: 'Jump Squats', sets: 4, reps: 10, note: 'Max height each rep' },
+            { name: 'Bulgarian Split Squat', sets: 3, reps: '10/leg', note: 'Go deeper than last time' },
+            { name: 'Glute Bridge March', sets: 3, reps: '10/leg', note: 'Hold bridge, alternate legs' },
+            { name: 'Calf Raises', sets: 3, reps: 25, note: 'Pause at peak contraction' },
+        ]},
+        { focus: 'Full Body Circuit', exercises: [
+            { name: 'Push-ups', sets: 3, reps: 12, note: 'No rest between exercises' },
+            { name: 'Bodyweight Squat', sets: 3, reps: 15, note: 'Circuit: do all 4 back-to-back' },
+            { name: 'Mountain Climbers', sets: 3, reps: 20, note: 'Then rest 60 sec, repeat' },
+            { name: 'Plank', sets: 3, reps: '30s', note: '3 rounds total' },
+        ]},
+        { focus: 'Rest & Reflect', rest: true },
+        // WEEK 4 — Peak and test
+        { focus: 'Max Effort Push', exercises: [
+            { name: 'Push-ups (Max Reps)', sets: 3, reps: 'Max', note: 'Go until form breaks, rest 90 sec' },
+            { name: 'Diamond Push-ups', sets: 3, reps: 10, note: 'Triceps are on fire' },
+            { name: 'Pike Push-ups', sets: 3, reps: 10, note: 'Shoulders should be screaming' },
+            { name: 'Plank', sets: 3, reps: '45s', note: 'Mental toughness set' },
+        ]},
+        { focus: 'Max Effort Legs', exercises: [
+            { name: 'Bodyweight Squat (Max Reps)', sets: 2, reps: 'Max', note: 'How many can you do? Write it down' },
+            { name: 'Walking Lunges', sets: 3, reps: '12/leg', note: 'Longest stride possible' },
+            { name: 'Jump Squats', sets: 3, reps: 12, note: 'Power output' },
+            { name: 'Wall Sit', sets: 2, reps: '45s', note: 'Fight through the burn' },
+        ]},
+        { focus: 'Core & Conditioning', exercises: [
+            { name: 'Mountain Climbers', sets: 4, reps: 20, note: 'Fast, explosive' },
+            { name: 'Bicycle Crunches', sets: 3, reps: 20, note: 'Slow and controlled' },
+            { name: 'Plank', sets: 3, reps: '45s', note: 'Tight core entire time' },
+            { name: 'Glute Bridge March', sets: 3, reps: '10/leg', note: 'Hold bridge, alternate' },
+        ]},
+        { focus: 'Upper Body Blast', exercises: [
+            { name: 'Push-ups', sets: 4, reps: 15, note: 'Every rep clean' },
+            { name: 'Diamond Push-ups', sets: 3, reps: 10, note: 'Tricep burnout' },
+            { name: 'Pike Push-ups', sets: 3, reps: 10, note: 'Shoulders on fire' },
+            { name: 'Doorway Rows', sets: 3, reps: 12, note: 'Pull hard, squeeze' },
+        ]},
+        { focus: 'Lower Body Blast', exercises: [
+            { name: 'Jump Squats', sets: 4, reps: 12, note: 'Max height' },
+            { name: 'Bulgarian Split Squat', sets: 3, reps: '10/leg', note: 'Deep, controlled' },
+            { name: 'Wall Sit', sets: 3, reps: '45s', note: 'Mental toughness' },
+            { name: 'Calf Raises', sets: 3, reps: 25, note: 'Burn through it' },
+        ]},
+        { focus: 'Rest & Reflect', rest: true },
+        { focus: 'Full Body Blitz', exercises: [
+            { name: 'Burpees', sets: 4, reps: 10, note: 'Every rep with full extension' },
+            { name: 'Push-ups', sets: 4, reps: 15, note: 'Chest to floor' },
+            { name: 'Bodyweight Squat', sets: 4, reps: 20, note: 'Deep and controlled' },
+            { name: 'Plank', sets: 3, reps: '60s', note: 'You can do this. Believe it.' },
+        ]},
+        { focus: 'The Final Test', exercises: [
+            { name: 'Push-ups (Max Reps)', sets: 1, reps: 'Max', note: 'Compare to day 1 — how far have you come?' },
+            { name: 'Bodyweight Squat (Max Reps)', sets: 1, reps: 'Max', note: 'Count every single one' },
+            { name: 'Plank (Max Hold)', sets: 1, reps: 'Max', note: 'Time yourself. Beat your best.' },
+            { name: 'Burpees', sets: 1, reps: 'Max in 2 min', note: 'Leave everything on the floor. You did it.' },
+        ]},
+        { focus: 'Victory Lap', exercises: [
+            { name: 'Your Favorite Exercise', sets: 3, reps: 'Your Choice', note: 'Pick whatever you love most and enjoy it' },
+            { name: 'Stretching', sets: 1, reps: '10 min', note: 'Full body. You earned this. Reflect on 30 days of growth' },
+        ]},
+    ],
+
+    // ─── WARRIOR'S PATH: Intermediate PPL, gym required ───
+    warrior: [
+        // WEEK 1 — Moderate volume, establish working weights
+        { focus: 'Push (Chest/Shoulders/Triceps)', exercises: [
+            { name: 'Bench Press', sets: 4, reps: 8, note: 'Find a challenging but clean 8-rep weight' },
+            { name: 'Overhead Press', sets: 3, reps: 10, note: 'Brace core, no leg drive' },
+            { name: 'Incline Dumbbell Press', sets: 3, reps: 10, note: 'Full stretch at bottom' },
+            { name: 'Lateral Raises', sets: 3, reps: 15, note: 'Light weight, control the arc' },
+            { name: 'Tricep Pushdown', sets: 3, reps: 12, note: 'Squeeze at full extension' },
+        ]},
+        { focus: 'Pull (Back/Biceps)', exercises: [
+            { name: 'Barbell Row', sets: 4, reps: 8, note: 'Pull to lower chest, squeeze shoulder blades' },
+            { name: 'Lat Pulldown', sets: 3, reps: 10, note: 'Pull to upper chest, lean back slightly' },
+            { name: 'Seated Cable Row', sets: 3, reps: 10, note: 'Pull elbows back, chest up' },
+            { name: 'Face Pulls', sets: 3, reps: 15, note: 'High pull, externally rotate' },
+            { name: 'Bicep Curls', sets: 3, reps: 12, note: 'No swinging' },
+        ]},
+        { focus: 'Legs (Quad/Ham/Glute)', exercises: [
+            { name: 'Squat', sets: 4, reps: 8, note: 'Below parallel, brace hard' },
+            { name: 'Romanian Deadlift', sets: 3, reps: 10, note: 'Feel the hamstring stretch' },
+            { name: 'Leg Press', sets: 3, reps: 12, note: 'Full depth, controlled' },
+            { name: 'Walking Lunges', sets: 3, reps: '10/leg', note: 'Long stride, upright torso' },
+            { name: 'Calf Raises', sets: 4, reps: 15, note: 'Full ROM, pause at top' },
+        ]},
+        { focus: 'Rest & Recover', rest: true },
+        { focus: 'Push (Volume)', exercises: [
+            { name: 'Dumbbell Bench Press', sets: 4, reps: 10, note: 'Full stretch at bottom' },
+            { name: 'Arnold Press', sets: 3, reps: 10, note: 'Rotate through the press' },
+            { name: 'Cable Fly', sets: 3, reps: 12, note: 'Squeeze chest at center' },
+            { name: 'Overhead Tricep Extension', sets: 3, reps: 12, note: 'Deep stretch, full lockout' },
+        ]},
+        { focus: 'Pull (Volume)', exercises: [
+            { name: 'Pull-ups', sets: 4, reps: 6, note: 'Dead hang to chin over bar. Assisted OK' },
+            { name: 'Dumbbell Row', sets: 3, reps: '10/arm', note: 'Row to hip, squeeze lat' },
+            { name: 'Straight Arm Pulldown', sets: 3, reps: 12, note: 'Feel the lats stretch and contract' },
+            { name: 'Hammer Curls', sets: 3, reps: 12, note: 'Neutral grip, controlled' },
+        ]},
+        { focus: 'Rest & Recover', rest: true },
+        // WEEK 2 — Add weight or reps to compound lifts
+        { focus: 'Push (Strength)', exercises: [
+            { name: 'Bench Press', sets: 4, reps: 6, note: 'Heavier than week 1. RPE 7-8' },
+            { name: 'Overhead Press', sets: 4, reps: 8, note: 'Add 5 lbs from last week' },
+            { name: 'Incline Dumbbell Press', sets: 3, reps: 10, note: 'Go heavier if reps felt easy' },
+            { name: 'Lateral Raises', sets: 4, reps: 15, note: 'Extra set this week' },
+            { name: 'Skull Crushers', sets: 3, reps: 10, note: 'Elbows in, deep stretch' },
+        ]},
+        { focus: 'Pull (Strength)', exercises: [
+            { name: 'Deadlift', sets: 4, reps: 5, note: 'Hinge at hips, flat back, lock out' },
+            { name: 'Barbell Row', sets: 4, reps: 8, note: 'Match or beat last week' },
+            { name: 'Lat Pulldown', sets: 3, reps: 10, note: 'Slow negative (3 sec)' },
+            { name: 'Face Pulls', sets: 3, reps: 15, note: 'Keep these light — it is prehab' },
+            { name: 'EZ Bar Curl', sets: 3, reps: 10, note: 'Strict form, full ROM' },
+        ]},
+        { focus: 'Legs (Strength)', exercises: [
+            { name: 'Squat', sets: 4, reps: 6, note: 'Heavier than week 1' },
+            { name: 'Romanian Deadlift', sets: 4, reps: 8, note: 'Add weight, keep hamstring tension' },
+            { name: 'Bulgarian Split Squat', sets: 3, reps: '8/leg', note: 'Dumbbells in hands' },
+            { name: 'Leg Curl', sets: 3, reps: 12, note: 'Squeeze at contraction' },
+            { name: 'Calf Raises', sets: 4, reps: 15, note: 'Heavier this week' },
+        ]},
+        { focus: 'Rest & Recover', rest: true },
+        { focus: 'Push (Hypertrophy)', exercises: [
+            { name: 'Dumbbell Bench Press', sets: 4, reps: 12, note: 'Higher reps, mind-muscle connection' },
+            { name: 'Seated Dumbbell Press', sets: 3, reps: 12, note: 'No momentum' },
+            { name: 'Pec Deck', sets: 3, reps: 15, note: 'Squeeze hard at center' },
+            { name: 'Lateral Raises', sets: 3, reps: 15, note: 'Drop set on final set' },
+            { name: 'Tricep Pushdown', sets: 3, reps: 15, note: 'Burn it out' },
+        ]},
+        { focus: 'Pull (Hypertrophy)', exercises: [
+            { name: 'Chin-ups', sets: 4, reps: 6, note: 'Underhand grip, feel the biceps too' },
+            { name: 'T-Bar Row', sets: 3, reps: 10, note: 'Pull to sternum' },
+            { name: 'Seated Cable Row', sets: 3, reps: 12, note: 'Pause at contraction' },
+            { name: 'Rear Delt Fly', sets: 3, reps: 15, note: 'Light, lots of squeeze' },
+            { name: 'Preacher Curls', sets: 3, reps: 12, note: 'Full stretch at bottom' },
+        ]},
+        { focus: 'Rest & Recover', rest: true },
+        // WEEK 3 — Peak volume
+        { focus: 'Push (Heavy)', exercises: [
+            { name: 'Bench Press', sets: 5, reps: 5, note: 'Heaviest bench yet. Own the weight' },
+            { name: 'Overhead Press', sets: 4, reps: 6, note: 'Strict. Fight for each rep' },
+            { name: 'Incline Dumbbell Press', sets: 4, reps: 10, note: 'Heavier dumbbells' },
+            { name: 'Cable Lateral Raise', sets: 4, reps: 12, note: 'Constant tension' },
+            { name: 'Close Grip Bench Press', sets: 3, reps: 8, note: 'Tricep destroyer' },
+        ]},
+        { focus: 'Pull (Heavy)', exercises: [
+            { name: 'Deadlift', sets: 5, reps: 3, note: 'Heavy triples. Focus on each rep' },
+            { name: 'Barbell Row', sets: 4, reps: 6, note: 'Heaviest rows yet' },
+            { name: 'Pull-ups', sets: 4, reps: 'Max', note: 'Go to near failure each set' },
+            { name: 'Face Pulls', sets: 3, reps: 15, note: 'Always keep these in' },
+            { name: 'Barbell Curl', sets: 3, reps: 10, note: 'Controlled cheat on last 2 reps is ok' },
+        ]},
+        { focus: 'Legs (Heavy)', exercises: [
+            { name: 'Squat', sets: 5, reps: 5, note: 'Heaviest squats yet. Brace like your life depends on it' },
+            { name: 'Romanian Deadlift', sets: 4, reps: 8, note: 'Hamstrings should be screaming' },
+            { name: 'Leg Press', sets: 4, reps: 12, note: 'Deep. Full ROM. No half reps' },
+            { name: 'Leg Extension', sets: 3, reps: 15, note: 'Squeeze at top, 2-sec hold' },
+            { name: 'Seated Calf Raise', sets: 4, reps: 20, note: 'Burn through it' },
+        ]},
+        { focus: 'Rest & Recover', rest: true },
+        { focus: 'Push (Pump)', exercises: [
+            { name: 'Machine Chest Press', sets: 4, reps: 12, note: 'Slow and smooth' },
+            { name: 'Arnold Press', sets: 3, reps: 12, note: 'Feel the rotation' },
+            { name: 'Cable Fly', sets: 4, reps: 15, note: 'Squeeze every single rep' },
+            { name: 'Tricep Dips', sets: 3, reps: 'Max', note: 'Bodyweight to failure' },
+        ]},
+        { focus: 'Pull (Pump)', exercises: [
+            { name: 'Lat Pulldown (Wide)', sets: 4, reps: 12, note: 'Pull wide to upper chest' },
+            { name: 'Dumbbell Row', sets: 4, reps: '12/arm', note: 'Higher reps, feel the squeeze' },
+            { name: 'Cable Curl', sets: 3, reps: 15, note: 'Constant tension' },
+            { name: 'Rear Delt Fly', sets: 3, reps: 15, note: 'Light and controlled' },
+        ]},
+        { focus: 'Rest & Recover', rest: true },
+        // WEEK 4 — Deload & Test
+        { focus: 'Push (Deload)', exercises: [
+            { name: 'Bench Press', sets: 3, reps: 8, note: 'Lighter — 70% of your best. Recover' },
+            { name: 'Overhead Press', sets: 3, reps: 8, note: 'Easy weight, perfect reps' },
+            { name: 'Lateral Raises', sets: 3, reps: 12, note: 'Light. Moving blood' },
+            { name: 'Tricep Pushdown', sets: 3, reps: 12, note: 'Easy. Stay fresh' },
+        ]},
+        { focus: 'Pull (Deload)', exercises: [
+            { name: 'Barbell Row', sets: 3, reps: 8, note: '70% effort. Perfect form reps' },
+            { name: 'Lat Pulldown', sets: 3, reps: 10, note: 'Light and smooth' },
+            { name: 'Face Pulls', sets: 3, reps: 15, note: 'Prehab, keep the shoulders healthy' },
+            { name: 'Bicep Curls', sets: 3, reps: 12, note: 'Just moving weight, not grinding' },
+        ]},
+        { focus: 'Legs (Deload)', exercises: [
+            { name: 'Squat', sets: 3, reps: 8, note: '70% of your heavy. Crisp reps' },
+            { name: 'Romanian Deadlift', sets: 3, reps: 10, note: 'Light, feel the stretch' },
+            { name: 'Walking Lunges', sets: 2, reps: '8/leg', note: 'Bodyweight only, easy' },
+            { name: 'Calf Raises', sets: 3, reps: 15, note: 'Light and easy' },
+        ]},
+        { focus: 'Weak Point Day', exercises: [
+            { name: 'Incline Dumbbell Press', sets: 3, reps: 10, note: 'Address any lagging push muscles' },
+            { name: 'Dumbbell Row', sets: 3, reps: '10/arm', note: 'Unilateral work for balance' },
+            { name: 'Leg Curl', sets: 3, reps: 12, note: 'Hamstrings often underdeveloped' },
+            { name: 'Lateral Raises', sets: 3, reps: 15, note: 'Cap those delts' },
+        ]},
+        { focus: 'Active Recovery', exercises: [
+            { name: 'Walking or Light Jog', sets: 1, reps: '20 min', note: 'Get blood flowing, nothing intense' },
+            { name: 'Foam Rolling', sets: 1, reps: '10 min', note: 'Hit quads, hamstrings, back, lats' },
+            { name: 'Stretching', sets: 1, reps: '10 min', note: 'Hip flexors, chest, shoulders, hamstrings' },
+        ]},
+        { focus: 'Rest Before Test Day', rest: true },
+        { focus: 'Mental Prep Day', exercises: [
+            { name: 'Squat (Openers)', sets: 3, reps: 3, note: 'Light — practice your walkout and setup' },
+            { name: 'Bench Press (Openers)', sets: 3, reps: 3, note: 'Light — rehearse your cues' },
+            { name: 'Deadlift (Openers)', sets: 3, reps: 2, note: 'Light — dial in your starting position' },
+        ]},
+        { focus: 'TEST DAY: Big 3', exercises: [
+            { name: 'Squat (Work to heavy single)', sets: 6, reps: '5/3/1/1/1/1', note: 'Warm up, then find your max' },
+            { name: 'Bench Press (Work to heavy single)', sets: 6, reps: '5/3/1/1/1/1', note: 'Same — find your 1RM' },
+            { name: 'Deadlift (Work to heavy single)', sets: 5, reps: '5/3/1/1/1', note: 'One big pull. Leave it all out there' },
+        ]},
+        { focus: 'Victory Day', exercises: [
+            { name: 'Light Full Body Circuit', sets: 3, reps: '10 each', note: 'Push-ups, rows, squats, lunges — celebrate what your body can do' },
+            { name: 'Stretching & Foam Roll', sets: 1, reps: '15 min', note: '30 days done. You are stronger than when you started. That is a fact.' },
+        ]},
+    ],
+
+    // ─── TEMPLE BUILDER: Advanced, 5/3/1 inspired, 5-day split ───
+    temple: [
+        // WEEK 1 — 5s week
+        { focus: 'Squat + Accessories', exercises: [
+            { name: 'Squat', sets: 3, reps: '5/5/5+', note: '65%/75%/85% of 1RM. Last set AMRAP' },
+            { name: 'Front Squat', sets: 3, reps: 8, note: '60% of back squat, stay upright' },
+            { name: 'Leg Curl', sets: 4, reps: 10, note: 'Squeeze hamstrings at contraction' },
+            { name: 'Bulgarian Split Squat', sets: 3, reps: '10/leg', note: 'Dumbbells, deep stretch' },
+            { name: 'Hanging Leg Raise', sets: 3, reps: 12, note: 'Core stability' },
+        ]},
+        { focus: 'Bench + Accessories', exercises: [
+            { name: 'Bench Press', sets: 3, reps: '5/5/5+', note: '65%/75%/85% of 1RM. Last set AMRAP' },
+            { name: 'Incline Dumbbell Press', sets: 4, reps: 10, note: 'Full stretch at bottom' },
+            { name: 'Dumbbell Fly', sets: 3, reps: 12, note: 'Slight bend in elbows, squeeze' },
+            { name: 'Tricep Pushdown', sets: 3, reps: 15, note: 'Pump work' },
+            { name: 'Face Pulls', sets: 3, reps: 15, note: 'Shoulder health' },
+        ]},
+        { focus: 'Rest', rest: true },
+        { focus: 'Deadlift + Back', exercises: [
+            { name: 'Deadlift', sets: 3, reps: '5/5/5+', note: '65%/75%/85% of 1RM. Last set AMRAP' },
+            { name: 'Barbell Row', sets: 4, reps: 8, note: 'Heavy, pull to lower chest' },
+            { name: 'Pull-ups', sets: 4, reps: 'Max', note: 'Add weight if 10+ is easy' },
+            { name: 'Seated Cable Row', sets: 3, reps: 12, note: 'Squeeze for 2 sec' },
+            { name: 'Bicep Curls', sets: 3, reps: 12, note: 'Strict curls, no swing' },
+        ]},
+        { focus: 'OHP + Shoulders', exercises: [
+            { name: 'Overhead Press', sets: 3, reps: '5/5/5+', note: '65%/75%/85% of 1RM. Last set AMRAP' },
+            { name: 'Seated Dumbbell Press', sets: 3, reps: 10, note: 'Controlled press, no bounce' },
+            { name: 'Lateral Raises', sets: 4, reps: 15, note: 'Light. High volume.' },
+            { name: 'Rear Delt Fly', sets: 3, reps: 15, note: 'Rear delts need love' },
+            { name: 'Shrugs', sets: 3, reps: 12, note: 'Heavy, hold at top' },
+        ]},
+        { focus: 'Legs (Volume)', exercises: [
+            { name: 'Leg Press', sets: 4, reps: 15, note: 'Deep, 3-sec negatives' },
+            { name: 'Romanian Deadlift', sets: 4, reps: 10, note: 'Feel the hamstring stretch' },
+            { name: 'Walking Lunges', sets: 3, reps: '12/leg', note: 'Dumbbells, long stride' },
+            { name: 'Leg Extension', sets: 3, reps: 15, note: 'Hold peak contraction 2 sec' },
+            { name: 'Seated Calf Raise', sets: 4, reps: 20, note: 'Full stretch, full contraction' },
+        ]},
+        { focus: 'Rest', rest: true },
+        // WEEK 2 — 3s week
+        { focus: 'Squat (3s Week)', exercises: [
+            { name: 'Squat', sets: 3, reps: '3/3/3+', note: '70%/80%/90% of 1RM. Last set AMRAP' },
+            { name: 'Pause Squat', sets: 3, reps: 5, note: '3-sec pause at bottom, 65%' },
+            { name: 'Leg Press', sets: 3, reps: 12, note: 'Moderate weight, control' },
+            { name: 'Leg Curl', sets: 3, reps: 12, note: 'Superset with extensions' },
+            { name: 'Leg Extension', sets: 3, reps: 12, note: 'Superset with curls' },
+        ]},
+        { focus: 'Bench (3s Week)', exercises: [
+            { name: 'Bench Press', sets: 3, reps: '3/3/3+', note: '70%/80%/90% of 1RM. Last set AMRAP' },
+            { name: 'Close Grip Bench Press', sets: 3, reps: 8, note: 'Tricep focus' },
+            { name: 'Incline Bench Press', sets: 3, reps: 8, note: 'Upper chest emphasis' },
+            { name: 'Cable Fly', sets: 3, reps: 15, note: 'Blood flow, feel the stretch' },
+            { name: 'Skull Crushers', sets: 3, reps: 10, note: 'Deep stretch, full lockout' },
+        ]},
+        { focus: 'Rest', rest: true },
+        { focus: 'Deadlift (3s Week)', exercises: [
+            { name: 'Deadlift', sets: 3, reps: '3/3/3+', note: '70%/80%/90% of 1RM. Last set AMRAP' },
+            { name: 'Deficit Deadlift or Rack Pull', sets: 3, reps: 5, note: 'Weak point work — pick your weakness' },
+            { name: 'Pendlay Row', sets: 4, reps: 6, note: 'Explosive off the floor, controlled down' },
+            { name: 'Weighted Pull-ups', sets: 4, reps: 5, note: 'Add weight belt or dumbbell' },
+            { name: 'Hammer Curls', sets: 3, reps: 12, note: 'Brachialis and forearm work' },
+        ]},
+        { focus: 'OHP (3s Week)', exercises: [
+            { name: 'Overhead Press', sets: 3, reps: '3/3/3+', note: '70%/80%/90% of 1RM. Last set AMRAP' },
+            { name: 'Push Press', sets: 3, reps: 5, note: 'Leg drive to get heavier weight overhead' },
+            { name: 'Arnold Press', sets: 3, reps: 10, note: 'Full rotation' },
+            { name: 'Cable Lateral Raise', sets: 4, reps: 12, note: 'Constant tension' },
+            { name: 'Face Pulls', sets: 3, reps: 15, note: 'Always. Every week.' },
+        ]},
+        { focus: 'Legs (Power)', exercises: [
+            { name: 'Box Jumps', sets: 4, reps: 5, note: 'Explosive. Step down, don\'t jump down' },
+            { name: 'Hip Thrust', sets: 4, reps: 8, note: 'Heavy, 2-sec squeeze at top' },
+            { name: 'Goblet Squat', sets: 3, reps: 15, note: 'Light, deep, blood flow' },
+            { name: 'Reverse Lunges', sets: 3, reps: '10/leg', note: 'Dumbbells, step back far' },
+            { name: 'Calf Raises', sets: 4, reps: 15, note: 'Standing, heavy' },
+        ]},
+        { focus: 'Rest', rest: true },
+        // WEEK 3 — 5/3/1 week
+        { focus: 'Squat (1s Week)', exercises: [
+            { name: 'Squat', sets: 3, reps: '5/3/1+', note: '75%/85%/95% of 1RM. Last set all-out' },
+            { name: 'Front Squat', sets: 3, reps: 5, note: 'Moderate, quality reps' },
+            { name: 'Good Mornings', sets: 3, reps: 10, note: 'Posterior chain, light' },
+            { name: 'Ab Wheel Rollout', sets: 3, reps: 10, note: 'Full extension if possible' },
+        ]},
+        { focus: 'Bench (1s Week)', exercises: [
+            { name: 'Bench Press', sets: 3, reps: '5/3/1+', note: '75%/85%/95% of 1RM. Last set all-out' },
+            { name: 'Dumbbell Bench Press', sets: 3, reps: 8, note: 'Heavy dumbbells' },
+            { name: 'Dips', sets: 3, reps: 'Max', note: 'Weighted if 15+ is easy' },
+            { name: 'Overhead Tricep Extension', sets: 3, reps: 12, note: 'Big stretch' },
+        ]},
+        { focus: 'Rest', rest: true },
+        { focus: 'Deadlift (1s Week)', exercises: [
+            { name: 'Deadlift', sets: 3, reps: '5/3/1+', note: '75%/85%/95% of 1RM. This is it. Go heavy' },
+            { name: 'Barbell Row', sets: 4, reps: 6, note: 'Match the intensity' },
+            { name: 'Chin-ups', sets: 4, reps: 'Max', note: 'Underhand, feel biceps' },
+            { name: 'Cable Curl', sets: 3, reps: 12, note: 'Finish strong' },
+        ]},
+        { focus: 'OHP (1s Week)', exercises: [
+            { name: 'Overhead Press', sets: 3, reps: '5/3/1+', note: '75%/85%/95% of 1RM. Everything you\'ve got' },
+            { name: 'Seated Dumbbell Press', sets: 3, reps: 8, note: 'Shoulders should be lit up' },
+            { name: 'Lateral Raises', sets: 5, reps: 12, note: 'High volume finisher' },
+            { name: 'Barbell Shrugs', sets: 4, reps: 10, note: 'Heavy, hold at top' },
+        ]},
+        { focus: 'Legs (Endurance)', exercises: [
+            { name: 'Squat', sets: 2, reps: 20, note: '20-rep squat widow-maker. Pick a weight and don\'t rack it' },
+            { name: 'Walking Lunges', sets: 3, reps: '15/leg', note: 'Dumbbell, long strides' },
+            { name: 'Leg Curl', sets: 4, reps: 12, note: 'Superset with extensions' },
+            { name: 'Leg Extension', sets: 4, reps: 12, note: 'Feel the burn' },
+        ]},
+        { focus: 'Rest', rest: true },
+        // WEEK 4 — Deload & Test
+        { focus: 'Deload: Upper', exercises: [
+            { name: 'Bench Press', sets: 3, reps: 5, note: '60% of 1RM. Easy, crisp reps' },
+            { name: 'Overhead Press', sets: 3, reps: 5, note: '60% of 1RM. Moving blood' },
+            { name: 'Pull-ups', sets: 3, reps: 8, note: 'Bodyweight only, smooth' },
+            { name: 'Face Pulls', sets: 3, reps: 15, note: 'Light prehab' },
+        ]},
+        { focus: 'Deload: Lower', exercises: [
+            { name: 'Squat', sets: 3, reps: 5, note: '60% of 1RM. Stay sharp, don\'t grind' },
+            { name: 'Romanian Deadlift', sets: 3, reps: 8, note: 'Light, stretch the hams' },
+            { name: 'Walking Lunges', sets: 2, reps: '8/leg', note: 'Bodyweight, easy' },
+            { name: 'Calf Raises', sets: 3, reps: 15, note: 'Easy finish' },
+        ]},
+        { focus: 'Deload: Accessories', exercises: [
+            { name: 'Incline Dumbbell Press', sets: 3, reps: 8, note: 'Light, pump work' },
+            { name: 'Lat Pulldown', sets: 3, reps: 10, note: 'Easy, feel the lats' },
+            { name: 'Lateral Raises', sets: 3, reps: 12, note: 'Light. Blood flow' },
+            { name: 'Bicep Curls', sets: 3, reps: 12, note: 'Easy curls, stay loose' },
+        ]},
+        { focus: 'Rest', rest: true },
+        { focus: 'Opener Practice', exercises: [
+            { name: 'Squat (Opener Weight)', sets: 3, reps: 2, note: 'Your planned first attempt — practice the walkout' },
+            { name: 'Bench Press (Opener Weight)', sets: 3, reps: 2, note: 'Smooth. Dial in your setup' },
+            { name: 'Deadlift (Opener Weight)', sets: 2, reps: 1, note: 'One clean rep. Visualize test day' },
+        ]},
+        { focus: 'Rest Before Test', rest: true },
+        { focus: 'TEST: Squat + Bench', exercises: [
+            { name: 'Squat (Work to 1RM)', sets: 7, reps: '5/3/1/1/1/1/1', note: 'Build up. Hit a new max. Earn it' },
+            { name: 'Bench Press (Work to 1RM)', sets: 7, reps: '5/3/1/1/1/1/1', note: 'Same. Chase your PR' },
+        ]},
+        { focus: 'TEST: Deadlift + OHP', exercises: [
+            { name: 'Deadlift (Work to 1RM)', sets: 6, reps: '5/3/1/1/1/1', note: 'One massive pull. Everything you\'ve built leads here' },
+            { name: 'Overhead Press (Work to 1RM)', sets: 6, reps: '5/3/1/1/1/1', note: 'Strict press. No leg drive. Pure strength' },
+        ]},
+        { focus: 'The Temple Stands', exercises: [
+            { name: 'Light Bench Press', sets: 3, reps: 10, note: 'Light weight. Appreciate the movement' },
+            { name: 'Light Squat', sets: 3, reps: 10, note: 'Reflect on where you started vs now' },
+            { name: 'Stretching & Recovery', sets: 1, reps: '15 min', note: '30 days of iron discipline. The temple is built. Now maintain it.' },
+        ]},
+    ],
+};
+
+const CHALLENGE_VERSES = [
+    { text: "I can do all things through Christ who strengthens me.", ref: "Philippians 4:13" },
+    { text: "Be strong and courageous. Do not be afraid.", ref: "Joshua 1:9" },
+    { text: "He gives strength to the weary and increases the power of the weak.", ref: "Isaiah 40:29" },
+    { text: "The LORD is my strength and my shield.", ref: "Psalm 28:7" },
+    { text: "No discipline seems pleasant at the time, but later it produces a harvest of righteousness.", ref: "Hebrews 12:11" },
+    { text: "Whatever you do, work at it with all your heart, as working for the Lord.", ref: "Colossians 3:23" },
+    { text: "Let us not become weary in doing good.", ref: "Galatians 6:9" },
+    { text: "The joy of the LORD is your strength.", ref: "Nehemiah 8:10" },
+    { text: "She sets about her work vigorously; her arms are strong for her tasks.", ref: "Proverbs 31:17" },
+    { text: "Do you not know that your bodies are temples of the Holy Spirit?", ref: "1 Corinthians 6:19" },
+    { text: "For God gave us a spirit not of fear but of power and love and self-control.", ref: "2 Timothy 1:7" },
+    { text: "Trust in the LORD with all your heart.", ref: "Proverbs 3:5" },
+    { text: "Commit to the LORD whatever you do, and he will establish your plans.", ref: "Proverbs 16:3" },
+    { text: "I press on toward the goal to win the prize.", ref: "Philippians 3:14" },
+    { text: "But those who hope in the LORD will renew their strength.", ref: "Isaiah 40:31" },
+    { text: "Blessed is the one who perseveres under trial.", ref: "James 1:12" },
+    { text: "And let us run with perseverance the race marked out for us.", ref: "Hebrews 12:1" },
+    { text: "Be on your guard; stand firm in the faith; be courageous; be strong.", ref: "1 Corinthians 16:13" },
+    { text: "God is our refuge and strength, an ever-present help in trouble.", ref: "Psalm 46:1" },
+    { text: "The name of the LORD is a fortified tower; the righteous run to it and are safe.", ref: "Proverbs 18:10" },
+    { text: "For physical training is of some value, but godliness has value for all things.", ref: "1 Timothy 4:8" },
+    { text: "Create in me a pure heart, O God, and renew a steadfast spirit within me.", ref: "Psalm 51:10" },
+    { text: "Delight yourself in the LORD, and he will give you the desires of your heart.", ref: "Psalm 37:4" },
+    { text: "The LORD your God is in your midst, a mighty one who will save.", ref: "Zephaniah 3:17" },
+    { text: "And we know that in all things God works for the good of those who love him.", ref: "Romans 8:28" },
+    { text: "My flesh and my heart may fail, but God is the strength of my heart.", ref: "Psalm 73:26" },
+    { text: "The LORD is my light and my salvation — whom shall I fear?", ref: "Psalm 27:1" },
+    { text: "Come to me, all you who are weary and burdened, and I will give you rest.", ref: "Matthew 11:28" },
+    { text: "I have fought the good fight, I have finished the race, I have kept the faith.", ref: "2 Timothy 4:7" },
+    { text: "Well done, good and faithful servant.", ref: "Matthew 25:21" },
+];
+
+const CHALLENGE_DEVOTIONS = [
+    "Today is day one. Every great journey starts here. Show up and give your best.",
+    "Consistency beats perfection. Just show up today.",
+    "Your body is a gift. Honor it with how you move today.",
+    "Strength isn't just physical — it's choosing discipline when motivation fades.",
+    "Rest is not weakness. God rested on the seventh day. Recovery is part of the plan.",
+    "Push past comfort today. Growth lives on the other side of easy.",
+    "Compare yourself only to who you were yesterday.",
+    "Every rep is a prayer of gratitude for what your body can do.",
+    "When the weight feels heavy, remember Who carries you.",
+    "Halfway through the week — your consistency is building something lasting.",
+    "Soreness is temporary. The strength you're building is eternal.",
+    "Train like you're building a temple. Because you are.",
+    "Mental toughness is forged in the same fire as physical strength.",
+    "Your discipline today is a gift to your future self.",
+    "Two weeks in. Look how far you've come. Keep going.",
+    "The iron doesn't care about your excuses. Neither does greatness.",
+    "Today's workout is tomorrow's warm-up. You're getting stronger.",
+    "Fuel your body with purpose. Every meal is a choice.",
+    "Find joy in the process, not just the results.",
+    "You are more capable than you think. Prove it today.",
+    "Three weeks strong. This isn't a phase — it's who you're becoming.",
+    "When you want to quit, remember why you started.",
+    "The hardest part is showing up. You've already won half the battle.",
+    "Strength isn't born in comfort. Embrace the challenge.",
+    "Your faithfulness in small things leads to great things.",
+    "Almost there. The final stretch separates good from great.",
+    "Pain is temporary. The pride of finishing lasts forever.",
+    "You are writing a testimony with every rep.",
+    "Tomorrow is the last day. Give everything you have today.",
+    "You did it. 30 days of iron and faith. This is just the beginning.",
+];
+
+const CHALLENGES = [
+    {
+        id: 'foundations',
+        name: 'Iron Foundations',
+        description: 'No gym needed. 30 days of bodyweight training that builds real strength from scratch. 4 weeks of progressive overload with rest days built in.',
+        icon: '&#x1F3D7;',
+        days: CHALLENGE_DAYS.foundations,
+    },
+    {
+        id: 'warrior',
+        name: "Warrior's Path",
+        description: 'Push/Pull/Legs split for the gym. 4 weeks of escalating intensity — moderate volume to heavy strength to a deload and final test day.',
+        icon: '&#x2694;',
+        days: CHALLENGE_DAYS.warrior,
+    },
+    {
+        id: 'temple',
+        name: 'Temple Builder',
+        description: '5/3/1-inspired powerlifting program. Squat, Bench, Deadlift, OHP cycled through 5s, 3s, and 1s weeks with a deload and max-out finale.',
+        icon: '&#x26EA;',
+        days: CHALLENGE_DAYS.temple,
+    }
+];
+
+function getActiveChallenge() { return DB.get('challenge', null); }
+function saveActiveChallenge(c) { DB.set('challenge', c); }
+
+function getChallengeDay(challenge) {
+    const start = new Date(challenge.startDate);
+    const now = new Date(today());
+    return Math.floor((now - start) / 86400000) + 1;
+}
+
+function renderChallenges() {
+    const container = document.getElementById('challenges-container');
+    if (!container) return;
+    const active = getActiveChallenge();
+
+    if (active) {
+        const challenge = CHALLENGES.find(c => c.id === active.id);
+        if (!challenge) return;
+        const totalDays = challenge.days.length;
+        const dayNum = getChallengeDay(active);
+        const completed = active.completedDays || [];
+        const todayDone = completed.includes(dayNum);
+        const isFinished = dayNum > totalDays;
+        const progress = Math.min(completed.length, totalDays);
+
+        if (isFinished) {
+            container.innerHTML = `
+                <div class="challenge-active">
+                    <div class="challenge-complete-banner">
+                        <span style="font-size:48px">&#x1F3C6;</span>
+                        <h3>${challenge.name} — Complete!</h3>
+                        <p>You finished all 30 days. Incredible discipline!</p>
+                    </div>
+                    <button class="btn btn-primary btn-full" onclick="finishChallenge()" style="margin-top:12px">Start a New Challenge</button>
+                </div>`;
+            return;
+        }
+
+        const dayData = getDayChallengeContent(challenge, dayNum);
+
+        container.innerHTML = `
+            <div class="challenge-active">
+                <div class="challenge-header-row">
+                    <span class="challenge-icon-lg">${challenge.icon}</span>
+                    <div>
+                        <h3>${challenge.name}</h3>
+                        <p class="challenge-day-label">Day ${dayNum} of ${totalDays}</p>
+                    </div>
+                </div>
+                <div class="challenge-progress-bar">
+                    <div class="challenge-progress-fill" style="width:${(progress / totalDays) * 100}%"></div>
+                </div>
+                <p class="challenge-progress-text">${progress}/${totalDays} days completed</p>
+
+                <div class="challenge-today-card">
+                    <h4 class="challenge-focus-label">${dayData.focus}</h4>
+                    <div class="challenge-verse-block">
+                        <p class="challenge-verse-text">"${getTranslatedVerse(dayData.verse.ref, dayData.verse.text)}"</p>
+                        <p class="challenge-verse-ref">— ${dayData.verse.ref} (${getBibleVersion()})</p>
+                    </div>
+                    <p class="challenge-devotion">${dayData.devotion}</p>
+                    ${dayData.rest ? `
+                        <div class="challenge-rest-day">
+                            <span style="font-size:32px">&#x1F9D8;</span>
+                            <p>Active recovery day. Walk, stretch, foam roll, or just rest. Your muscles grow when you recover.</p>
+                        </div>
+                    ` : `
+                        <div class="challenge-workout-list">
+                            ${dayData.exercises.map(ex => `
+                                <div class="challenge-exercise-item">
+                                    <div class="challenge-exercise-main">
+                                        <span class="challenge-exercise-name">${ex.name}</span>
+                                        <span class="challenge-exercise-detail">${ex.sets} x ${ex.reps}</span>
+                                    </div>
+                                    ${ex.note ? `<p class="challenge-exercise-note">${ex.note}</p>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                    ${todayDone
+                        ? '<div class="challenge-done-badge">&#x2714; Completed Today</div>'
+                        : `<button class="btn btn-primary btn-full" onclick="completeChallengeDay()">${dayData.rest ? 'Mark Rest Day Complete' : "Complete Today's Workout"}</button>`
+                    }
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="abandonChallenge()" style="margin-top:10px;opacity:0.6">Quit Challenge</button>
+            </div>`;
+    } else {
+        const completedIds = DB.get('completedChallenges', []);
+        container.innerHTML = CHALLENGES.map(c => `
+            <div class="challenge-card">
+                <div class="challenge-card-header">
+                    <span class="challenge-icon-lg">${c.icon}</span>
+                    <div>
+                        <h3>${c.name} ${completedIds.includes(c.id) ? '<span class="challenge-completed-tag">&#x2714; Completed</span>' : ''}</h3>
+                        <p>${c.description}</p>
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="startChallenge('${c.id}')" style="margin-top:10px">Start Challenge</button>
+            </div>
+        `).join('');
+    }
+}
+
+function getDayChallengeContent(challenge, dayNum) {
+    const dayIdx = Math.min(dayNum - 1, challenge.days.length - 1);
+    const dayData = challenge.days[dayIdx];
+    return {
+        verse: CHALLENGE_VERSES[(dayNum - 1) % CHALLENGE_VERSES.length],
+        devotion: CHALLENGE_DEVOTIONS[(dayNum - 1) % CHALLENGE_DEVOTIONS.length],
+        focus: dayData.focus,
+        rest: !!dayData.rest,
+        exercises: dayData.exercises || []
+    };
+}
+
+function startChallenge(id) {
+    saveActiveChallenge({ id, startDate: today(), completedDays: [] });
+    renderChallenges();
+    showToast('Challenge started! Let\'s go!');
+}
+
+function completeChallengeDay() {
+    const active = getActiveChallenge();
+    if (!active) return;
+    const dayNum = getChallengeDay(active);
+    if (!active.completedDays.includes(dayNum)) {
+        active.completedDays.push(dayNum);
+        saveActiveChallenge(active);
+    }
+    renderChallenges();
+    showToast('Day complete! Great work!');
+    checkAchievements();
+}
+
+function abandonChallenge() {
+    if (!confirm('Are you sure you want to quit this challenge? Your progress will be lost.')) return;
+    DB.set('challenge', null);
+    renderChallenges();
+}
+
+function finishChallenge() {
+    const active = getActiveChallenge();
+    if (active) {
+        const completed = DB.get('completedChallenges', []);
+        if (!completed.includes(active.id)) completed.push(active.id);
+        DB.set('completedChallenges', completed);
+    }
+    DB.set('challenge', null);
+    renderChallenges();
+}
+
+// =============================================
+// FEATURE: Onboarding
+// =============================================
+
+let obGender = 'male';
+let obStep = 1;
+
+function obSetGender(g) {
+    obGender = g;
+    document.getElementById('ob-male').classList.toggle('active', g === 'male');
+    document.getElementById('ob-female').classList.toggle('active', g === 'female');
+}
+
+function nextOnboardingStep() {
+    // Validate current step
+    if (obStep === 2) {
+        const name = document.getElementById('ob-name').value.trim();
+        if (!name) { alert('Please enter your name.'); return; }
+    }
+    if (obStep === 3) {
+        // Build summary for step 4
+        const name = document.getElementById('ob-name').value.trim();
+        const weight = document.getElementById('ob-weight').value;
+        const goal = document.getElementById('ob-goal').value;
+        const goalLabels = { lose: 'Lose Weight', maintain: 'Maintain Weight', gain: 'Build Muscle' };
+        const feet = document.getElementById('ob-feet').value;
+        const inches = document.getElementById('ob-inches').value;
+        const age = document.getElementById('ob-age').value;
+
+        // Calculate TDEE
+        const heightInches = (parseInt(feet) || 0) * 12 + (parseInt(inches) || 0);
+        const weightLbs = parseFloat(weight) || 0;
+        const weightKg = weightLbs * 0.453592;
+        const heightCm = heightInches * 2.54;
+        const genderOffset = obGender === 'female' ? -161 : 5;
+        const bmr = 10 * weightKg + 6.25 * heightCm - 5 * (parseInt(age) || 25) + genderOffset;
+        const actMult = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
+        const activity = document.getElementById('ob-activity').value;
+        let tdee = Math.round(bmr * (actMult[activity] || 1.2));
+        if (goal === 'lose') tdee -= 400;
+        else if (goal === 'gain') tdee += 300;
+        const proteinGoal = Math.round(weightLbs * 0.8);
+
+        document.getElementById('ob-summary').innerHTML = `
+            <div class="ob-summary-item"><span>Name</span><strong>${escapeHtml(name)}</strong></div>
+            <div class="ob-summary-item"><span>Goal</span><strong>${goalLabels[goal]}</strong></div>
+            ${tdee > 500 ? `<div class="ob-summary-item"><span>Daily Calories</span><strong>${tdee} kcal</strong></div>` : ''}
+            ${proteinGoal > 30 ? `<div class="ob-summary-item"><span>Protein Target</span><strong>${proteinGoal}g</strong></div>` : ''}
+        `;
+    }
+
+    obStep++;
+    const slides = document.querySelectorAll('.onboarding-slide');
+    const dots = document.querySelectorAll('.step-dot');
+    slides.forEach(s => s.classList.remove('active'));
+    dots.forEach(d => d.classList.remove('active'));
+    const next = document.querySelector(`.onboarding-slide[data-step="${obStep}"]`);
+    if (next) next.classList.add('active');
+    if (dots[obStep - 1]) dots[obStep - 1].classList.add('active');
+}
+
+function completeOnboarding() {
+    const name = document.getElementById('ob-name').value.trim();
+    const age = parseInt(document.getElementById('ob-age').value) || 0;
+    const rawWeight = parseFloat(document.getElementById('ob-weight').value) || 0;
+    const feet = parseInt(document.getElementById('ob-feet').value) || 0;
+    const inches = parseInt(document.getElementById('ob-inches').value) || 0;
+    const heightTotal = feet * 12 + inches;
+    const goal = document.getElementById('ob-goal').value;
+    const activity = document.getElementById('ob-activity').value;
+
+    // Calculate calories
+    const weightKg = rawWeight * 0.453592;
+    const heightCm = heightTotal * 2.54;
+    const genderOffset = obGender === 'female' ? -161 : 5;
+    const bmr = 10 * weightKg + 6.25 * heightCm - 5 * (age || 25) + genderOffset;
+    const actMult = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
+    let tdee = Math.round(bmr * (actMult[activity] || 1.2));
+    if (goal === 'lose') tdee -= 400;
+    else if (goal === 'gain') tdee += 300;
+
+    const profile = {
+        name, gender: obGender, age, heightFeet: feet, heightInches: inches,
+        height: heightTotal, weight: rawWeight, goal, activity,
+        calorieGoal: tdee > 500 ? tdee : 2000,
+        proteinGoal: rawWeight > 30 ? Math.round(rawWeight * 0.8) : 150
+    };
+    DB.set('profile', profile);
+
+    if (rawWeight > 0) {
+        const weights = DB.get('weights', []);
+        weights.push({ date: today(), weight: rawWeight });
+        DB.set('weights', weights);
+    }
+
+    DB.set('onboarded', true);
+    document.getElementById('onboarding').classList.add('hidden');
+
+    // Refresh everything
+    loadProfile();
+    loadUnits();
+    updateDashboard();
+    drawWeightChart();
+    updateNutritionBars();
+    checkAchievements();
+}
+
+function showOnboarding() {
+    const profile = DB.get('profile', {});
+    if (!profile.name && !DB.get('onboarded', false)) {
+        document.getElementById('onboarding').classList.remove('hidden');
+    }
+}
+
+// --- Custom Exercise Library ---
+function getCustomExercises() { return DB.get('customExercises', []); }
+
+function addCustomExercise() {
+    const nameInput = document.getElementById('custom-ex-name');
+    const muscleSelect = document.getElementById('custom-ex-muscle');
+    const name = nameInput.value.trim();
+    if (!name) return;
+    const muscle = muscleSelect.value;
+    const exercises = getCustomExercises();
+    if (exercises.some(e => e.name.toLowerCase() === name.toLowerCase())) {
+        showToast('Exercise already exists');
+        return;
+    }
+    exercises.push({ name, muscle });
+    DB.set('customExercises', exercises);
+    nameInput.value = '';
+    renderCustomExercises();
+    refreshCustomExerciseIntegration();
+    showToast(`Added "${name}" to ${muscle}`);
+}
+
+function removeCustomExercise(index) {
+    const exercises = getCustomExercises();
+    exercises.splice(index, 1);
+    DB.set('customExercises', exercises);
+    renderCustomExercises();
+    refreshCustomExerciseIntegration();
+}
+
+function renderCustomExercises() {
+    const container = document.getElementById('custom-exercises-list');
+    if (!container) return;
+    const exercises = getCustomExercises();
+    if (exercises.length === 0) {
+        container.innerHTML = '<p class="empty-state">No custom exercises yet. Add your own above!</p>';
+        return;
+    }
+    container.innerHTML = exercises.map((e, i) => `
+        <div class="custom-ex-item">
+            <span class="custom-ex-name">${escapeHtml(e.name)}</span>
+            <span class="custom-ex-muscle-tag">${e.muscle}</span>
+            <button class="delete-btn" onclick="removeCustomExercise(${i})">&times;</button>
+        </div>
+    `).join('');
+}
+
+function refreshCustomExerciseIntegration() {
+    // Add custom exercises to datalist
+    const datalist = document.getElementById('exercise-suggestions');
+    if (!datalist) return;
+    // Remove old custom options
+    datalist.querySelectorAll('.custom-option').forEach(o => o.remove());
+    getCustomExercises().forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e.name;
+        opt.className = 'custom-option';
+        datalist.appendChild(opt);
+    });
+}
+
+function getFullMuscleMap() {
+    // Base muscle map
+    const muscleMap = {
+        chest: ['Bench Press','Incline Bench Press','Decline Bench Press','Dumbbell Bench Press','Incline Dumbbell Press','Dumbbell Fly','Cable Fly','Chest Dips','Push-ups','Machine Chest Press','Pec Deck'],
+        back: ['Deadlift','Romanian Deadlift','Sumo Deadlift','Barbell Row','Dumbbell Row','Pendlay Row','T-Bar Row','Seated Cable Row','Lat Pulldown','Pull-ups','Chin-ups','Straight Arm Pulldown','Hyperextensions','Good Mornings'],
+        shoulders: ['Overhead Press','Seated Dumbbell Press','Arnold Press','Lateral Raises','Front Raises','Rear Delt Fly','Cable Lateral Raise','Upright Row','Shrugs','Barbell Shrugs','Face Pulls','Machine Shoulder Press'],
+        legs: ['Squat','Front Squat','Goblet Squat','Bulgarian Split Squat','Hack Squat','Leg Press','Lunges','Walking Lunges','Reverse Lunges','Leg Extension','Leg Curl','Seated Leg Curl','Hip Thrust','Glute Bridge','Calf Raises','Seated Calf Raise','Step-ups','Box Jumps'],
+        biceps: ['Bicep Curls','Hammer Curls','Preacher Curls','Concentration Curls','Incline Dumbbell Curl','EZ Bar Curl','Cable Curl','Spider Curls'],
+        triceps: ['Tricep Pushdown','Overhead Tricep Extension','Skull Crushers','Close Grip Bench Press','Tricep Dips','Tricep Kickbacks','Cable Overhead Extension','Diamond Push-ups'],
+        core: ['Plank','Crunches','Hanging Leg Raise','Cable Crunch','Ab Wheel Rollout','Russian Twist','Bicycle Crunches','Leg Raises','Woodchoppers','Pallof Press','Dead Bug','Mountain Climbers'],
+    };
+    // Merge custom exercises
+    getCustomExercises().forEach(e => {
+        if (muscleMap[e.muscle]) {
+            muscleMap[e.muscle].push(e.name);
+        }
+    });
+    return muscleMap;
+}
+
+function toggleCustomExercises() {
+    const panel = document.getElementById('custom-exercises-panel');
+    const arrow = document.getElementById('custom-ex-arrow');
+    panel.classList.toggle('hidden');
+    arrow.innerHTML = panel.classList.contains('hidden') ? '&#x25BC;' : '&#x25B2;';
+}
+
+// --- Weekly Report Card ---
+function getWeekRange() {
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - day);
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+    return { start: startOfWeek, end: endOfWeek };
+}
+
+function formatShortDate(d) {
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function renderWeeklyReport() {
+    const container = document.getElementById('weekly-report');
+    if (!container) return;
+
+    const { start, end } = getWeekRange();
+    const startStr = start.toISOString().split('T')[0];
+    const endStr = end.toISOString().split('T')[0];
+
+    const allWorkouts = DB.get('workouts', []);
+    const allMeals = DB.get('meals', []);
+    const allWeights = DB.get('weights', []);
+    const profile = DB.get('profile', {});
+
+    // Filter to this week
+    const weekWorkouts = allWorkouts.filter(w => w.date >= startStr && w.date <= endStr);
+    const weekMeals = allMeals.filter(m => m.date >= startStr && m.date <= endStr);
+    const weekWeights = allWeights.filter(w => w.date >= startStr && w.date <= endStr);
+
+    // Days trained this week
+    const trainDays = new Set(weekWorkouts.map(w => w.date)).size;
+
+    // Total volume
+    const totalVolume = weekWorkouts.reduce((sum, w) => {
+        return sum + w.sets.reduce((s, set) => s + set.weight * set.reps, 0);
+    }, 0);
+
+    // Average daily calories
+    const calDays = {};
+    weekMeals.forEach(m => {
+        calDays[m.date] = (calDays[m.date] || 0) + m.calories;
+    });
+    const calDayCount = Object.keys(calDays).length;
+    const avgCalories = calDayCount > 0 ? Math.round(Object.values(calDays).reduce((a, b) => a + b, 0) / calDayCount) : 0;
+
+    // Weight change this week
+    let weightDelta = null;
+    if (weekWeights.length >= 2) {
+        const sorted = [...weekWeights].sort((a, b) => a.date.localeCompare(b.date));
+        weightDelta = sorted[sorted.length - 1].weight - sorted[0].weight;
+    }
+
+    // PRs this week (best set weight per exercise this week vs all time before)
+    let prCount = 0;
+    const weekExercises = {};
+    weekWorkouts.forEach(w => {
+        const maxWeight = Math.max(...w.sets.map(s => s.weight));
+        if (!weekExercises[w.name] || maxWeight > weekExercises[w.name]) {
+            weekExercises[w.name] = maxWeight;
+        }
+    });
+    const priorWorkouts = allWorkouts.filter(w => w.date < startStr);
+    Object.entries(weekExercises).forEach(([name, weekMax]) => {
+        const priorMax = priorWorkouts
+            .filter(w => w.name === name)
+            .reduce((best, w) => {
+                const m = Math.max(...w.sets.map(s => s.weight));
+                return m > best ? m : best;
+            }, 0);
+        if (weekMax > priorMax && priorMax > 0) prCount++;
+    });
+
+    // Current streak
+    const streakEl = document.getElementById('streak-count');
+    const streak = streakEl ? parseInt(streakEl.textContent) || 0 : 0;
+
+    // Show the card
+    container.style.display = '';
+
+    document.getElementById('report-week').textContent = `Week of ${formatShortDate(start)} – ${formatShortDate(end)}`;
+
+    // Stats grid
+    const statsHtml = [
+        { icon: '&#x1F3CB;', label: 'Days Trained', value: `${trainDays} / 7` },
+        { icon: '&#x1F4AA;', label: 'Total Volume', value: `${parseFloat(lbsToDisplay(totalVolume)).toLocaleString()} ${wu()}` },
+        { icon: '&#x1F525;', label: 'Avg Calories', value: avgCalories > 0 ? avgCalories.toLocaleString() : '—' },
+        { icon: '&#x2696;', label: 'Weight Change', value: weightDelta !== null ? `${weightDelta > 0 ? '+' : ''}${parseFloat(lbsToDisplay(weightDelta)).toFixed(1)} ${wu()}` : '—' },
+        { icon: '&#x1F3C6;', label: 'PRs Hit', value: prCount },
+        { icon: '&#x1F525;', label: 'Streak', value: `${streak} days` },
+    ].map(s => `
+        <div class="report-stat">
+            <span class="report-stat-icon">${s.icon}</span>
+            <span class="report-stat-value">${s.value}</span>
+            <span class="report-stat-label">${s.label}</span>
+        </div>
+    `).join('');
+    document.getElementById('report-stats-grid').innerHTML = statsHtml;
+
+    // Verse of the week (use the week number to pick one)
+    const weekNum = Math.floor((start.getTime() - new Date(start.getFullYear(), 0, 1).getTime()) / (7 * 86400000));
+    const verse = VERSES[weekNum % VERSES.length];
+    const verseText = getTranslatedVerse(verse.ref, verse.text);
+    const version = getBibleVersion();
+    document.getElementById('report-verse').innerHTML = `<em>"${escapeHtml(verseText)}"</em><br><small>— ${escapeHtml(verse.ref)} (${version})</small>`;
+}
+
+// =============================================
+// END OF NEW FEATURES
+// =============================================
+
 // --- Initialize ---
 function init() {
+    loadBibleVersion();
     displayDailyVerse();
     loadProfile();
     loadUnits();
@@ -1432,6 +3351,14 @@ function init() {
     renderCalendarHeatmap();
     renderMuscleHeatmap();
     scheduleMidnightReset();
+    renderRoutinesList();
+    updateSaveTemplateBtn();
+    updateRestTimerVisibility();
+    renderChallenges();
+    renderWeeklyReport();
+    renderCustomExercises();
+    refreshCustomExerciseIntegration();
+    showOnboarding();
 
     // Redraw charts on resize
     window.addEventListener('resize', () => {

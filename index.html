@@ -14,11 +14,63 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png">
 </head>
 <body>
+    <!-- Onboarding Overlay -->
+    <div id="onboarding" class="onboarding-overlay hidden">
+        <div class="onboarding-content">
+            <div class="onboarding-steps">
+                <span class="step-dot active"></span>
+                <span class="step-dot"></span>
+                <span class="step-dot"></span>
+                <span class="step-dot"></span>
+            </div>
+            <div class="onboarding-slide active" data-step="1">
+                <div class="onboarding-icon">&#x2694;</div>
+                <h1>Iron Faith</h1>
+                <p class="onboarding-tagline">Forge your body. Strengthen your spirit.</p>
+                <p class="onboarding-verse">"I can do all things through Christ who strengthens me." &mdash; Philippians 4:13</p>
+                <button class="btn btn-primary btn-full" onclick="nextOnboardingStep()">Get Started</button>
+            </div>
+            <div class="onboarding-slide" data-step="2">
+                <h2>About You</h2>
+                <p class="onboarding-sub">Let's personalize your experience</p>
+                <div class="form-group"><label>Your Name</label><input type="text" id="ob-name" placeholder="Enter your name"></div>
+                <div class="form-group"><label>Gender</label><div class="unit-toggle"><button class="unit-btn active" id="ob-male" onclick="obSetGender('male')">Male</button><button class="unit-btn" id="ob-female" onclick="obSetGender('female')">Female</button></div></div>
+                <div class="form-row"><div class="form-group"><label>Age</label><input type="number" id="ob-age" placeholder="Age"></div><div class="form-group"><label>Weight (lbs)</label><input type="number" id="ob-weight" placeholder="lbs" step="0.1"></div></div>
+                <div class="form-group"><label>Height</label><div class="form-row"><input type="number" id="ob-feet" placeholder="Feet" min="3" max="8"><input type="number" id="ob-inches" placeholder="Inches" min="0" max="11"></div></div>
+                <button class="btn btn-primary btn-full" onclick="nextOnboardingStep()">Continue</button>
+            </div>
+            <div class="onboarding-slide" data-step="3">
+                <h2>Your Goals</h2>
+                <p class="onboarding-sub">What are you training for?</p>
+                <div class="form-group"><label>Fitness Goal</label><select id="ob-goal"><option value="lose">Lose Weight</option><option value="maintain">Maintain Weight</option><option value="gain">Build Muscle / Gain Weight</option></select></div>
+                <div class="form-group"><label>Activity Level</label><select id="ob-activity"><option value="sedentary">Sedentary (little exercise)</option><option value="light">Lightly Active (1-3 days/week)</option><option value="moderate">Moderately Active (3-5 days/week)</option><option value="active">Very Active (6-7 days/week)</option></select></div>
+                <button class="btn btn-primary btn-full" onclick="nextOnboardingStep()">Continue</button>
+            </div>
+            <div class="onboarding-slide" data-step="4">
+                <div class="onboarding-icon">&#x1F4AA;</div>
+                <h2>You're All Set!</h2>
+                <div id="ob-summary" class="ob-summary"></div>
+                <p class="onboarding-verse">"For physical training is of some value, but godliness has value for all things." &mdash; 1 Timothy 4:8</p>
+                <button class="btn btn-primary btn-full" onclick="completeOnboarding()">Start Training</button>
+            </div>
+        </div>
+    </div>
+
     <div id="app">
         <!-- Daily Verse Banner -->
         <div id="verse-banner" class="verse-banner">
             <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">&#x263C;</button>
-            <span class="verse-icon">&#x2727;</span>
+            <div class="verse-top-row">
+                <span class="verse-icon">&#x2727;</span>
+                <select id="bible-version" class="bible-select" onchange="setBibleVersion(this.value)">
+                    <option value="NIV">NIV</option>
+                    <option value="KJV">KJV</option>
+                    <option value="ESV">ESV</option>
+                    <option value="NKJV">NKJV</option>
+                    <option value="NLT">NLT</option>
+                    <option value="NASB">NASB</option>
+                </select>
+            </div>
             <p id="daily-verse" class="verse-text"></p>
             <p id="verse-ref" class="verse-ref"></p>
         </div>
@@ -28,6 +80,7 @@
             <h1>Iron Faith</h1>
             <p class="tagline">Forge your body. Strengthen your spirit.</p>
             <div class="header-actions">
+                <a href="basic.html" class="btn btn-sm btn-secondary" style="text-decoration:none;font-size:11px;padding:6px 14px;">Switch to Basic</a>
                 <button class="btn btn-sm btn-primary" id="install-btn" onclick="installApp()" style="display:none" title="Install Iron Faith">&#x2B07; Install</button>
             </div>
         </header>
@@ -49,6 +102,10 @@
             <button class="tab-btn" data-tab="coach">
                 <span class="tab-icon">&#x2605;</span>
                 <span>Coach</span>
+            </button>
+            <button class="tab-btn" data-tab="social">
+                <span class="tab-icon">&#x2661;</span>
+                <span>Social</span>
             </button>
             <button class="tab-btn" data-tab="profile">
                 <span class="tab-icon">&#x263A;</span>
@@ -78,6 +135,15 @@
                 </div>
             </div>
 
+            <div class="card weekly-report-card" id="weekly-report" style="display:none;">
+                <div class="report-header">
+                    <h2>&#x1F4CA; Weekly Report Card</h2>
+                    <span class="report-week" id="report-week"></span>
+                </div>
+                <div class="report-stats-grid" id="report-stats-grid"></div>
+                <div class="report-verse" id="report-verse"></div>
+            </div>
+
             <div class="card">
                 <h2>Weight Progress</h2>
                 <canvas id="weight-chart" height="200"></canvas>
@@ -103,6 +169,11 @@
             </div>
 
             <div class="card">
+                <h2>Faith &amp; Fitness Challenges</h2>
+                <div id="challenges-container"></div>
+            </div>
+
+            <div class="card">
                 <h2>Recent Workouts</h2>
                 <div id="recent-workouts" class="recent-list">
                     <p class="empty-state">No workouts logged yet. Start training!</p>
@@ -114,7 +185,25 @@
 
         <!-- Workout Tab -->
         <section id="workout" class="tab-content">
+            <!-- My Routines -->
             <div class="card">
+                <h2>My Routines</h2>
+                <div id="routines-list" class="routines-list">
+                    <p class="empty-state">No routines saved yet. Complete a session and save it as a routine!</p>
+                </div>
+            </div>
+
+            <!-- Template Session (hidden by default) -->
+            <div id="template-session" class="card hidden">
+                <div class="template-session-header">
+                    <h2 id="template-session-title">Routine Session</h2>
+                    <button class="btn btn-secondary btn-sm" onclick="cancelTemplateSession()">Cancel</button>
+                </div>
+                <div id="template-exercises"></div>
+                <button class="btn btn-primary btn-full" onclick="finishTemplateSession()" style="margin-top:14px">Finish Workout</button>
+            </div>
+
+            <div class="card" id="log-workout-card">
                 <h2>Log Workout</h2>
                 <div class="form-group">
                     <label>Exercise Name</label>
@@ -285,6 +374,31 @@
                     <p class="empty-state">No exercises logged today.</p>
                 </div>
             </div>
+            <button class="btn btn-secondary btn-full" onclick="saveAsTemplate()" id="save-template-btn" style="display:none">Save Session as Routine</button>
+
+            <!-- Custom Exercises -->
+            <div class="card">
+                <div class="custom-exercises-header" onclick="toggleCustomExercises()">
+                    <h2>My Custom Exercises</h2>
+                    <span class="toggle-arrow" id="custom-ex-arrow">&#x25BC;</span>
+                </div>
+                <div id="custom-exercises-panel" class="hidden">
+                    <div class="custom-ex-form">
+                        <input type="text" id="custom-ex-name" placeholder="Exercise name">
+                        <select id="custom-ex-muscle">
+                            <option value="chest">Chest</option>
+                            <option value="back">Back</option>
+                            <option value="shoulders">Shoulders</option>
+                            <option value="legs">Legs</option>
+                            <option value="biceps">Biceps</option>
+                            <option value="triceps">Triceps</option>
+                            <option value="core">Core</option>
+                        </select>
+                        <button class="btn btn-primary btn-sm" onclick="addCustomExercise()">Add</button>
+                    </div>
+                    <div id="custom-exercises-list" class="custom-exercises-list"></div>
+                </div>
+            </div>
         </section>
 
         <!-- Calories Tab -->
@@ -292,8 +406,20 @@
             <div class="card">
                 <h2>Log Meal</h2>
                 <div class="form-group">
-                    <label>Meal / Food Name</label>
-                    <input type="text" id="meal-name" placeholder="e.g., Grilled Chicken Breast">
+                    <label>Search Food or Enter Name</label>
+                    <div class="food-search-wrap">
+                        <input type="text" id="meal-name" placeholder="e.g., Chicken Breast or custom meal" oninput="searchFood(this.value)" autocomplete="off">
+                        <div id="food-search-results" class="food-search-results hidden"></div>
+                    </div>
+                </div>
+                <div class="form-group" id="servings-group" style="display:none">
+                    <label>Servings</label>
+                    <div class="servings-row">
+                        <button class="btn btn-secondary btn-sm" onclick="adjustServings(-0.5)">-</button>
+                        <span id="serving-count">1</span>
+                        <button class="btn btn-secondary btn-sm" onclick="adjustServings(0.5)">+</button>
+                        <span id="serving-desc" class="serving-desc"></span>
+                    </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -410,6 +536,113 @@
             </div>
         </section>
 
+        <!-- Social Tab -->
+        <section id="social" class="tab-content">
+            <!-- Auth (not logged in) -->
+            <div id="social-auth" class="hidden">
+                <div class="card" style="text-align:center;padding:30px 22px">
+                    <div style="font-size:40px;margin-bottom:10px">&#x2661;</div>
+                    <h2 style="margin-bottom:6px">Join the Community</h2>
+                    <p style="color:var(--text-muted);font-size:13px">Connect with friends, share your lifts, stay accountable together.</p>
+                </div>
+                <div class="card">
+                    <div class="auth-tabs">
+                        <button class="auth-tab active" onclick="showAuthTab('login')">Log In</button>
+                        <button class="auth-tab" onclick="showAuthTab('signup')">Sign Up</button>
+                    </div>
+                    <div id="auth-login">
+                        <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="you@email.com"></div>
+                        <div class="form-group"><label>Password</label><input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key==='Enter')socialSignIn()"></div>
+                        <button class="btn btn-primary btn-full" onclick="socialSignIn()">Log In</button>
+                    </div>
+                    <div id="auth-signup" class="hidden">
+                        <div class="form-group"><label>Display Name</label><input type="text" id="signup-name" placeholder="Your name"></div>
+                        <div class="form-group"><label>Email</label><input type="email" id="signup-email" placeholder="you@email.com"></div>
+                        <div class="form-group"><label>Password</label><input type="password" id="signup-password" placeholder="6+ characters" onkeydown="if(event.key==='Enter')socialSignUp()"></div>
+                        <button class="btn btn-primary btn-full" onclick="socialSignUp()">Create Account</button>
+                    </div>
+                    <div class="auth-divider"><span>or</span></div>
+                    <button class="btn btn-secondary btn-full" onclick="socialGoogleSignIn()">Continue with Google</button>
+                </div>
+            </div>
+
+            <!-- Username Setup -->
+            <div id="social-setup" class="hidden">
+                <div class="card" style="text-align:center">
+                    <div style="font-size:40px;margin-bottom:10px">&#x1F44B;</div>
+                    <h2>Welcome, <span id="setup-display-name"></span>!</h2>
+                    <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px">Choose a username so friends can find you.</p>
+                    <div class="form-group" style="text-align:left"><label>Username</label><input type="text" id="setup-username" placeholder="e.g., ironfaith_jared" maxlength="20" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'')"></div>
+                    <button class="btn btn-primary btn-full" onclick="setupUsername()">Let's Go</button>
+                </div>
+            </div>
+
+            <!-- Main Social -->
+            <div id="social-main" class="hidden">
+                <div class="social-profile-banner">
+                    <div>
+                        <strong id="social-display-name">Name</strong>
+                        <span id="social-username" class="social-handle">@username</span>
+                    </div>
+                </div>
+
+                <div class="social-nav">
+                    <button class="social-nav-btn active" onclick="showSocialView('feed')">Feed</button>
+                    <button class="social-nav-btn" onclick="showSocialView('friends')">Friends <span id="request-badge" class="request-badge hidden">0</span></button>
+                    <button class="social-nav-btn" onclick="showSocialView('profile')">Profile</button>
+                </div>
+
+                <button class="btn btn-primary btn-full" onclick="openPostModal()" style="margin-bottom:14px">&#x1F4F8; Post a Lift</button>
+
+                <!-- Feed -->
+                <div id="social-feed" class="social-view">
+                    <div id="feed-posts"><p class="empty-state">Loading feed...</p></div>
+                </div>
+
+                <!-- Friends -->
+                <div id="social-friends" class="social-view hidden"></div>
+
+                <!-- Profile -->
+                <div id="social-profile" class="social-view hidden"></div>
+            </div>
+        </section>
+
+        <!-- Post Modal -->
+        <div id="post-modal" class="share-modal hidden">
+            <div class="share-modal-content" style="max-width:500px">
+                <button class="share-modal-close" onclick="closePostModal()">&times;</button>
+                <h2 style="margin-bottom:14px">Post a Lift</h2>
+                <div id="post-stats-preview"></div>
+                <div class="form-group" style="margin-top:14px">
+                    <label>Photo</label>
+                    <input type="file" id="post-photo-input" accept="image/*" capture="environment" onchange="previewPostPhoto(event)" style="padding:10px">
+                </div>
+                <div id="post-photo-preview"></div>
+                <div class="form-group">
+                    <label>Caption</label>
+                    <input type="text" id="post-caption" placeholder="Hit a new PR today!" maxlength="280">
+                </div>
+                <div class="form-group">
+                    <label>Share a Word</label>
+                    <div class="verse-message-tabs">
+                        <button class="verse-tab active" id="verse-tab-btn" onclick="showVerseTab('verse')">Bible Verse</button>
+                        <button class="verse-tab" id="message-tab-btn" onclick="showVerseTab('message')">Message</button>
+                    </div>
+                    <div id="verse-picker">
+                        <input type="text" id="verse-search" placeholder="Search verses..." oninput="filterVerses(this.value)">
+                        <select id="verse-select" onchange="previewVerse()">
+                            <option value="">-- Select a verse (optional) --</option>
+                        </select>
+                        <div id="verse-preview" class="verse-preview hidden"></div>
+                    </div>
+                    <div id="message-input-area" class="hidden">
+                        <input type="text" id="post-message" placeholder="Share an encouraging word..." maxlength="200">
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-full" id="post-submit-btn" onclick="submitPost()">Post</button>
+            </div>
+        </div>
+
         <!-- Profile Tab -->
         <section id="profile" class="tab-content">
             <div class="card">
@@ -502,6 +735,45 @@
         </section>
     </div>
 
+    <!-- Rest Timer -->
+    <div id="rest-timer" class="rest-timer">
+        <button class="rest-timer-toggle" onclick="toggleRestTimer()">
+            <span id="rest-timer-icon">&#x23F1;</span>
+            <span id="rest-timer-mini" class="rest-timer-mini hidden"></span>
+        </button>
+        <div class="rest-timer-panel hidden">
+            <div class="rest-timer-display">
+                <svg class="timer-ring" viewBox="0 0 100 100">
+                    <circle class="timer-ring-bg" cx="50" cy="50" r="45"/>
+                    <circle class="timer-ring-progress" id="timer-ring-progress" cx="50" cy="50" r="45"/>
+                </svg>
+                <span class="timer-time" id="timer-time">0:00</span>
+            </div>
+            <div class="rest-timer-presets">
+                <button onclick="startRestTimer(30)">0:30</button>
+                <button onclick="startRestTimer(60)">1:00</button>
+                <button onclick="startRestTimer(90)">1:30</button>
+                <button onclick="startRestTimer(120)">2:00</button>
+                <button onclick="startRestTimer(180)">3:00</button>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="stopRestTimer()" id="stop-timer-btn" style="display:none;width:100%;margin-top:8px">Stop Timer</button>
+        </div>
+    </div>
+
+    <!-- Share Progress Modal -->
+    <div id="share-modal" class="share-modal hidden">
+        <div class="share-modal-content">
+            <button class="share-modal-close" onclick="closeShareModal()">&times;</button>
+            <canvas id="progress-card-canvas" width="600" height="800"></canvas>
+            <div class="share-modal-actions">
+                <button class="btn btn-primary" onclick="shareCardImage()">Share</button>
+                <button class="btn btn-secondary" onclick="downloadCard()">Download</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="food-db.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
@@ -509,5 +781,6 @@
     <script src="app.js"></script>
     <script src="photos.js"></script>
     <script src="coach.js"></script>
+    <script src="social.js"></script>
 </body>
 </html>

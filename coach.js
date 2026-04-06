@@ -151,7 +151,9 @@ function randomVerse() {
 
 function verseHtml(v) {
     if (!v) v = randomVerse();
-    return `<div class="verse-inline">"${v.text}" — <strong>${v.ref}</strong></div>`;
+    const text = typeof getTranslatedVerse === 'function' ? getTranslatedVerse(v.ref, v.text) : v.text;
+    const version = typeof getBibleVersion === 'function' ? getBibleVersion() : 'NIV';
+    return `<div class="verse-inline">"${text}" — <strong>${v.ref} (${version})</strong></div>`;
 }
 
 function insightHtml(text) {

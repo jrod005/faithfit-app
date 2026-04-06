@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iron Faith Basic - Fitness & Faith Tracker</title>
+    <link rel="stylesheet" href="basic-styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1a1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Iron Faith">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body>
+    <div id="app">
+        <!-- Daily Verse -->
+        <div class="verse-banner">
+            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">&#x263C;</button>
+            <span class="verse-icon">&#x2727;</span>
+            <p id="daily-verse" class="verse-text"></p>
+            <p id="verse-ref" class="verse-ref"></p>
+        </div>
+
+        <!-- Header -->
+        <header class="app-header">
+            <h1>Iron Faith</h1>
+            <p class="tagline">Simple. Focused. Faithful.</p>
+            <a href="index.html" class="version-switch">Switch to Pro &rarr;</a>
+        </header>
+
+        <!-- Tab Navigation -->
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="dashboard">
+                <span class="tab-icon">&#x25A3;</span>
+                <span>Dashboard</span>
+            </button>
+            <button class="tab-btn" data-tab="workout">
+                <span class="tab-icon">&#x2693;</span>
+                <span>Workout</span>
+            </button>
+            <button class="tab-btn" data-tab="nutrition">
+                <span class="tab-icon">&#x2615;</span>
+                <span>Nutrition</span>
+            </button>
+            <button class="tab-btn" data-tab="profile">
+                <span class="tab-icon">&#x263A;</span>
+                <span>Profile</span>
+            </button>
+        </nav>
+
+        <!-- Dashboard -->
+        <section id="dashboard" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card primary">
+                    <h3>Today's Workouts</h3>
+                    <p class="stat-number" id="today-workouts">0</p>
+                </div>
+                <div class="stat-card success">
+                    <h3>Calories Today</h3>
+                    <p class="stat-number" id="today-calories">0</p>
+                    <p class="stat-sub" id="calorie-goal-text">Goal: --</p>
+                </div>
+                <div class="stat-card accent">
+                    <h3>Current Streak</h3>
+                    <p class="stat-number" id="streak-count">0 days</p>
+                </div>
+                <div class="stat-card warning">
+                    <h3>Body Weight</h3>
+                    <p class="stat-number" id="current-weight">-- lbs</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Weight Progress</h2>
+                <canvas id="weight-chart" height="200"></canvas>
+                <div class="weight-input-row">
+                    <input type="number" id="weight-input" placeholder="Enter weight" step="0.1">
+                    <button class="btn btn-primary" onclick="logWeight()">Log Weight</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Recent Workouts</h2>
+                <div id="recent-workouts" class="recent-list">
+                    <p class="empty-state">No workouts logged yet. Start training!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Workout -->
+        <section id="workout" class="tab-content">
+            <div class="card">
+                <h2>Log Workout</h2>
+                <div class="form-group">
+                    <label>Exercise Name</label>
+                    <input type="text" id="exercise-name" placeholder="e.g., Bench Press" list="exercise-suggestions">
+                    <datalist id="exercise-suggestions">
+                        <option value="Bench Press">
+                        <option value="Incline Bench Press">
+                        <option value="Dumbbell Bench Press">
+                        <option value="Dumbbell Fly">
+                        <option value="Push-ups">
+                        <option value="Deadlift">
+                        <option value="Romanian Deadlift">
+                        <option value="Barbell Row">
+                        <option value="Dumbbell Row">
+                        <option value="Lat Pulldown">
+                        <option value="Pull-ups">
+                        <option value="Chin-ups">
+                        <option value="Overhead Press">
+                        <option value="Lateral Raises">
+                        <option value="Face Pulls">
+                        <option value="Squat">
+                        <option value="Front Squat">
+                        <option value="Leg Press">
+                        <option value="Lunges">
+                        <option value="Leg Extension">
+                        <option value="Leg Curl">
+                        <option value="Hip Thrust">
+                        <option value="Calf Raises">
+                        <option value="Bicep Curls">
+                        <option value="Hammer Curls">
+                        <option value="Tricep Pushdown">
+                        <option value="Skull Crushers">
+                        <option value="Plank">
+                        <option value="Crunches">
+                        <option value="Hanging Leg Raise">
+                        <option value="Cable Crunch">
+                        <option value="Kettlebell Swing">
+                        <option value="Burpees">
+                    </datalist>
+                </div>
+
+                <div id="sets-container">
+                    <div class="set-row">
+                        <span class="set-label">Set 1</span>
+                        <input type="number" class="set-weight" placeholder="Weight" step="2.5">
+                        <span class="x-label">x</span>
+                        <input type="number" class="set-reps" placeholder="Reps">
+                    </div>
+                </div>
+
+                <div class="btn-row">
+                    <button class="btn btn-secondary" onclick="addSet()">+ Add Set</button>
+                    <button class="btn btn-secondary" onclick="removeSet()">- Remove Set</button>
+                </div>
+
+                <button class="btn btn-primary btn-full" onclick="logExercise()">Save Exercise</button>
+            </div>
+
+            <div class="card">
+                <h2>Today's Session</h2>
+                <div id="todays-exercises" class="exercise-log">
+                    <p class="empty-state">No exercises logged today.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Nutrition -->
+        <section id="nutrition" class="tab-content">
+            <div class="card">
+                <h2>Log Meal</h2>
+                <div class="form-group">
+                    <label>Meal Name</label>
+                    <input type="text" id="meal-name" placeholder="e.g., Chicken Breast">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Calories</label>
+                        <input type="number" id="meal-calories" placeholder="kcal">
+                    </div>
+                    <div class="form-group">
+                        <label>Protein (g)</label>
+                        <input type="number" id="meal-protein" placeholder="g">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Carbs (g)</label>
+                        <input type="number" id="meal-carbs" placeholder="g">
+                    </div>
+                    <div class="form-group">
+                        <label>Fat (g)</label>
+                        <input type="number" id="meal-fat" placeholder="g">
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-full" onclick="logMeal()">Log Meal</button>
+            </div>
+
+            <div class="card">
+                <h2>Today's Nutrition</h2>
+                <div class="macro-bars">
+                    <div class="macro-bar-group">
+                        <div class="macro-header"><span>Calories</span><span id="cal-count">0 / --</span></div>
+                        <div class="progress-bar"><div class="progress-fill cal-fill" id="cal-bar" style="width:0%"></div></div>
+                    </div>
+                    <div class="macro-bar-group">
+                        <div class="macro-header"><span>Protein</span><span id="protein-count">0g</span></div>
+                        <div class="progress-bar"><div class="progress-fill protein-fill" id="protein-bar" style="width:0%"></div></div>
+                    </div>
+                    <div class="macro-bar-group">
+                        <div class="macro-header"><span>Carbs</span><span id="carbs-count">0g</span></div>
+                        <div class="progress-bar"><div class="progress-fill carbs-fill" id="carbs-bar" style="width:0%"></div></div>
+                    </div>
+                    <div class="macro-bar-group">
+                        <div class="macro-header"><span>Fat</span><span id="fat-count">0g</span></div>
+                        <div class="progress-bar"><div class="progress-fill fat-fill" id="fat-bar" style="width:0%"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Meals Today</h2>
+                <div id="meals-list" class="meals-list">
+                    <p class="empty-state">No meals logged today.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Profile -->
+        <section id="profile" class="tab-content">
+            <div class="card">
+                <h2>Your Profile</h2>
+                <div class="form-group">
+                    <label>Units</label>
+                    <div class="unit-toggle">
+                        <button class="unit-btn active" id="unit-imperial" onclick="setUnits('imperial')">Imperial (lbs/ft)</button>
+                        <button class="unit-btn" id="unit-metric" onclick="setUnits('metric')">Metric (kg/cm)</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="profile-name" placeholder="Your name">
+                </div>
+                <div class="form-group">
+                    <label>Gender</label>
+                    <div class="unit-toggle">
+                        <button class="unit-btn active" id="gender-male" onclick="setGender('male')">Male</button>
+                        <button class="unit-btn" id="gender-female" onclick="setGender('female')">Female</button>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Age</label>
+                        <input type="number" id="profile-age" placeholder="Age">
+                    </div>
+                    <div class="form-group">
+                        <label id="weight-label">Weight (lbs)</label>
+                        <input type="number" id="profile-weight" placeholder="e.g., 180" step="0.1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Height</label>
+                    <div class="form-row" id="height-imperial">
+                        <div class="height-input-group">
+                            <input type="number" id="profile-height-feet" placeholder="Feet" min="3" max="8">
+                            <span class="input-suffix">ft</span>
+                        </div>
+                        <div class="height-input-group">
+                            <input type="number" id="profile-height-inches" placeholder="Inches" min="0" max="11">
+                            <span class="input-suffix">in</span>
+                        </div>
+                    </div>
+                    <div class="height-input-group hidden" id="height-metric">
+                        <input type="number" id="profile-height-cm" placeholder="e.g., 175" step="1">
+                        <span class="input-suffix">cm</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Fitness Goal</label>
+                    <select id="profile-goal">
+                        <option value="lose">Lose Weight</option>
+                        <option value="maintain">Maintain Weight</option>
+                        <option value="gain">Build Muscle / Gain Weight</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Activity Level</label>
+                    <select id="profile-activity">
+                        <option value="sedentary">Sedentary (little exercise)</option>
+                        <option value="light">Lightly Active (1-3 days/week)</option>
+                        <option value="moderate">Moderately Active (3-5 days/week)</option>
+                        <option value="active">Very Active (6-7 days/week)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Daily Calorie Goal</label>
+                    <input type="number" id="profile-calories" placeholder="Auto-calculated or manual">
+                    <button class="btn btn-secondary btn-sm" onclick="calculateCalories()">Auto-Calculate</button>
+                </div>
+                <div class="form-group">
+                    <label>Daily Protein Goal (g)</label>
+                    <input type="number" id="profile-protein" placeholder="e.g., 150">
+                </div>
+                <button class="btn btn-primary btn-full" onclick="saveProfile()">Save Profile</button>
+            </div>
+
+            <div class="card">
+                <h2>Data Management</h2>
+                <div class="btn-row">
+                    <button class="btn btn-secondary" onclick="exportData()">Export Data</button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('import-file').click()">Import Data</button>
+                    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+                </div>
+                <div class="btn-row" style="margin-top:8px">
+                    <button class="btn btn-danger" onclick="clearAllData()">Clear All Data</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="basic-app.js"></script>
+</body>
+</html>
