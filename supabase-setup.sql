@@ -142,3 +142,25 @@ CREATE POLICY "Posts visibility with privacy" ON posts FOR SELECT USING (
     OR EXISTS (SELECT 1 FROM profiles WHERE profiles.id = posts.uid AND profiles.is_public = true)
     OR EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND posts.uid = ANY(profiles.friends))
 );
+
+-- =============================================
+-- COMMENTS TABLE
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS comments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  post_id UUID REFERENCES posts(id) ON DELETE CASCADE NOT NULL,
+  uid UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  username TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id, created_at);
+
+ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view comments" ON comments FOR SELECT USING (true);
+CREATE POLICY "Users create own comments" ON comments FOR INSERT WITH CHECK (auth.uid() = uid);
+CREATE POLICY "Users delete own comments" ON comments FOR DELETE USING (auth.uid() = uid);

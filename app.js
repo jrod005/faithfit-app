@@ -4169,11 +4169,23 @@ function finishActiveWorkout() {
     if (activeRestTimer) clearInterval(activeRestTimer);
     document.getElementById('active-workout').classList.add('hidden');
     document.getElementById('workout-hub-card').classList.remove('hidden');
+    const sharePrompt = saved > 0;
+    const sessionName = activeWorkout && activeWorkout.dayName;
     updateDashboard();
     updateTodaysExercises();
     renderTodaysWorkoutBanner();
     checkAchievements();
     showToast(`Saved ${saved} exercise${saved !== 1 ? 's' : ''}!`);
+
+    if (sharePrompt && typeof currentUser !== 'undefined' && currentUser) {
+        setTimeout(() => {
+            if (confirm('Share this workout to your feed?')) {
+                if (typeof openPostModalFromWorkout === 'function') {
+                    openPostModalFromWorkout(`Just finished ${sessionName || 'a session'}!`);
+                }
+            }
+        }, 400);
+    }
 }
 
 // ===== Routine Builder =====

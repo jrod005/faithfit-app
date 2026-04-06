@@ -591,6 +591,16 @@ async function loadFeed() {
                 <button class="post-like-btn ${liked ? 'liked' : ''}" onclick="sbToggleLike('${p.id}')">
                     ${liked ? '&#x2764;' : '&#x2661;'} ${likeCount > 0 ? likeCount : ''}
                 </button>
+                <button class="post-comment-btn" onclick="toggleComments('${p.id}')">
+                    &#x1F4AC; Comments
+                </button>
+            </div>
+            <div id="comments-wrap-${p.id}" class="comments-wrap hidden">
+                <div id="comments-${p.id}" class="comments-list"></div>
+                <div class="comment-input-row">
+                    <input type="text" id="comment-input-${p.id}" placeholder="Add a comment..." maxlength="280" onkeydown="if(event.key==='Enter')submitComment('${p.id}')">
+                    <button class="btn btn-primary btn-sm" onclick="submitComment('${p.id}')">Post</button>
+                </div>
             </div>
         </div>`;
     }).join('');
@@ -607,6 +617,76 @@ async function deletePost(postId) {
     await sb.from('posts').delete().eq('id', postId);
     loadFeed();
     showToast('Post deleted');
+}
+
+// ========== COMMENTS ==========
+
+async function loadComments(postId) {
+    const container = document.getElementById('comments-' + postId);
+    if (!container) return;
+    const { data: comments } = await sb.from('comments')
+        .select()
+        .eq('post_id', postId)
+        .order('created_at', { ascending: true });
+
+    if (!comments || comments.length === 0) {
+        container.innerHTML = '<p class="comments-empty">Be the first to comment</p>';
+        return;
+    }
+    container.innerHTML = comments.map(c => {
+        const isOwn = c.uid === currentUser.id;
+        return `<div class="comment-item">
+            <div class="comment-body">
+                <strong>@${escapeHtml(c.username)}</strong>
+                <span>${escapeHtml(c.text)}</span>
+            </div>
+            ${isOwn ? `<button class="comment-delete" onclick="deleteComment('${c.id}','${postId}')">&times;</button>` : ''}
+        </div>`;
+    }).join('');
+}
+
+async function toggleComments(postId) {
+    const wrap = document.getElementById('comments-wrap-' + postId);
+    if (!wrap) return;
+    const isHidden = wrap.classList.contains('hidden');
+    wrap.classList.toggle('hidden');
+    if (isHidden) loadComments(postId);
+}
+
+async function submitComment(postId) {
+    const input = document.getElementById('comment-input-' + postId);
+    const text = input.value.trim();
+    if (!text) return;
+    const { error } = await sb.from('comments').insert({
+        post_id: postId,
+        uid: currentUser.id,
+        username: userProfile.username,
+        display_name: userProfile.display_name,
+        text
+    });
+    if (error) return showToast(error.message);
+    input.value = '';
+    loadComments(postId);
+}
+
+async function deleteComment(commentId, postId) {
+    await sb.from('comments').delete().eq('id', commentId);
+    loadComments(postId);
+}
+
+// ========== SHARE FROM WORKOUT ==========
+
+function openPostModalFromWorkout(prefillCaption) {
+    if (!currentUser || !userProfile) {
+        // Switch to social tab so they can sign up
+        if (typeof switchTab === 'function') switchTab('social');
+        showToast('Sign in to share your workout');
+        return;
+    }
+    openPostModal();
+    if (prefillCaption) {
+        document.getElementById('post-caption').value = prefillCaption;
+    }
 }
 
 // ========== UI RENDERING ==========

@@ -2236,6 +2236,91 @@ canvas {
 }
 .post-like-btn.liked { color: #ef4444; border-color: rgba(239,68,68,0.3); }
 .post-like-btn:hover { border-color: var(--text-muted); }
+.post-comment-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: inherit;
+    margin-left: 8px;
+    transition: all var(--transition);
+}
+.post-comment-btn:hover { border-color: var(--text-muted); }
+
+.comments-wrap {
+    padding: 0 16px 14px;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+}
+.comments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 0;
+}
+.comment-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+}
+.comment-item .comment-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.comment-item .comment-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.comment-item .comment-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    word-break: break-word;
+}
+.comment-item .comment-del {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0 4px;
+}
+.comment-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.comment-input-row input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 8px 14px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 14px;
+}
+.comment-input-row button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 18px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+}
 
 .post-auto-stats {
     padding: 10px 14px;
