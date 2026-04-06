@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ironfaith-v16';
+const CACHE_NAME = 'ironfaith-v17';
 const ASSETS = [
     './',
     './index.html',
