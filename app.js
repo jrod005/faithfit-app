@@ -2425,7 +2425,6 @@ function updateRestTimerVisibility() {
 // =============================================
 
 let currentServings = 1;
-let selectedFood = null;
 
 function searchFood(query) {
     const results = document.getElementById('food-search-results');
