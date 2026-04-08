@@ -381,8 +381,10 @@ async function checkPendingRestore() {
             }
         );
         if (!resp.ok) {
-            console.error('Pending restore HTTP', resp.status);
-            if (typeof showToast === 'function') showToast('Restore failed: HTTP ' + resp.status);
+            const body = await resp.text().catch(() => '');
+            console.error('Pending restore HTTP', resp.status, body);
+            DB.set('pendingCloudRestore', false);
+            if (typeof showToast === 'function') showToast('Restore skipped (HTTP ' + resp.status + ')');
             return;
         }
         const rows = await resp.json();
@@ -407,6 +409,7 @@ async function checkPendingRestore() {
         }
     } catch (e) {
         console.error('checkPendingRestore failed:', e);
+        DB.set('pendingCloudRestore', false);
         if (typeof showToast === 'function') showToast('Restore error: ' + (e.message || 'unknown'));
     }
 }
