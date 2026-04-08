@@ -5,7 +5,16 @@
 const SUPABASE_URL = 'https://cmlmkgdkoqeafmpmbxhl.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtbG1rZ2Rrb3FlYWZtcG1ieGhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MjM5MDIsImV4cCI6MjA5MDk5OTkwMn0.8xnXFow6vyu1hCyIYZplfC2yzzdZ2dtxcFtTBZ8n3hQ';
 
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let sb = null;
+try {
+    if (window.supabase && typeof window.supabase.createClient === 'function') {
+        sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } else {
+        console.error('Supabase library failed to load');
+    }
+} catch (e) {
+    console.error('Supabase init failed:', e);
+}
 
 let currentUser = null;
 let userProfile = null;
@@ -84,7 +93,7 @@ async function socialSignOut() {
 }
 
 // Auth state listener
-sb.auth.onAuthStateChange(async (event, session) => {
+if (sb) sb.auth.onAuthStateChange(async (event, session) => {
     if (session?.user) {
         currentUser = session.user;
         const { data } = await sb.from('profiles').select().eq('id', currentUser.id).single();
@@ -99,6 +108,10 @@ sb.auth.onAuthStateChange(async (event, session) => {
 
 // Also check on load
 (async () => {
+    if (!sb) {
+        renderSocialTab();
+        return;
+    }
     try {
         const { data: { session } } = await sb.auth.getSession();
         if (session?.user) {
@@ -115,14 +128,22 @@ sb.auth.onAuthStateChange(async (event, session) => {
 })();
 
 // Also re-render whenever the user opens the Social tab (defensive)
-document.addEventListener('DOMContentLoaded', () => {
+function attachSocialTabHook() {
     const socialBtn = document.querySelector('.tab-btn[data-tab="social"]');
-    if (socialBtn) {
+    if (socialBtn && !socialBtn.dataset.socialHooked) {
+        socialBtn.dataset.socialHooked = '1';
         socialBtn.addEventListener('click', () => {
-            if (typeof renderSocialTab === 'function') renderSocialTab();
+            if (typeof renderSocialTab === 'function') {
+                try { renderSocialTab(); } catch (e) { console.error('renderSocialTab failed', e); }
+            }
         });
     }
-});
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attachSocialTabHook);
+} else {
+    attachSocialTabHook();
+}
 
 // ========== PROFILE ==========
 
