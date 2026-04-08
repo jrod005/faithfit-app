@@ -697,30 +697,41 @@
         <section id="coach" class="tab-content">
             <div class="coach-chat-header">
                 <div class="coach-avatar-sm" aria-label="Iron Faith mascot">
-                    <svg viewBox="0 0 64 64" width="38" height="38" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                        <!-- halo -->
-                        <ellipse cx="32" cy="7" rx="9" ry="2.2"/>
-                        <!-- head -->
-                        <circle cx="32" cy="16" r="5"/>
-                        <!-- wings -->
-                        <path d="M27 24 C19 22 14 27 12 33 C17 33 22 32 26 32 Z"/>
-                        <path d="M37 24 C45 22 50 27 52 33 C47 33 42 32 38 32 Z"/>
-                        <!-- arms raised -->
-                        <path d="M28 24 L24 12"/>
-                        <path d="M36 24 L40 12"/>
-                        <!-- barbell bar -->
-                        <line x1="14" y1="9" x2="50" y2="9"/>
-                        <!-- inner plates -->
-                        <rect x="19" y="6" width="3" height="6" rx="0.6"/>
-                        <rect x="42" y="6" width="3" height="6" rx="0.6"/>
-                        <!-- outer plates -->
-                        <rect x="11" y="3" width="5" height="12" rx="1"/>
-                        <rect x="48" y="3" width="5" height="12" rx="1"/>
-                        <!-- torso -->
-                        <path d="M28 24 L28 38 L36 38 L36 24"/>
-                        <!-- legs -->
-                        <path d="M30 38 L28 48"/>
-                        <path d="M34 38 L36 48"/>
+                    <svg viewBox="0 0 80 80" width="42" height="42" xmlns="http://www.w3.org/2000/svg">
+                        <g fill="currentColor">
+                            <!-- Halo ring (donut shape via even-odd fill) -->
+                            <path fill-rule="evenodd" d="M30 8 a10 3 0 1 1 20 0 a10 3 0 1 1 -20 0 z M33.5 8 a6.5 1.6 0 1 0 13 0 a6.5 1.6 0 1 0 -13 0 z"/>
+                            <!-- Head -->
+                            <circle cx="40" cy="19" r="5.5"/>
+                            <!-- Left wing: feathered leaf -->
+                            <path d="M34 30
+                                     C22 26 10 30 4 44
+                                     C10 42 16 42 22 44
+                                     C14 44 8 50 6 58
+                                     C14 52 22 50 28 52
+                                     C22 52 18 56 18 62
+                                     C26 56 32 53 35 50 Z"/>
+                            <!-- Right wing: mirror -->
+                            <path d="M46 30
+                                     C58 26 70 30 76 44
+                                     C70 42 64 42 58 44
+                                     C66 44 72 50 74 58
+                                     C66 52 58 50 52 52
+                                     C58 52 62 56 62 62
+                                     C54 56 48 53 45 50 Z"/>
+                            <!-- Robe / gown -->
+                            <path d="M33 28 L47 28 L53 62 L27 62 Z"/>
+                            <!-- Arms raised holding barbell -->
+                            <path d="M33 28 L28 12 L33 12 L38 28 Z"/>
+                            <path d="M47 28 L52 12 L57 12 L42 28 Z" transform="translate(-5 0)"/>
+                            <!-- Barbell bar -->
+                            <rect x="14" y="9" width="52" height="3" rx="1"/>
+                            <!-- Plates -->
+                            <rect x="10" y="3" width="5" height="15" rx="1"/>
+                            <rect x="65" y="3" width="5" height="15" rx="1"/>
+                            <rect x="17" y="5" width="3" height="11" rx="0.6"/>
+                            <rect x="60" y="5" width="3" height="11" rx="0.6"/>
+                        </g>
                     </svg>
                 </div>
                 <div class="coach-header-text">
