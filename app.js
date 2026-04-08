@@ -641,6 +641,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.add('active');
         document.getElementById(btn.dataset.tab).classList.add('active');
         updateRestTimerVisibility();
+        if (btn.dataset.tab === 'coach' && typeof initCoach === 'function') initCoach();
     });
 });
 

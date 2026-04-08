@@ -463,6 +463,14 @@ function generateWorkoutPlan(ctx) {
 
     const plan = plans[level]?.[goal] || plans.beginner.gain;
 
+    // Register plan as a saveable routine
+    try {
+        const routine = buildRoutineFromCoachPlan(plan, level, goal);
+        window._coachPlans = window._coachPlans || {};
+        window._coachPlans[routine.id] = routine;
+        window._lastCoachPlanId = routine.id;
+    } catch (e) { window._lastCoachPlanId = null; }
+
     let html = `<h3>Your Personalized Plan: ${plan.title}</h3>`;
     html += insightHtml(`Based on your ${ctx.workouts.length} logged workouts, I'm classifying you as <strong>${level}</strong> level with a <strong>${goal === 'lose' ? 'fat loss' : goal === 'gain' ? 'muscle building' : 'maintenance'}</strong> goal.`);
 
@@ -1969,10 +1977,67 @@ const TOPIC_RESPONSES = {
 
 // --- Chat Interface ---
 let coachInitialized = false;
+const COACH_HISTORY_KEY = 'coachHistory';
+const COACH_HISTORY_MAX = 80;
+window._coachPlans = window._coachPlans || {};
+
+function loadCoachHistoryEntries() {
+    return DB.get(COACH_HISTORY_KEY, []);
+}
+
+function saveCoachHistoryEntry(entry) {
+    const list = loadCoachHistoryEntries();
+    list.push(entry);
+    while (list.length > COACH_HISTORY_MAX) list.shift();
+    DB.set(COACH_HISTORY_KEY, list);
+}
+
+function clearCoachChat() {
+    confirmDialog('Clear all chat history with Coach?', { okText: 'Clear', danger: true }).then(ok => {
+        if (!ok) return;
+        DB.set(COACH_HISTORY_KEY, []);
+        window._coachPlans = {};
+        const container = document.getElementById('coach-messages');
+        if (container) container.innerHTML = '';
+        coachInitialized = false;
+        initCoach();
+        showToast('Chat cleared', 'success');
+    });
+}
+
+function formatCoachTime(ts) {
+    const d = new Date(ts);
+    const now = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    const opts = { hour: 'numeric', minute: '2-digit' };
+    if (sameDay) return d.toLocaleTimeString([], opts);
+    const dayDiff = Math.floor((now - d) / 86400000);
+    if (dayDiff < 7) return d.toLocaleDateString([], { weekday: 'short' }) + ' ' + d.toLocaleTimeString([], opts);
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
 
 function initCoach() {
     if (coachInitialized) return;
     coachInitialized = true;
+
+    const history = loadCoachHistoryEntries();
+    if (history.length > 0) {
+        // Rehydrate previous conversation
+        history.forEach(entry => {
+            if (entry.role === 'bot') {
+                renderBotMessage(entry.html, entry.time, false, entry.suggestions, entry.planId);
+                if (entry.planId && entry.planRoutine) {
+                    window._coachPlans[entry.planId] = entry.planRoutine;
+                }
+            } else if (entry.role === 'user') {
+                renderUserMessage(entry.text, entry.time, entry.photo);
+            }
+        });
+        const container = document.getElementById('coach-messages');
+        if (container) container.scrollTop = container.scrollHeight;
+        return;
+    }
+
     const ctx = getCoachContext();
     const name = ctx.profile.name ? escapeHtml(ctx.profile.name) : 'there';
     const hour = new Date().getHours();
@@ -1982,25 +2047,178 @@ function initCoach() {
     welcome += `<p>I analyze your workouts, nutrition, and weight data to give you personalized advice. Ask me anything or tap a quick action above!</p>`;
     welcome += verseHtml();
 
-    addBotMessage(welcome);
+    const starterChips = ['Generate a workout plan for me', 'How is my nutrition looking?', 'Analyze my progress'];
+    addBotMessage(welcome, { suggestions: starterChips });
 }
 
-function addBotMessage(html) {
+function renderBotMessage(html, time, animate, suggestions, planId) {
     const container = document.getElementById('coach-messages');
+    if (!container) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'coach-msg-wrap bot';
+
     const msg = document.createElement('div');
-    msg.className = 'coach-msg bot';
+    msg.className = 'coach-msg bot' + (animate ? ' streaming' : '');
     msg.innerHTML = html;
-    container.appendChild(msg);
+
+    // Inject "Save as routine" button when a plan is attached
+    if (planId && window._coachPlans[planId]) {
+        const saveBar = document.createElement('div');
+        saveBar.className = 'coach-plan-actions';
+        saveBar.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="saveCoachPlanToRoutines('${planId}')">&#x2B; Save as routine</button>`;
+        msg.appendChild(saveBar);
+    }
+
+    // Stagger-reveal children for streaming feel
+    if (animate) {
+        Array.from(msg.children).forEach((child, i) => {
+            child.style.animationDelay = (i * 90) + 'ms';
+            child.classList.add('stream-in');
+        });
+    }
+
+    wrap.appendChild(msg);
+
+    const meta = document.createElement('div');
+    meta.className = 'coach-msg-time';
+    meta.textContent = formatCoachTime(time);
+    wrap.appendChild(meta);
+
+    if (suggestions && suggestions.length) {
+        const chips = document.createElement('div');
+        chips.className = 'coach-suggestions';
+        suggestions.forEach(s => {
+            const b = document.createElement('button');
+            b.className = 'coach-chip';
+            b.textContent = s;
+            b.onclick = () => coachAsk(s);
+            chips.appendChild(b);
+        });
+        wrap.appendChild(chips);
+    }
+
+    container.appendChild(wrap);
     container.scrollTop = container.scrollHeight;
+}
+
+function renderUserMessage(text, time, photoData) {
+    const container = document.getElementById('coach-messages');
+    if (!container) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'coach-msg-wrap user';
+
+    const msg = document.createElement('div');
+    msg.className = 'coach-msg user';
+    if (photoData) {
+        const img = document.createElement('img');
+        img.className = 'chat-photo';
+        img.src = photoData;
+        img.onclick = function() { openLightbox(this.src); };
+        msg.appendChild(img);
+        if (text) {
+            const t = document.createElement('div');
+            t.textContent = text;
+            msg.appendChild(t);
+        }
+    } else {
+        msg.textContent = text;
+    }
+    wrap.appendChild(msg);
+
+    const meta = document.createElement('div');
+    meta.className = 'coach-msg-time';
+    meta.textContent = formatCoachTime(time);
+    wrap.appendChild(meta);
+
+    container.appendChild(wrap);
+    container.scrollTop = container.scrollHeight;
+}
+
+function addBotMessage(html, opts) {
+    opts = opts || {};
+    const time = Date.now();
+    const suggestions = opts.suggestions || null;
+    const planId = opts.planId || null;
+    renderBotMessage(html, time, true, suggestions, planId);
+    const entry = { role: 'bot', html, time, suggestions };
+    if (planId) {
+        entry.planId = planId;
+        entry.planRoutine = window._coachPlans[planId] || null;
+    }
+    saveCoachHistoryEntry(entry);
 }
 
 function addUserMessage(text) {
-    const container = document.getElementById('coach-messages');
-    const msg = document.createElement('div');
-    msg.className = 'coach-msg user';
-    msg.textContent = text;
-    container.appendChild(msg);
-    container.scrollTop = container.scrollHeight;
+    const time = Date.now();
+    renderUserMessage(text, time, null);
+    saveCoachHistoryEntry({ role: 'user', text, time });
+}
+
+// Pick 2-3 follow-up suggestions based on topic + context
+function suggestFollowUps(text, ctx) {
+    const lower = (text || '').toLowerCase();
+    if (/workout plan|routine|program|split/.test(lower)) {
+        return ['How long should I rest between sets?', 'Warm-up routine', 'How is my consistency?'];
+    }
+    if (/meal plan|what.*eat|food/.test(lower)) {
+        return ['How is my nutrition looking?', 'Pre/post workout meal', 'What is my protein target?'];
+    }
+    if (/progress|recap|how am i doing|analyze/.test(lower)) {
+        return ['Weak point analysis', 'What should I work on next?', 'How is my consistency?'];
+    }
+    if (/plateau|stuck|stall/.test(lower)) {
+        return ['Weak point analysis', 'How is my recovery?', 'Cardio guide'];
+    }
+    if (/1rm|max|estimated/.test(lower)) {
+        return ['Weak point analysis', 'How can I get stronger?', 'Generate a workout plan for me'];
+    }
+    if (/streak|consistency/.test(lower)) {
+        return ['What should I work on next?', 'Analyze my progress', 'Weekly recap'];
+    }
+    if (/warm.?up/.test(lower)) {
+        return ['Generate a workout plan for me', 'How can I improve mobility?', 'Cardio guide'];
+    }
+    if (/weak point|lagging/.test(lower)) {
+        return ['Generate a workout plan for me', 'How can I get stronger?', 'Analyze my progress'];
+    }
+    return ['Analyze my progress', 'Generate a workout plan for me', 'How is my nutrition looking?'];
+}
+
+// Convert a coach-generated plan into a saveable routine
+function saveCoachPlanToRoutines(planId) {
+    const routine = window._coachPlans && window._coachPlans[planId];
+    if (!routine) return showToast('Plan no longer available', 'warn');
+    const my = (typeof getMyRoutines === 'function') ? getMyRoutines() : DB.get('myRoutines', []);
+    if (my.some(r => r.id === routine.id)) return showToast('Already saved', 'info');
+    my.push(JSON.parse(JSON.stringify(routine)));
+    if (typeof setMyRoutines === 'function') setMyRoutines(my);
+    else DB.set('myRoutines', my);
+    showToast('Saved to My Routines', 'success');
+    if (typeof haptic === 'function') haptic(20);
+}
+
+// Build a routine object from the structured plan used by generateWorkoutPlan
+function buildRoutineFromCoachPlan(plan, level, goal) {
+    const id = 'coach_' + Date.now();
+    const days = plan.split.map(d => {
+        const exercises = d.exercises.map(ex => {
+            // sets like "3x8", "4x5", "3x10/leg", "3x30s"
+            const m = String(ex.sets).match(/^(\d+)\s*x\s*([\w\/-]+)/i);
+            const setCount = m ? parseInt(m[1], 10) : 3;
+            const repStr = m ? m[2] : '8-10';
+            return { name: ex.name, sets: setCount, reps: repStr, rest: 90, note: ex.note || '' };
+        });
+        return { name: d.day, dayType: (d.focus || '').toLowerCase().includes('lower') ? 'legs' : 'mixed', exercises };
+    });
+    return {
+        id,
+        name: plan.title,
+        type: 'Coach',
+        level: level || 'intermediate',
+        category: 'gym',
+        description: 'Auto-generated by your Iron Faith Coach.',
+        days,
+    };
 }
 
 function showTyping() {
@@ -2059,7 +2277,7 @@ function processCoachInput(text, photoData) {
         const ctx = getCoachContext();
         analyzePoseFromPhoto(photoData, ctx, text).then(response => {
             removeTyping();
-            addBotMessage(response);
+            addBotMessage(response, { suggestions: ['Weak point analysis', 'Generate a workout plan for me', 'Warm-up routine'] });
         }).catch(() => {
             removeTyping();
             addBotMessage(analyzePhoto(getCoachContext(), text));
@@ -2072,6 +2290,9 @@ function processCoachInput(text, photoData) {
         removeTyping();
         const ctx = getCoachContext();
         const lower = text.toLowerCase();
+
+        // Reset plan capture before handler runs
+        window._lastCoachPlanId = null;
 
         // Find matching topic
         let response = null;
@@ -2090,18 +2311,15 @@ function processCoachInput(text, photoData) {
             response = TOPIC_RESPONSES.fallback(ctx, text);
         }
 
-        addBotMessage(response);
+        const suggestions = suggestFollowUps(text, ctx);
+        const planId = window._lastCoachPlanId || null;
+        addBotMessage(response, { suggestions, planId });
+        window._lastCoachPlanId = null;
     }, 400 + Math.random() * 600);
 }
 
 function addUserMessageWithPhoto(text, photoData) {
-    const container = document.getElementById('coach-messages');
-    const msg = document.createElement('div');
-    msg.className = 'coach-msg user';
-    msg.innerHTML = `<img class="chat-photo" src="${photoData}" onclick="openLightbox('${photoData.substring(0, 50)}')">` +
-        (text ? `<div>${escapeHtml(text)}</div>` : '');
-    // Fix lightbox for inline photos
-    msg.querySelector('img').onclick = function() { openLightbox(this.src); };
-    container.appendChild(msg);
-    container.scrollTop = container.scrollHeight;
+    const time = Date.now();
+    renderUserMessage(text, time, photoData);
+    saveCoachHistoryEntry({ role: 'user', text, time, photo: photoData });
 }

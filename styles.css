@@ -611,6 +611,98 @@ input::placeholder {
     margin-bottom: 14px;
 }
 
+.coach-header-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.coach-clear-btn {
+    background: transparent;
+    border: 1px solid var(--border-light);
+    color: var(--text-muted);
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    font-size: 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all var(--transition);
+}
+.coach-clear-btn:hover {
+    color: #ff6b6b;
+    border-color: #ff6b6b;
+}
+.coach-clear-btn:active { transform: scale(0.94); }
+
+.coach-msg-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 100%;
+}
+.coach-msg-wrap.user { align-items: flex-end; align-self: flex-end; max-width: 90%; }
+.coach-msg-wrap.bot { align-items: flex-start; align-self: flex-start; max-width: 95%; }
+
+.coach-msg-time {
+    font-size: 10px;
+    color: var(--text-muted);
+    opacity: 0.7;
+    padding: 0 6px;
+    letter-spacing: 0.3px;
+}
+
+.coach-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+    padding: 0 4px;
+}
+.coach-chip {
+    padding: 7px 13px;
+    border: 1px solid var(--border-light);
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-family: inherit;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all var(--transition);
+    animation: chipIn 0.35s ease both;
+}
+.coach-chip:hover {
+    border-color: var(--accent, #fff);
+    color: var(--text);
+    background: var(--card-bg-elevated);
+}
+.coach-chip:active { transform: scale(0.95); }
+@keyframes chipIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.coach-plan-actions {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    gap: 8px;
+}
+.btn-sm {
+    padding: 7px 14px !important;
+    font-size: 12px !important;
+    border-radius: 10px !important;
+}
+
+.coach-msg.streaming > .stream-in {
+    opacity: 0;
+    animation: streamIn 0.5s ease forwards;
+}
+@keyframes streamIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 .coach-avatar-sm {
     font-size: 28px;
     width: 48px;
