@@ -1046,6 +1046,17 @@
         </div>
     </div>
 
+    <div id="workout-share-modal" class="share-modal hidden">
+        <div class="share-modal-content">
+            <button class="share-modal-close" onclick="closeWorkoutShareModal()">&times;</button>
+            <canvas id="workout-share-canvas" width="1080" height="1350" style="max-width:100%;height:auto;border-radius:var(--radius-md)"></canvas>
+            <div class="share-modal-actions">
+                <button class="btn btn-primary" onclick="shareWorkoutCard()">Share</button>
+                <button class="btn btn-secondary" onclick="downloadWorkoutCard()">Download</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="food-db.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>

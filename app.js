@@ -3651,6 +3651,262 @@ function downloadCard() {
 }
 
 // =============================================
+// WORKOUT SHARE CARD — Instagram-story format
+// =============================================
+
+let lastFinishedWorkout = null;
+
+function openWorkoutShareModal(data) {
+    if (data) lastFinishedWorkout = data;
+    if (!lastFinishedWorkout) return;
+    generateWorkoutShareCard(lastFinishedWorkout);
+    document.getElementById('workout-share-modal').classList.remove('hidden');
+}
+
+function closeWorkoutShareModal() {
+    document.getElementById('workout-share-modal').classList.add('hidden');
+}
+
+function shareWorkoutCard() {
+    const canvas = document.getElementById('workout-share-canvas');
+    canvas.toBlob(blob => {
+        if (navigator.share && navigator.canShare) {
+            const file = new File([blob], 'iron-faith-workout.png', { type: 'image/png' });
+            const shareData = { files: [file], title: 'My Iron Faith Workout' };
+            if (navigator.canShare(shareData)) {
+                navigator.share(shareData).catch(() => {});
+                return;
+            }
+        }
+        downloadWorkoutCard();
+    }, 'image/png');
+}
+
+function downloadWorkoutCard() {
+    const canvas = document.getElementById('workout-share-canvas');
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `iron-faith-workout-${today()}.png`;
+    a.click();
+    showToast('Workout card downloaded!');
+}
+
+function generateWorkoutShareCard(data) {
+    const canvas = document.getElementById('workout-share-canvas');
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+
+    // ── Background gradient (deep black → red) ─────────────
+    const bg = ctx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, '#0a0a0a');
+    bg.addColorStop(0.55, '#1a0505');
+    bg.addColorStop(1, '#2a0808');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+
+    // Subtle diagonal accent stripes (top-left)
+    ctx.save();
+    ctx.globalAlpha = 0.06;
+    ctx.fillStyle = '#dc2626';
+    for (let i = -200; i < w; i += 90) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i + 40, 0);
+        ctx.lineTo(i + 240, 200);
+        ctx.lineTo(i + 200, 200);
+        ctx.closePath();
+        ctx.fill();
+    }
+    ctx.restore();
+
+    // ── Top brand bar ──────────────────────────────────────
+    ctx.fillStyle = '#dc2626';
+    ctx.fillRect(0, 0, w, 8);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 42px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('IRON', 60, 90);
+    ctx.fillStyle = '#dc2626';
+    ctx.fillText('FAITH', 178, 90);
+
+    ctx.fillStyle = '#888';
+    ctx.font = '24px Inter, sans-serif';
+    ctx.textAlign = 'right';
+    const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    ctx.fillText(dateStr, w - 60, 90);
+
+    // ── Workout name (HUGE) ────────────────────────────────
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#fff';
+    const sessionName = (data.sessionName || 'Workout').toUpperCase();
+    let nameSize = 90;
+    ctx.font = `900 ${nameSize}px Inter, sans-serif`;
+    while (ctx.measureText(sessionName).width > w - 120 && nameSize > 50) {
+        nameSize -= 4;
+        ctx.font = `900 ${nameSize}px Inter, sans-serif`;
+    }
+    ctx.fillText(sessionName, 60, 220);
+
+    // Red underline
+    const nameW = ctx.measureText(sessionName).width;
+    ctx.fillStyle = '#dc2626';
+    ctx.fillRect(60, 240, Math.min(nameW, w - 120), 6);
+
+    ctx.fillStyle = '#888';
+    ctx.font = '26px Inter, sans-serif';
+    ctx.fillText('CRUSHED IT', 60, 290);
+
+    // ── Stats grid (2x2) ───────────────────────────────────
+    const mins = Math.max(1, Math.round((data.durationMs || 0) / 60000));
+    const volDisplay = parseFloat(lbsToDisplay(data.totalVolume || 0)).toLocaleString();
+    const stats = [
+        { label: 'DURATION', value: `${mins}`, unit: 'MIN' },
+        { label: 'VOLUME', value: volDisplay, unit: wu().toUpperCase() },
+        { label: 'EXERCISES', value: `${data.exerciseCount || 0}`, unit: '' },
+        { label: 'SETS', value: `${data.setCount || 0}`, unit: '' },
+    ];
+
+    const gridX = 60, gridY = 340;
+    const cellW = (w - 120 - 30) / 2;
+    const cellH = 170;
+    stats.forEach((s, i) => {
+        const cx = gridX + (i % 2) * (cellW + 30);
+        const cy = gridY + Math.floor(i / 2) * (cellH + 25);
+
+        // Card bg
+        ctx.fillStyle = 'rgba(255,255,255,0.04)';
+        roundRect(ctx, cx, cy, cellW, cellH, 18, true);
+
+        // Left red accent
+        ctx.fillStyle = '#dc2626';
+        roundRect(ctx, cx, cy, 6, cellH, 3, true);
+
+        ctx.fillStyle = '#888';
+        ctx.font = 'bold 22px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(s.label, cx + 30, cy + 45);
+
+        ctx.fillStyle = '#fff';
+        ctx.font = '900 72px Inter, sans-serif';
+        ctx.fillText(s.value, cx + 30, cy + 125);
+
+        if (s.unit) {
+            const valW = ctx.measureText(s.value).width;
+            ctx.fillStyle = '#dc2626';
+            ctx.font = 'bold 26px Inter, sans-serif';
+            ctx.fillText(s.unit, cx + 30 + valW + 12, cy + 125);
+        }
+    });
+
+    // ── Top Lift highlight ─────────────────────────────────
+    let yPos = gridY + 2 * cellH + 25 + 40;
+    if (data.topLift && data.topLift.name && data.topLift.weight > 0) {
+        ctx.fillStyle = 'rgba(220,38,38,0.12)';
+        roundRect(ctx, 60, yPos, w - 120, 130, 18, true);
+        ctx.strokeStyle = '#dc2626';
+        ctx.lineWidth = 2;
+        roundRect(ctx, 60, yPos, w - 120, 130, 18, false, true);
+
+        ctx.fillStyle = '#dc2626';
+        ctx.font = 'bold 22px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('★ TOP LIFT', 90, yPos + 40);
+
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 32px Inter, sans-serif';
+        const liftName = data.topLift.name.length > 28 ? data.topLift.name.slice(0, 26) + '…' : data.topLift.name;
+        ctx.fillText(liftName, 90, yPos + 80);
+
+        ctx.fillStyle = '#fff';
+        ctx.font = '900 48px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        const liftStr = `${lbsToDisplay(data.topLift.weight)}${wu()} × ${data.topLift.reps}`;
+        ctx.fillText(liftStr, w - 90, yPos + 95);
+        yPos += 160;
+    } else {
+        yPos += 20;
+    }
+
+    // ── Verse ──────────────────────────────────────────────
+    ctx.textAlign = 'center';
+    const verse = (typeof getDailyVerse === 'function') ? getDailyVerse() : null;
+    if (verse) {
+        ctx.fillStyle = '#444';
+        ctx.beginPath();
+        ctx.moveTo(120, yPos);
+        ctx.lineTo(w - 120, yPos);
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        yPos += 40;
+
+        const verseText = (typeof getTranslatedVerse === 'function')
+            ? getTranslatedVerse(verse.ref, verse.text) : verse.text;
+        ctx.fillStyle = '#bbb';
+        ctx.font = 'italic 26px Georgia, serif';
+        const words = verseText.split(' ');
+        let line = '';
+        const lines = [];
+        words.forEach(word => {
+            const test = line + word + ' ';
+            if (ctx.measureText(test).width > w - 200) {
+                lines.push(line.trim());
+                line = word + ' ';
+            } else {
+                line = test;
+            }
+        });
+        if (line.trim()) lines.push(line.trim());
+        const maxLines = 3;
+        const shown = lines.slice(0, maxLines);
+        if (lines.length > maxLines) shown[maxLines - 1] = shown[maxLines - 1].replace(/\.?$/, '…');
+        shown.forEach((l, i) => {
+            const txt = (i === 0 ? '"' : '') + l + (i === shown.length - 1 ? '"' : '');
+            ctx.fillText(txt, w / 2, yPos + i * 36);
+        });
+        yPos += shown.length * 36 + 18;
+
+        ctx.fillStyle = '#dc2626';
+        ctx.font = 'bold 22px Inter, sans-serif';
+        ctx.fillText(`— ${verse.ref}`, w / 2, yPos);
+    }
+
+    // ── Footer ─────────────────────────────────────────────
+    ctx.fillStyle = '#dc2626';
+    ctx.fillRect(0, h - 8, w, 8);
+
+    let handle = 'ironfa.it';
+    try {
+        if (typeof userProfile !== 'undefined' && userProfile && userProfile.username) {
+            handle = '@' + userProfile.username + '  ·  ironfa.it';
+        }
+    } catch (e) {}
+    ctx.fillStyle = '#666';
+    ctx.font = 'bold 24px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(handle, w / 2, h - 40);
+}
+
+// Small helper for rounded rects (used by share card)
+function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+    if (typeof r === 'number') r = { tl: r, tr: r, br: r, bl: r };
+    ctx.beginPath();
+    ctx.moveTo(x + r.tl, y);
+    ctx.lineTo(x + w - r.tr, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r.tr);
+    ctx.lineTo(x + w, y + h - r.br);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
+    ctx.lineTo(x + r.bl, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r.bl);
+    ctx.lineTo(x, y + r.tl);
+    ctx.quadraticCurveTo(x, y, x + r.tl, y);
+    ctx.closePath();
+    if (fill) ctx.fill();
+    if (stroke) ctx.stroke();
+}
+
+// =============================================
 // FEATURE: 30-Day Faith + Fitness Challenges
 // =============================================
 
@@ -5160,6 +5416,9 @@ async function finishActiveWorkout() {
     const sessionName = activeWorkout.dayName;
     const durationMs = activeWorkout.startedAt ? Date.now() - activeWorkout.startedAt : 0;
     let saved = 0;
+    let totalVolume = 0;
+    let setCount = 0;
+    let topLift = { name: '', weight: 0, reps: 0 };
     const workouts = DB.get('workouts', []);
     activeWorkout.exercises.forEach(ex => {
         const validSets = ex.logged
@@ -5170,6 +5429,11 @@ async function finishActiveWorkout() {
             weight: getCurrentUnits() === 'metric' ? s.weight * 2.20462 : s.weight,
             reps: s.reps
         }));
+        realWeights.forEach(s => {
+            totalVolume += s.weight * s.reps;
+            setCount++;
+            if (s.weight > topLift.weight) topLift = { name: ex.name, weight: s.weight, reps: s.reps };
+        });
         workouts.push({
             name: ex.name,
             sets: realWeights,
@@ -5180,6 +5444,17 @@ async function finishActiveWorkout() {
         saved++;
     });
     DB.set('workouts', workouts);
+
+    // Snapshot for the share card before we clear activeWorkout
+    lastFinishedWorkout = {
+        sessionName: sessionName || 'Workout',
+        durationMs,
+        exerciseCount: saved,
+        setCount,
+        totalVolume,
+        topLift
+    };
+
     activeWorkout = null;
     if (activeWorkoutTimer) clearInterval(activeWorkoutTimer);
     if (activeRestTimer) clearInterval(activeRestTimer);
@@ -5192,12 +5467,44 @@ async function finishActiveWorkout() {
     checkAchievements();
     showToast(`Saved ${saved} exercise${saved !== 1 ? 's' : ''}!`, 'success');
 
-    if (sharePrompt && typeof currentUser !== 'undefined' && currentUser) {
-        const share = await confirmDialog('Share this workout to your feed?', { okText: 'Share' });
-        if (share && typeof openPostModalFromWorkout === 'function') {
+    if (sharePrompt) {
+        const choice = await workoutShareChoiceDialog();
+        if (choice === 'card') {
+            openWorkoutShareModal(lastFinishedWorkout);
+        } else if (choice === 'feed' && typeof currentUser !== 'undefined' && currentUser && typeof openPostModalFromWorkout === 'function') {
             openPostModalFromWorkout(`Just finished ${sessionName || 'a session'}!`);
         }
     }
+}
+
+// Three-way prompt: Share Card / Post to Feed / Skip
+function workoutShareChoiceDialog() {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px';
+        const signedIn = (typeof currentUser !== 'undefined' && currentUser);
+        overlay.innerHTML = `
+            <div style="background:#1a1a1a;border:1px solid #333;border-radius:16px;padding:24px;max-width:380px;width:100%;text-align:center">
+                <div style="font-size:42px;margin-bottom:8px">🔥</div>
+                <h3 style="margin:0 0 8px;color:#fff;font-size:22px">Workout crushed!</h3>
+                <p style="margin:0 0 20px;color:#888;font-size:14px">Show off what you just did</p>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                    <button class="btn btn-primary" data-choice="card" style="width:100%">📸 Share Workout Card</button>
+                    ${signedIn ? '<button class="btn btn-secondary" data-choice="feed" style="width:100%">Post to Feed</button>' : ''}
+                    <button class="btn btn-tertiary" data-choice="skip" style="width:100%;background:transparent;color:#888">Skip</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', e => {
+            const choice = e.target.dataset.choice;
+            if (choice || e.target === overlay) {
+                document.body.removeChild(overlay);
+                resolve(choice || 'skip');
+            }
+        });
+    });
 }
 
 // ===== Routine Builder =====
