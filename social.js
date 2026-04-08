@@ -370,6 +370,30 @@ if (document.readyState === 'loading') {
     setTimeout(ironfaithSocialBootstrap, 0);
 }
 
+// Generic direct-REST SELECT. `path` is everything after /rest/v1/.
+// Example: directSelect('posts?uid=in.(uid1,uid2)&order=created_at.desc&limit=30')
+async function directSelect(path) {
+    try {
+        const sessInfo = await getAccessTokenSafely();
+        if (!sessInfo?.token) return null;
+        const resp = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: 'Bearer ' + sessInfo.token,
+            },
+            cache: 'no-store',
+        });
+        if (!resp.ok) {
+            console.error('directSelect HTTP', resp.status, path);
+            return null;
+        }
+        return await resp.json();
+    } catch (e) {
+        console.error('directSelect crashed:', path, e);
+        return null;
+    }
+}
+
 // Direct REST profile fetch — works when supabase-js is hung
 async function directFetchProfile(uid) {
     try {
@@ -1172,25 +1196,28 @@ async function loadFeed() {
     const container = document.getElementById('feed-posts');
     if (!container) return;
 
-    const friends = userProfile.friends || [];
-    const uids = [currentUser.id, ...friends];
+    container.innerHTML = '<p class="empty-state">Loading feed...</p>';
 
-    const { data: posts, error } = await sb.from('posts')
-        .select()
-        .in('uid', uids.slice(0, 30))
-        .order('created_at', { ascending: false })
-        .limit(30);
+    const friends = (userProfile && userProfile.friends) || [];
+    const uids = [currentUser.id, ...friends].slice(0, 30);
+    const uidsList = uids.map(u => '"' + u + '"').join(',');
 
-    if (error || !posts || posts.length === 0) {
+    // Direct REST — bypass the hung library
+    const posts = await directSelect(
+        'posts?uid=in.(' + encodeURIComponent(uidsList) + ')&order=created_at.desc&limit=30&select=*'
+    );
+
+    if (!posts || posts.length === 0) {
         container.innerHTML = '<p class="empty-state">No posts yet. Be the first — post a lift!</p>';
         return;
     }
 
-    // Batch-fetch profile pics for post authors
+    // Batch-fetch profile pics for post authors via direct REST
     const uniqueUids = [...new Set(posts.map(p => p.uid))];
-    const { data: authorProfiles } = await sb.from('profiles')
-        .select('id, profile_pic')
-        .in('id', uniqueUids);
+    const uniqList = uniqueUids.map(u => '"' + u + '"').join(',');
+    const authorProfiles = await directSelect(
+        'profiles?id=in.(' + encodeURIComponent(uniqList) + ')&select=id,profile_pic'
+    );
     const avatarMap = {};
     if (authorProfiles) authorProfiles.forEach(a => { avatarMap[a.id] = a.profile_pic; });
 
@@ -1404,12 +1431,11 @@ async function renderFriendsView() {
     const container = document.getElementById('social-friends');
     if (!container) return;
 
-    // Pending requests to me
-    const { data: requests } = await sb.from('friend_requests')
-        .select()
-        .eq('to_uid', currentUser.id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+    // Pending requests to me — direct REST
+    const requests = await directSelect(
+        'friend_requests?to_uid=eq.' + encodeURIComponent(currentUser.id) +
+        '&status=eq.pending&order=created_at.desc&select=*'
+    );
 
     let html = '';
 
@@ -1457,9 +1483,11 @@ async function renderFriendsView() {
     if (friends.length === 0) {
         html += '<p class="empty-state">No friends yet. Search for users above!</p>';
     } else {
-        const { data: friendProfiles } = await sb.from('profiles')
-            .select('id, username, display_name, stats, profile_pic')
-            .in('id', friends);
+        const friendsList = friends.map(u => '"' + u + '"').join(',');
+        const friendProfiles = await directSelect(
+            'profiles?id=in.(' + encodeURIComponent(friendsList) +
+            ')&select=id,username,display_name,stats,profile_pic'
+        );
 
         if (friendProfiles) {
             friendProfiles.forEach(f => {
