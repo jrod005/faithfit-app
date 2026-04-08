@@ -99,15 +99,30 @@ sb.auth.onAuthStateChange(async (event, session) => {
 
 // Also check on load
 (async () => {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session?.user) {
-        currentUser = session.user;
-        const { data } = await sb.from('profiles').select().eq('id', currentUser.id).single();
-        userProfile = data;
-        if (userProfile) syncStatsToSupabase();
-        renderSocialTab();
+    try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session?.user) {
+            currentUser = session.user;
+            const { data } = await sb.from('profiles').select().eq('id', currentUser.id).single();
+            userProfile = data;
+            if (userProfile) syncStatsToSupabase();
+        }
+    } catch (e) {
+        console.error('Initial auth check failed', e);
     }
+    // Always render — shows auth UI when signed out, main UI when signed in
+    renderSocialTab();
 })();
+
+// Also re-render whenever the user opens the Social tab (defensive)
+document.addEventListener('DOMContentLoaded', () => {
+    const socialBtn = document.querySelector('.tab-btn[data-tab="social"]');
+    if (socialBtn) {
+        socialBtn.addEventListener('click', () => {
+            if (typeof renderSocialTab === 'function') renderSocialTab();
+        });
+    }
+});
 
 // ========== PROFILE ==========
 
