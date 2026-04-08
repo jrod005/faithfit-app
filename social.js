@@ -375,7 +375,10 @@ if (document.readyState === 'loading') {
 async function directSelect(path) {
     try {
         const sessInfo = await getAccessTokenSafely();
-        if (!sessInfo?.token) return null;
+        if (!sessInfo?.token) {
+            if (typeof showToast === 'function') showToast('No auth token for ' + path.split('?')[0]);
+            return null;
+        }
         const resp = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
             headers: {
                 apikey: SUPABASE_ANON_KEY,
@@ -384,12 +387,15 @@ async function directSelect(path) {
             cache: 'no-store',
         });
         if (!resp.ok) {
-            console.error('directSelect HTTP', resp.status, path);
+            const body = await resp.text().catch(() => '');
+            console.error('directSelect HTTP', resp.status, path, body);
+            if (typeof showToast === 'function') showToast('REST ' + resp.status + ' on ' + path.split('?')[0]);
             return null;
         }
         return await resp.json();
     } catch (e) {
         console.error('directSelect crashed:', path, e);
+        if (typeof showToast === 'function') showToast('REST crashed: ' + (e.message || 'unknown'));
         return null;
     }
 }
@@ -1200,23 +1206,26 @@ async function loadFeed() {
 
     const friends = (userProfile && userProfile.friends) || [];
     const uids = [currentUser.id, ...friends].slice(0, 30);
-    const uidsList = uids.map(u => '"' + u + '"').join(',');
+    // PostgREST in.() takes raw UUIDs without quotes for uuid columns
+    const uidsList = uids.join(',');
 
-    // Direct REST — bypass the hung library
     const posts = await directSelect(
-        'posts?uid=in.(' + encodeURIComponent(uidsList) + ')&order=created_at.desc&limit=30&select=*'
+        'posts?uid=in.(' + uidsList + ')&order=created_at.desc&limit=30&select=*'
     );
 
-    if (!posts || posts.length === 0) {
+    if (posts === null) {
+        container.innerHTML = '<p class="empty-state">Couldn\'t load feed (network or auth). Pull to retry.</p>';
+        return;
+    }
+    if (posts.length === 0) {
         container.innerHTML = '<p class="empty-state">No posts yet. Be the first — post a lift!</p>';
         return;
     }
 
     // Batch-fetch profile pics for post authors via direct REST
     const uniqueUids = [...new Set(posts.map(p => p.uid))];
-    const uniqList = uniqueUids.map(u => '"' + u + '"').join(',');
     const authorProfiles = await directSelect(
-        'profiles?id=in.(' + encodeURIComponent(uniqList) + ')&select=id,profile_pic'
+        'profiles?id=in.(' + uniqueUids.join(',') + ')&select=id,profile_pic'
     );
     const avatarMap = {};
     if (authorProfiles) authorProfiles.forEach(a => { avatarMap[a.id] = a.profile_pic; });
@@ -1483,9 +1492,8 @@ async function renderFriendsView() {
     if (friends.length === 0) {
         html += '<p class="empty-state">No friends yet. Search for users above!</p>';
     } else {
-        const friendsList = friends.map(u => '"' + u + '"').join(',');
         const friendProfiles = await directSelect(
-            'profiles?id=in.(' + encodeURIComponent(friendsList) +
+            'profiles?id=in.(' + friends.join(',') +
             ')&select=id,username,display_name,stats,profile_pic'
         );
 
