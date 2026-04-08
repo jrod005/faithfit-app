@@ -2,6 +2,40 @@
 // Iron Faith - Fitness & Faith Tracker
 // =============================================
 
+// --- Global Error Boundary ---
+window.addEventListener('error', (event) => {
+    console.error('Caught error:', event.error || event.message);
+    showErrorBanner(event.error?.message || event.message || 'Unknown error');
+});
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+    showErrorBanner(event.reason?.message || String(event.reason) || 'Async error');
+});
+
+function showErrorBanner(msg) {
+    let banner = document.getElementById('global-error-banner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'global-error-banner';
+        banner.className = 'global-error-banner';
+        banner.innerHTML = `
+            <div class="global-error-icon">&#x26A0;</div>
+            <div class="global-error-body">
+                <strong>Something went wrong</strong>
+                <span class="global-error-msg"></span>
+            </div>
+            <button class="global-error-close" onclick="document.getElementById('global-error-banner').remove()">&times;</button>
+        `;
+        document.body.appendChild(banner);
+    }
+    const msgEl = banner.querySelector('.global-error-msg');
+    if (msgEl) msgEl.textContent = String(msg).slice(0, 200);
+    setTimeout(() => {
+        const b = document.getElementById('global-error-banner');
+        if (b) b.remove();
+    }, 8000);
+}
+
 // --- Data Layer ---
 const SYNCED_KEYS = new Set([
     'profile', 'workouts', 'meals', 'weights', 'myRoutines', 'customExercises',

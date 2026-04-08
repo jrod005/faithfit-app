@@ -2,1049 +2,116 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
-    <title>Iron Faith - Fitness & Faith Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Iron Faith &mdash; Strengthen Body &amp; Spirit</title>
+    <meta name="description" content="Iron Faith is a fitness and faith tracking app. Log workouts, plan meals, track progress, and grow spiritually. Free, private, and works offline.">
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1a1a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Iron Faith">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+    <!-- Open Graph / Social sharing -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Iron Faith &mdash; Strengthen Body &amp; Spirit">
+    <meta property="og:description" content="Fitness + faith in one app. Workouts, nutrition, prayer journal, AI coach. Free, private, works offline.">
+    <meta property="og:image" content="icons/icon-512.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Iron Faith">
+    <meta name="twitter:description" content="Fitness + faith in one app. Workouts, nutrition, prayer journal, AI coach.">
+    <meta name="twitter:image" content="icons/icon-512.png">
+
+    <script>
+        // Auto-redirect installed PWAs straight to the app
+        if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+            window.location.replace('./app.html');
+        }
+    </script>
 </head>
-<body>
-    <!-- Onboarding Overlay -->
-    <div id="onboarding" class="onboarding-overlay hidden">
-        <div class="onboarding-content">
-            <div class="onboarding-steps">
-                <span class="step-dot active"></span>
-                <span class="step-dot"></span>
-                <span class="step-dot"></span>
-                <span class="step-dot"></span>
-                <span class="step-dot"></span>
-                <span class="step-dot"></span>
+<body class="landing-body">
+    <div class="landing-wrap">
+        <header class="landing-header">
+            <div class="landing-brand">
+                <span class="landing-mark">&#x2694;</span>
+                <span class="landing-name">Iron Faith</span>
             </div>
-            <div class="onboarding-slide active" data-step="1">
-                <div class="onboarding-icon">&#x2694;</div>
-                <h1>Iron Faith</h1>
-                <p class="onboarding-tagline">Forge your body. Strengthen your spirit.</p>
-                <p class="onboarding-verse">"I can do all things through Christ who strengthens me." &mdash; Philippians 4:13</p>
-                <button class="btn btn-primary btn-full" onclick="nextOnboardingStep()">Get Started</button>
-            </div>
-            <div class="onboarding-slide" data-step="2">
-                <h2>About You</h2>
-                <p class="onboarding-sub">Let's personalize your experience</p>
-                <div class="form-group"><label>Your Name</label><input type="text" id="ob-name" placeholder="Enter your name"></div>
-                <div class="form-group"><label>Gender</label><div class="unit-toggle"><button class="unit-btn active" id="ob-male" onclick="obSetGender('male')">Male</button><button class="unit-btn" id="ob-female" onclick="obSetGender('female')">Female</button></div></div>
-                <div class="form-row"><div class="form-group"><label>Age</label><input type="number" id="ob-age" placeholder="Age"></div><div class="form-group"><label>Weight (lbs)</label><input type="number" id="ob-weight" placeholder="lbs" step="0.1"></div></div>
-                <div class="form-group"><label>Height</label><div class="form-row"><input type="number" id="ob-feet" placeholder="Feet" min="3" max="8"><input type="number" id="ob-inches" placeholder="Inches" min="0" max="11"></div></div>
-                <button class="btn btn-primary btn-full" onclick="nextOnboardingStep()">Continue</button>
-            </div>
-            <div class="onboarding-slide" data-step="3">
-                <h2>Your Goals</h2>
-                <p class="onboarding-sub">What are you training for?</p>
-                <div class="form-group"><label>Fitness Goal</label><select id="ob-goal"><option value="lose">Lose Weight</option><option value="maintain">Maintain Weight</option><option value="gain">Build Muscle / Gain Weight</option></select></div>
-                <div class="form-group"><label>Activity Level</label><select id="ob-activity"><option value="sedentary">Sedentary (little exercise)</option><option value="light">Lightly Active (1-3 days/week)</option><option value="moderate">Moderately Active (3-5 days/week)</option><option value="active">Very Active (6-7 days/week)</option></select></div>
-                <button class="btn btn-primary btn-full" onclick="nextOnboardingStep()">Continue</button>
-            </div>
-            <div class="onboarding-slide" data-step="4">
-                <h2>Your Training</h2>
-                <p class="onboarding-sub">Pick what fits you best</p>
-                <div class="form-group">
-                    <label>Experience Level</label>
-                    <div class="ob-choice-grid">
-                        <button class="ob-choice" data-ob="experience" data-val="beginner" onclick="obSelectChoice('experience','beginner')">
-                            <strong>Beginner</strong>
-                            <span>New to lifting or under 1 year</span>
-                        </button>
-                        <button class="ob-choice" data-ob="experience" data-val="intermediate" onclick="obSelectChoice('experience','intermediate')">
-                            <strong>Intermediate</strong>
-                            <span>1-3 years consistent training</span>
-                        </button>
-                        <button class="ob-choice" data-ob="experience" data-val="advanced" onclick="obSelectChoice('experience','advanced')">
-                            <strong>Advanced</strong>
-                            <span>3+ years, know your numbers</span>
-                        </button>
-                    </div>
-                </div>
-                <button class="btn btn-primary btn-full" onclick="nextOnboardingStep()">Continue</button>
-            </div>
-            <div class="onboarding-slide" data-step="5">
-                <h2>Where Do You Train?</h2>
-                <p class="onboarding-sub">We'll match a routine to your equipment</p>
-                <div class="ob-choice-grid">
-                    <button class="ob-choice" data-ob="equipment" data-val="gym" onclick="obSelectChoice('equipment','gym')">
-                        <strong>Full Gym</strong>
-                        <span>Barbells, machines, cables</span>
-                    </button>
-                    <button class="ob-choice" data-ob="equipment" data-val="dumbbell" onclick="obSelectChoice('equipment','dumbbell')">
-                        <strong>Dumbbells Only</strong>
-                        <span>Home gym essentials</span>
-                    </button>
-                    <button class="ob-choice" data-ob="equipment" data-val="bodyweight" onclick="obSelectChoice('equipment','bodyweight')">
-                        <strong>Bodyweight</strong>
-                        <span>No equipment needed</span>
-                    </button>
-                    <button class="ob-choice" data-ob="equipment" data-val="band" onclick="obSelectChoice('equipment','band')">
-                        <strong>Resistance Bands</strong>
-                        <span>Travel friendly</span>
-                    </button>
-                </div>
-                <button class="btn btn-primary btn-full" onclick="nextOnboardingStep()">Continue</button>
-            </div>
-            <div class="onboarding-slide" data-step="6">
-                <div class="onboarding-icon">&#x1F4AA;</div>
-                <h2>You're All Set!</h2>
-                <div id="ob-summary" class="ob-summary"></div>
-                <div id="ob-routine-suggestion" class="ob-routine-suggestion"></div>
-                <p class="onboarding-verse">"For physical training is of some value, but godliness has value for all things." &mdash; 1 Timothy 4:8</p>
-                <button class="btn btn-primary btn-full" onclick="completeOnboarding()">Start Training</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="app">
-        <!-- Daily Verse Banner -->
-        <div id="verse-banner" class="verse-banner">
-            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">&#x263C;</button>
-            <div class="verse-top-row">
-                <span class="verse-icon">&#x2727;</span>
-                <select id="bible-version" class="bible-select" onchange="setBibleVersion(this.value)">
-                    <option value="NIV">NIV</option>
-                    <option value="KJV">KJV</option>
-                    <option value="ESV">ESV</option>
-                    <option value="NKJV">NKJV</option>
-                    <option value="NLT">NLT</option>
-                    <option value="NASB">NASB</option>
-                </select>
-            </div>
-            <p id="daily-verse" class="verse-text"></p>
-            <p id="verse-ref" class="verse-ref"></p>
-        </div>
-
-        <!-- Header -->
-        <header class="app-header">
-            <h1>Iron Faith</h1>
-            <p class="tagline">Forge your body. Strengthen your spirit.</p>
-            <div class="header-actions">
-                <a href="basic.html" class="btn btn-sm btn-secondary" style="text-decoration:none;font-size:11px;padding:6px 14px;">Switch to Basic</a>
-                <button class="btn btn-sm btn-primary" id="install-btn" onclick="installApp()" style="display:none" title="Install Iron Faith">&#x2B07; Install</button>
-            </div>
+            <a href="./app.html" class="landing-nav-cta">Open App &rarr;</a>
         </header>
 
-        <!-- Tab Navigation -->
-        <nav class="tab-nav">
-            <button class="tab-btn active" data-tab="dashboard">
-                <span class="tab-icon">&#x25A3;</span>
-                <span>Dashboard</span>
-            </button>
-            <button class="tab-btn" data-tab="workout">
-                <span class="tab-icon">&#x2693;</span>
-                <span>Workout</span>
-            </button>
-            <button class="tab-btn" data-tab="calories">
-                <span class="tab-icon">&#x2615;</span>
-                <span>Nutrition</span>
-            </button>
-            <button class="tab-btn" data-tab="coach">
-                <span class="tab-icon">&#x2605;</span>
-                <span>Coach</span>
-            </button>
-            <button class="tab-btn" data-tab="social">
-                <span class="tab-icon">&#x2661;</span>
-                <span>Social</span>
-            </button>
-            <button class="tab-btn" data-tab="profile">
-                <span class="tab-icon">&#x263A;</span>
-                <span>Profile</span>
-            </button>
-        </nav>
-
-        <!-- Dashboard Tab -->
-        <section id="dashboard" class="tab-content active">
-            <div class="stats-grid">
-                <div class="stat-card primary">
-                    <h3>Today's Workouts</h3>
-                    <p class="stat-number" id="today-workouts">0</p>
-                </div>
-                <div class="stat-card success">
-                    <h3>Calories Today</h3>
-                    <p class="stat-number" id="today-calories">0</p>
-                    <p class="stat-sub" id="calorie-goal-text">Goal: --</p>
-                </div>
-                <div class="stat-card accent">
-                    <h3>Current Streak</h3>
-                    <p class="stat-number" id="streak-count">0 days</p>
-                </div>
-                <div class="stat-card warning">
-                    <h3>Body Weight</h3>
-                    <p class="stat-number" id="current-weight">-- lbs</p>
-                </div>
+        <section class="landing-hero">
+            <div class="landing-eyebrow">FITNESS &middot; FAITH &middot; FREE</div>
+            <h1>Strengthen your body.<br>Strengthen your spirit.</h1>
+            <p class="landing-sub">A fitness tracker and prayer journal in one. Log workouts, plan meals, talk to your AI coach, and grow spiritually &mdash; all in a single app that works offline.</p>
+            <div class="landing-cta-row">
+                <a href="./app.html" class="landing-btn-primary">Launch the app</a>
+                <a href="#install" class="landing-btn-secondary">Install on iPhone</a>
             </div>
-
-            <div id="discovery-hint" class="discovery-hint hidden"></div>
-
-            <div class="card prayer-journal-card">
-                <div class="prayer-journal-header">
-                    <h2>&#x270D; Prayer &amp; Gratitude</h2>
-                    <button class="btn btn-sm btn-secondary" onclick="togglePrayerHistory()" id="prayer-history-toggle">History</button>
-                </div>
-                <textarea id="prayer-journal-input" placeholder="What are you thankful for today? What are you praying for?" rows="3"></textarea>
-                <button class="btn btn-primary btn-full" onclick="savePrayerEntry()">Save Entry</button>
-                <div id="prayer-journal-history" class="prayer-journal-history hidden"></div>
-            </div>
-
-            <div class="card weekly-report-card" id="weekly-report" style="display:none;">
-                <div class="report-header">
-                    <h2>&#x1F4CA; Weekly Report Card</h2>
-                    <span class="report-week" id="report-week"></span>
-                </div>
-                <div class="report-stats-grid" id="report-stats-grid"></div>
-                <div class="report-verse" id="report-verse"></div>
-            </div>
-
-            <div class="card">
-                <h2>Weight Progress</h2>
-                <canvas id="weight-chart" height="200"></canvas>
-                <div class="weight-input-row">
-                    <input type="number" id="weight-input" placeholder="Enter weight (lbs)" step="0.1">
-                    <button class="btn btn-primary" onclick="logWeight()">Log Weight</button>
-                </div>
-            </div>
-
-            <div class="card">
-                <h2>Weekly Volume (Last 12 Weeks)</h2>
-                <canvas id="volume-chart" height="200"></canvas>
-                <p class="chart-caption" id="volume-caption"></p>
-            </div>
-
-            <div class="card">
-                <h2>Activity (Last 90 Days)</h2>
-                <div id="calendar-heatmap"></div>
-            </div>
-
-            <div class="card">
-                <h2>Muscle Balance (This Week)</h2>
-                <div id="muscle-heatmap"></div>
-            </div>
-
-            <div class="card">
-                <h2>Achievements</h2>
-                <div id="achievements-grid" class="achievements-grid"></div>
-            </div>
-
-            <div class="card">
-                <h2>Faith &amp; Fitness Challenges</h2>
-                <div id="challenges-container"></div>
-            </div>
-
-            <div class="card strength-progress-compact">
-                <div class="strength-compact-header">
-                    <h3>Strength Progress</h3>
-                    <select id="strength-exercise-select"></select>
-                </div>
-                <canvas id="strength-chart" height="120"></canvas>
-                <div id="strength-pr-summary" class="strength-pr-summary"></div>
-            </div>
-
-            <div class="card">
-                <h2>Recent Workouts</h2>
-                <div id="recent-workouts" class="recent-list">
-                    <div class="empty-state-card">
-                        <div class="empty-state-icon">&#x1F4AA;</div>
-                        <p class="empty-state-title">No workouts yet</p>
-                        <p class="empty-state-sub">Log your first lift to see it here and start tracking PRs.</p>
-                    </div>
-                </div>
-            </div>
-
-            <button class="btn btn-primary btn-full share-progress-btn" onclick="shareProgress()">&#x1F4E4; Share My Progress</button>
+            <p class="landing-verse">&ldquo;I can do all things through Christ who strengthens me.&rdquo; &mdash; Philippians 4:13</p>
         </section>
 
-        <!-- Workout Tab -->
-        <section id="workout" class="tab-content">
-            <!-- Workout Hub -->
-            <div class="card workout-hub" id="workout-hub-card">
-                <div id="todays-workout-banner"></div>
-                <div class="hub-grid">
-                    <button class="hub-btn" onclick="showHubView('routines')">
-                        <span class="hub-icon">&#x1F4D6;</span>
-                        <span class="hub-label">My Routines</span>
-                    </button>
-                    <button class="hub-btn" onclick="showHubView('explore')">
-                        <span class="hub-icon">&#x1F50D;</span>
-                        <span class="hub-label">Explore</span>
-                    </button>
-                    <button class="hub-btn" onclick="showHubView('builder')">
-                        <span class="hub-icon">&#x270F;</span>
-                        <span class="hub-label">Build Routine</span>
-                    </button>
-                    <button class="hub-btn hub-btn-empty" onclick="showHubView('empty')">
-                        <span class="hub-icon">&#x1F4AA;</span>
-                        <span class="hub-label">Empty Workout</span>
-                    </button>
-                </div>
+        <section class="landing-features">
+            <div class="landing-feature">
+                <div class="landing-feature-icon">&#x1F4AA;</div>
+                <h3>Workout Tracking</h3>
+                <p>Pre-built routines (PPL, Upper/Lower, Full Body), custom plans, set/rep logging, PRs, plate calc, rest timer, weak-point analysis.</p>
             </div>
-
-            <!-- Hub: My Routines -->
-            <div id="hub-routines" class="hub-view hidden">
-                <div class="card">
-                    <div class="hub-view-header">
-                        <h2>My Routines</h2>
-                        <button class="btn btn-secondary btn-sm" onclick="hideHubView()">Back</button>
-                    </div>
-                    <div id="my-routines-list"></div>
-                </div>
+            <div class="landing-feature">
+                <div class="landing-feature-icon">&#x270D;</div>
+                <h3>Faith Journal</h3>
+                <p>Daily verse with multiple Bible translations, prayer &amp; gratitude journal, scripture-rooted encouragement throughout the app.</p>
             </div>
-
-            <!-- Hub: Explore -->
-            <div id="hub-explore" class="hub-view hidden">
-                <div class="card">
-                    <div class="hub-view-header">
-                        <h2>Explore Routines</h2>
-                        <button class="btn btn-secondary btn-sm" onclick="hideHubView()">Back</button>
-                    </div>
-                    <div class="explore-filters">
-                        <select id="filter-category" onchange="renderExplore()">
-                            <option value="">All Categories</option>
-                        </select>
-                        <select id="filter-level" onchange="renderExplore()">
-                            <option value="">All Levels</option>
-                            <option value="beginner">Beginner</option>
-                            <option value="intermediate">Intermediate</option>
-                            <option value="advanced">Advanced</option>
-                        </select>
-                    </div>
-                    <div id="explore-routines-list"></div>
-                </div>
+            <div class="landing-feature">
+                <div class="landing-feature-icon">&#x2605;</div>
+                <h3>AI Coach</h3>
+                <p>Personalized workout plans, meal plans, progress analysis, form check via photo, weekly reports &mdash; powered by your own data.</p>
             </div>
-
-            <!-- Hub: Routine Detail -->
-            <div id="hub-routine-detail" class="hub-view hidden">
-                <div class="card">
-                    <div class="hub-view-header">
-                        <h2 id="routine-detail-title">Routine</h2>
-                        <button class="btn btn-secondary btn-sm" onclick="backToRoutineList()">Back</button>
-                    </div>
-                    <p id="routine-detail-desc" class="routine-detail-desc"></p>
-                    <div id="routine-detail-days"></div>
-                    <button class="btn btn-secondary btn-full" id="save-routine-btn" style="margin-top:12px;display:none" onclick="saveRoutineToMine()">+ Save to My Routines</button>
-                </div>
+            <div class="landing-feature">
+                <div class="landing-feature-icon">&#x1F37D;</div>
+                <h3>Nutrition</h3>
+                <p>Searchable food database, barcode-friendly meal logging, calorie + protein tracking aligned to your goal.</p>
             </div>
-
-            <!-- Hub: Builder -->
-            <div id="hub-builder" class="hub-view hidden">
-                <div class="card">
-                    <div class="hub-view-header">
-                        <h2>Build Your Own Routine</h2>
-                        <button class="btn btn-secondary btn-sm" onclick="hideHubView()">Back</button>
-                    </div>
-                    <div class="form-group">
-                        <label>Routine Name</label>
-                        <input type="text" id="builder-name" placeholder="My Custom Routine">
-                    </div>
-                    <div id="builder-days"></div>
-                    <button class="btn btn-secondary btn-full" onclick="builderAddDay()" style="margin-top:8px">+ Add Day</button>
-                    <button class="btn btn-primary btn-full" onclick="saveBuiltRoutine()" style="margin-top:8px">Save Routine</button>
-                </div>
+            <div class="landing-feature">
+                <div class="landing-feature-icon">&#x1F4C8;</div>
+                <h3>Real Progress</h3>
+                <p>Strength charts, body weight trends, calendar heatmap, muscle balance, weekly report cards, achievements.</p>
             </div>
-
-            <!-- Active Workout Session -->
-            <div id="active-workout" class="card hidden">
-                <div class="active-workout-header">
-                    <div>
-                        <h2 id="active-workout-title">Workout</h2>
-                        <span class="active-workout-time" id="active-workout-time">0:00</span>
-                    </div>
-                    <button class="btn btn-secondary btn-sm" onclick="endActiveWorkout()">End</button>
-                </div>
-                <div id="active-rest-timer" class="rest-timer hidden">
-                    <span id="rest-timer-text">Rest: 0:00</span>
-                    <button class="btn btn-secondary btn-sm" onclick="skipRest()">Skip</button>
-                </div>
-                <div id="active-exercises"></div>
-                <button class="btn btn-primary btn-full" onclick="finishActiveWorkout()" style="margin-top:14px">Finish Workout</button>
-            </div>
-
-            <!-- Template Session (legacy, hidden) -->
-            <div id="template-session" class="card hidden">
-                <div class="template-session-header">
-                    <h2 id="template-session-title">Routine Session</h2>
-                    <button class="btn btn-secondary btn-sm" onclick="cancelTemplateSession()">Cancel</button>
-                </div>
-                <div id="template-exercises"></div>
-                <button class="btn btn-primary btn-full" onclick="finishTemplateSession()" style="margin-top:14px">Finish Workout</button>
-            </div>
-
-            <div class="card" id="log-workout-card">
-                <h2>Log Workout</h2>
-                <div class="form-group">
-                    <label>Exercise Name</label>
-                    <input type="text" id="exercise-name" placeholder="e.g., Bench Press" list="exercise-suggestions">
-                    <datalist id="exercise-suggestions">
-                        <!-- Chest -->
-                        <option value="Bench Press">
-                        <option value="Incline Bench Press">
-                        <option value="Decline Bench Press">
-                        <option value="Dumbbell Bench Press">
-                        <option value="Incline Dumbbell Press">
-                        <option value="Dumbbell Fly">
-                        <option value="Cable Fly">
-                        <option value="Chest Dips">
-                        <option value="Push-ups">
-                        <option value="Machine Chest Press">
-                        <option value="Pec Deck">
-                        <!-- Back -->
-                        <option value="Deadlift">
-                        <option value="Romanian Deadlift">
-                        <option value="Sumo Deadlift">
-                        <option value="Barbell Row">
-                        <option value="Dumbbell Row">
-                        <option value="Pendlay Row">
-                        <option value="T-Bar Row">
-                        <option value="Seated Cable Row">
-                        <option value="Lat Pulldown">
-                        <option value="Pull-ups">
-                        <option value="Chin-ups">
-                        <option value="Face Pulls">
-                        <option value="Straight Arm Pulldown">
-                        <option value="Hyperextensions">
-                        <option value="Good Mornings">
-                        <!-- Shoulders -->
-                        <option value="Overhead Press">
-                        <option value="Seated Dumbbell Press">
-                        <option value="Arnold Press">
-                        <option value="Lateral Raises">
-                        <option value="Front Raises">
-                        <option value="Rear Delt Fly">
-                        <option value="Cable Lateral Raise">
-                        <option value="Upright Row">
-                        <option value="Shrugs">
-                        <option value="Barbell Shrugs">
-                        <option value="Machine Shoulder Press">
-                        <!-- Legs -->
-                        <option value="Squat">
-                        <option value="Front Squat">
-                        <option value="Goblet Squat">
-                        <option value="Bulgarian Split Squat">
-                        <option value="Hack Squat">
-                        <option value="Leg Press">
-                        <option value="Lunges">
-                        <option value="Walking Lunges">
-                        <option value="Reverse Lunges">
-                        <option value="Leg Extension">
-                        <option value="Leg Curl">
-                        <option value="Seated Leg Curl">
-                        <option value="Hip Thrust">
-                        <option value="Glute Bridge">
-                        <option value="Calf Raises">
-                        <option value="Seated Calf Raise">
-                        <option value="Step-ups">
-                        <option value="Box Jumps">
-                        <option value="Leg Press Calf Raise">
-                        <!-- Arms -->
-                        <option value="Bicep Curls">
-                        <option value="Hammer Curls">
-                        <option value="Preacher Curls">
-                        <option value="Concentration Curls">
-                        <option value="Incline Dumbbell Curl">
-                        <option value="EZ Bar Curl">
-                        <option value="Cable Curl">
-                        <option value="Spider Curls">
-                        <option value="Tricep Pushdown">
-                        <option value="Overhead Tricep Extension">
-                        <option value="Skull Crushers">
-                        <option value="Close Grip Bench Press">
-                        <option value="Tricep Dips">
-                        <option value="Tricep Kickbacks">
-                        <option value="Cable Overhead Extension">
-                        <option value="Diamond Push-ups">
-                        <!-- Core -->
-                        <option value="Plank">
-                        <option value="Crunches">
-                        <option value="Hanging Leg Raise">
-                        <option value="Cable Crunch">
-                        <option value="Ab Wheel Rollout">
-                        <option value="Russian Twist">
-                        <option value="Bicycle Crunches">
-                        <option value="Leg Raises">
-                        <option value="Woodchoppers">
-                        <option value="Pallof Press">
-                        <option value="Dead Bug">
-                        <option value="Mountain Climbers">
-                        <!-- Compound / Olympic -->
-                        <option value="Power Clean">
-                        <option value="Clean and Jerk">
-                        <option value="Snatch">
-                        <option value="Thruster">
-                        <option value="Kettlebell Swing">
-                        <option value="Turkish Get-up">
-                        <option value="Farmers Walk">
-                        <!-- Cardio / Conditioning -->
-                        <option value="Battle Ropes">
-                        <option value="Sled Push">
-                        <option value="Sled Pull">
-                        <option value="Burpees">
-                        <option value="Jump Rope">
-                        <option value="Rowing Machine">
-                    </datalist>
-                </div>
-
-                <div id="sets-container">
-                    <div class="set-row" data-set="1">
-                        <span class="set-label">Set 1</span>
-                        <input type="number" class="set-weight" placeholder="Weight" step="2.5">
-                        <span class="x-label">x</span>
-                        <input type="number" class="set-reps" placeholder="Reps">
-                    </div>
-                </div>
-
-                <div class="btn-row">
-                    <button class="btn btn-secondary" onclick="addSet()">+ Add Set</button>
-                    <button class="btn btn-secondary" onclick="removeSet()">- Remove Set</button>
-                </div>
-
-                <button class="btn btn-primary btn-full" onclick="logExercise()">Save Exercise</button>
-            </div>
-
-            <!-- Progressive Overload Tracker -->
-            <div class="card">
-                <h2>Progressive Overload Tracker</h2>
-                <p class="card-description">Track your strength gains over time</p>
-                <div class="form-group">
-                    <label>Select Exercise</label>
-                    <select id="overload-exercise" onchange="showOverloadData()">
-                        <option value="">-- Choose Exercise --</option>
-                    </select>
-                </div>
-                <div id="overload-display">
-                    <div id="overload-stats" class="overload-stats hidden">
-                        <div class="overload-stat">
-                            <span class="label">First Logged</span>
-                            <span class="value" id="overload-first">--</span>
-                        </div>
-                        <div class="overload-stat">
-                            <span class="label">Best Weight</span>
-                            <span class="value" id="overload-best">--</span>
-                        </div>
-                        <div class="overload-stat">
-                            <span class="label">Latest Weight</span>
-                            <span class="value" id="overload-latest">--</span>
-                        </div>
-                        <div class="overload-stat progress-stat">
-                            <span class="label">Progress</span>
-                            <span class="value" id="overload-progress">--</span>
-                        </div>
-                    </div>
-                    <canvas id="overload-chart" height="200" class="hidden"></canvas>
-                </div>
-            </div>
-
-            <!-- Today's Session -->
-            <div class="card">
-                <h2>Today's Session</h2>
-                <div id="todays-exercises" class="exercise-log">
-                    <div class="empty-state-card">
-                        <div class="empty-state-icon">&#x2693;</div>
-                        <p class="empty-state-title">Nothing logged today</p>
-                        <p class="empty-state-sub">Pick a routine from the hub above or log a freestyle exercise below.</p>
-                    </div>
-                </div>
-            </div>
-            <button class="btn btn-secondary btn-full" onclick="saveAsTemplate()" id="save-template-btn" style="display:none">Save Session as Routine</button>
-
-            <!-- Custom Exercises -->
-            <div class="card">
-                <div class="custom-exercises-header" onclick="toggleCustomExercises()">
-                    <h2>My Custom Exercises</h2>
-                    <span class="toggle-arrow" id="custom-ex-arrow">&#x25BC;</span>
-                </div>
-                <div id="custom-exercises-panel" class="hidden">
-                    <div class="custom-ex-form">
-                        <input type="text" id="custom-ex-name" placeholder="Exercise name">
-                        <select id="custom-ex-muscle">
-                            <option value="chest">Chest</option>
-                            <option value="back">Back</option>
-                            <option value="shoulders">Shoulders</option>
-                            <option value="legs">Legs</option>
-                            <option value="biceps">Biceps</option>
-                            <option value="triceps">Triceps</option>
-                            <option value="core">Core</option>
-                        </select>
-                        <button class="btn btn-primary btn-sm" onclick="addCustomExercise()">Add</button>
-                    </div>
-                    <div id="custom-exercises-list" class="custom-exercises-list"></div>
-                </div>
+            <div class="landing-feature">
+                <div class="landing-feature-icon">&#x2601;</div>
+                <h3>Cloud Backup</h3>
+                <p>Sign in to sync across devices. Your data stays private &mdash; we don&rsquo;t sell it, share it, or run ads.</p>
             </div>
         </section>
 
-        <!-- Calories Tab -->
-        <section id="calories" class="tab-content">
-            <div class="card">
-                <h2>Log Meal</h2>
-                <div class="form-group" style="position:relative;">
-                    <label>Meal / Food Name</label>
-                    <input type="text" id="meal-name" placeholder="e.g., Chicken Breast" autocomplete="off" oninput="onFoodSearch(this.value)" onfocus="onFoodSearch(this.value)">
-                    <div id="food-suggestions" class="food-suggestions"></div>
-                </div>
-                <div id="food-serving-row" class="form-row" style="display:none;">
-                    <div class="form-group">
-                        <label>Serving Size</label>
-                        <span id="food-serving-label" style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px;"></span>
-                        <input type="number" id="food-servings" value="1" min="0.25" step="0.25" placeholder="# of servings" oninput="onServingsChange()">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Calories</label>
-                        <input type="number" id="meal-calories" placeholder="kcal">
-                    </div>
-                    <div class="form-group">
-                        <label>Protein (g)</label>
-                        <input type="number" id="meal-protein" placeholder="g">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Carbs (g)</label>
-                        <input type="number" id="meal-carbs" placeholder="g">
-                    </div>
-                    <div class="form-group">
-                        <label>Fat (g)</label>
-                        <input type="number" id="meal-fat" placeholder="g">
-                    </div>
-                </div>
-                <div class="form-row" style="gap:8px;">
-                    <button class="btn btn-primary btn-full" onclick="logMeal()">Log Meal</button>
-                    <button class="btn btn-secondary btn-full" onclick="openBarcodeScanner()" style="flex:0 0 auto;padding:10px 16px;" title="Scan Barcode">&#x1F4F7; Scan</button>
-                </div>
-            </div>
-
-            <!-- Barcode Scanner Modal -->
-            <div id="barcode-modal" class="barcode-modal" style="display:none;">
-                <div class="barcode-modal-content">
-                    <div class="barcode-modal-header">
-                        <h3>Scan Barcode</h3>
-                        <button class="btn btn-secondary" onclick="closeBarcodeScanner()" style="padding:4px 12px;">&#x2715;</button>
-                    </div>
-                    <div id="barcode-reader"></div>
-                    <div id="barcode-status" class="barcode-status">Point your camera at a barcode</div>
-                    <div id="barcode-result" class="barcode-result" style="display:none;"></div>
-                </div>
-            </div>
-
-            <!-- Daily Nutrition Summary -->
-            <div class="card">
-                <h2>Today's Nutrition</h2>
-                <div class="macro-bars">
-                    <div class="macro-bar-group">
-                        <div class="macro-header">
-                            <span>Calories</span>
-                            <span id="cal-count">0 / --</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill cal-fill" id="cal-bar" style="width: 0%"></div>
-                        </div>
-                    </div>
-                    <div class="macro-bar-group">
-                        <div class="macro-header">
-                            <span>Protein</span>
-                            <span id="protein-count">0g</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill protein-fill" id="protein-bar" style="width: 0%"></div>
-                        </div>
-                    </div>
-                    <div class="macro-bar-group">
-                        <div class="macro-header">
-                            <span>Carbs</span>
-                            <span id="carbs-count">0g</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill carbs-fill" id="carbs-bar" style="width: 0%"></div>
-                        </div>
-                    </div>
-                    <div class="macro-bar-group">
-                        <div class="macro-header">
-                            <span>Fat</span>
-                            <span id="fat-count">0g</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill fat-fill" id="fat-bar" style="width: 0%"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <h2>Meals Today</h2>
-                <div id="meals-list" class="meals-list">
-                    <div class="empty-state-card">
-                        <div class="empty-state-icon">&#x1F37D;</div>
-                        <p class="empty-state-title">No meals logged today</p>
-                        <p class="empty-state-sub">Search the food database or add a meal manually to track your calories.</p>
-                    </div>
-                </div>
-            </div>
+        <section class="landing-install" id="install">
+            <h2>Install on your iPhone in 30 seconds</h2>
+            <ol class="landing-steps">
+                <li><strong>Open this page in Safari</strong> (Chrome won&rsquo;t work for iOS install).</li>
+                <li>Tap the <strong>Share</strong> button at the bottom of Safari (square with up-arrow).</li>
+                <li>Scroll down and tap <strong>&ldquo;Add to Home Screen&rdquo;</strong>.</li>
+                <li>Tap <strong>Add</strong>. The Iron Faith icon will appear on your home screen like a regular app.</li>
+            </ol>
+            <p class="landing-install-note">On Android: tap the menu (&#x22EE;) and select &ldquo;Install app&rdquo; or &ldquo;Add to Home screen.&rdquo;<br>On desktop: look for the install icon in the address bar.</p>
         </section>
 
-        <!-- Coach Tab -->
-        <section id="coach" class="tab-content">
-            <div class="coach-chat-header">
-                <div class="coach-avatar-sm">&#x2605;</div>
-                <div class="coach-header-text">
-                    <h2>Iron Faith Coach</h2>
-                    <p class="coach-status">Personalized guidance powered by your data</p>
-                </div>
-                <button class="coach-clear-btn" onclick="clearCoachChat()" title="Clear chat">&#x1F5D1;</button>
-            </div>
-
-            <div class="quick-actions">
-                <button class="quick-btn" onclick="coachAsk('Generate a workout plan for me')">Workout Plan</button>
-                <button class="quick-btn" onclick="coachAsk('Create a meal plan for me')">Meal Plan</button>
-                <button class="quick-btn" onclick="coachAsk('What should I eat to fill my macros')">What to Eat</button>
-                <button class="quick-btn" onclick="coachAsk('Analyze my progress')">My Progress</button>
-                <button class="quick-btn" onclick="coachAsk('What should I work on next?')">What Next?</button>
-                <button class="quick-btn" onclick="coachAsk('Help me break through a plateau')">Plateau Help</button>
-                <button class="quick-btn" onclick="coachAsk('How is my nutrition looking?')">Nutrition Check</button>
-                <button class="quick-btn" onclick="coachAsk('What is my estimated max?')">My 1RM</button>
-                <button class="quick-btn" onclick="coachAsk('Weekly recap')">Weekly Recap</button>
-                <button class="quick-btn" onclick="coachAsk('How is my consistency?')">My Streak</button>
-                <button class="quick-btn" onclick="coachAsk('Warm-up routine')">Warm-Up</button>
-                <button class="quick-btn" onclick="coachAsk('Weak point analysis')">Weak Points</button>
-                <button class="quick-btn" onclick="document.getElementById('coach-photo-input').click()">Attach Photo</button>
-            </div>
-
-            <div id="coach-messages" class="coach-messages">
-                <!-- Messages appear here -->
-            </div>
-
-            <div class="coach-input-area">
-                <button class="btn btn-secondary coach-photo-btn" onclick="document.getElementById('coach-photo-input').click()" title="Add photo">&#x1F4F7;</button>
-                <input type="file" id="coach-photo-input" accept="image/*" style="display:none" onchange="handleCoachPhoto(event)">
-                <input type="text" id="coach-input" placeholder="Ask your coach anything..." onkeydown="if(event.key==='Enter')sendCoachMessage()">
-                <button class="btn btn-primary coach-send-btn" onclick="sendCoachMessage()">&#x27A4;</button>
-            </div>
-            <div id="coach-photo-preview" class="coach-photo-preview hidden">
-                <img id="coach-preview-img" src="">
-                <button class="photo-preview-remove" onclick="removeCoachPhoto()">&times;</button>
-                <span class="photo-preview-label">Photo attached</span>
-            </div>
+        <section class="landing-final-cta">
+            <h2>Ready to start?</h2>
+            <a href="./app.html" class="landing-btn-primary landing-btn-large">Launch Iron Faith</a>
+            <p class="landing-meta">Free forever &middot; No ads &middot; Works offline &middot; Your data stays yours</p>
         </section>
 
-        <!-- Social Tab -->
-        <section id="social" class="tab-content">
-            <!-- Auth (not logged in) -->
-            <div id="social-auth" class="hidden">
-                <div class="card" style="text-align:center;padding:30px 22px">
-                    <div style="font-size:40px;margin-bottom:10px">&#x2661;</div>
-                    <h2 style="margin-bottom:6px">Join the Community</h2>
-                    <p style="color:var(--text-muted);font-size:13px">Connect with friends, share your lifts, stay accountable together.</p>
-                </div>
-                <div class="card">
-                    <div class="auth-tabs">
-                        <button class="auth-tab active" onclick="showAuthTab('login')">Log In</button>
-                        <button class="auth-tab" onclick="showAuthTab('signup')">Sign Up</button>
-                    </div>
-                    <div id="auth-login">
-                        <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="you@email.com"></div>
-                        <div class="form-group"><label>Password</label><input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key==='Enter')socialSignIn()"></div>
-                        <button class="btn btn-primary btn-full" onclick="socialSignIn()">Log In</button>
-                    </div>
-                    <div id="auth-signup" class="hidden">
-                        <div class="form-group"><label>Display Name</label><input type="text" id="signup-name" placeholder="Your name"></div>
-                        <div class="form-group"><label>Email</label><input type="email" id="signup-email" placeholder="you@email.com"></div>
-                        <div class="form-group"><label>Password</label><input type="password" id="signup-password" placeholder="6+ characters" onkeydown="if(event.key==='Enter')socialSignUp()"></div>
-                        <button class="btn btn-primary btn-full" onclick="socialSignUp()">Create Account</button>
-                    </div>
-                </div>
+        <footer class="landing-footer">
+            <div class="landing-footer-links">
+                <a href="./app.html">Open App</a>
+                <span>&middot;</span>
+                <a href="./privacy.html">Privacy</a>
+                <span>&middot;</span>
+                <a href="./terms.html">Terms</a>
             </div>
-
-            <!-- Username Setup -->
-            <div id="social-setup" class="hidden">
-                <div class="card" style="text-align:center">
-                    <div style="font-size:40px;margin-bottom:10px">&#x1F44B;</div>
-                    <h2>Welcome, <span id="setup-display-name"></span>!</h2>
-                    <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px">Choose a username so friends can find you.</p>
-                    <div class="form-group" style="text-align:left"><label>Username</label><input type="text" id="setup-username" placeholder="e.g., ironfaith_jared" maxlength="20" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'')"></div>
-                    <button class="btn btn-primary btn-full" onclick="setupUsername()">Let's Go</button>
-                </div>
-            </div>
-
-            <!-- Main Social -->
-            <div id="social-main" class="hidden">
-                <div class="social-profile-banner">
-                    <div>
-                        <strong id="social-display-name">Name</strong>
-                        <span id="social-username" class="social-handle">@username</span>
-                    </div>
-                </div>
-
-                <div class="social-nav">
-                    <button class="social-nav-btn active" onclick="showSocialView('feed')">Feed</button>
-                    <button class="social-nav-btn" onclick="showSocialView('friends')">Friends <span id="request-badge" class="request-badge hidden">0</span></button>
-                    <button class="social-nav-btn" onclick="showSocialView('profile')">Profile</button>
-                </div>
-
-                <button class="btn btn-primary btn-full" onclick="openPostModal()" style="margin-bottom:14px">&#x1F4F8; Post a Lift</button>
-
-                <!-- Feed -->
-                <div id="social-feed" class="social-view">
-                    <div id="feed-posts"><p class="empty-state">Loading feed...</p></div>
-                </div>
-
-                <!-- Friends -->
-                <div id="social-friends" class="social-view hidden"></div>
-
-                <!-- Profile -->
-                <div id="social-profile" class="social-view hidden"></div>
-            </div>
-        </section>
-
-        <!-- Post Modal -->
-        <div id="post-modal" class="share-modal hidden">
-            <div class="share-modal-content" style="max-width:500px">
-                <button class="share-modal-close" onclick="closePostModal()">&times;</button>
-                <h2 style="margin-bottom:14px">Post a Lift</h2>
-                <div id="post-stats-preview"></div>
-                <div class="form-group" style="margin-top:14px">
-                    <label>Photo</label>
-                    <input type="file" id="post-photo-input" accept="image/*" capture="environment" onchange="previewPostPhoto(event)" style="padding:10px">
-                </div>
-                <div id="post-photo-preview"></div>
-                <div class="form-group">
-                    <label>Caption</label>
-                    <input type="text" id="post-caption" placeholder="Hit a new PR today!" maxlength="280">
-                </div>
-                <div class="form-group">
-                    <label>Share a Word</label>
-                    <div class="verse-message-tabs">
-                        <button class="verse-tab active" id="verse-tab-btn" onclick="showVerseTab('verse')">Bible Verse</button>
-                        <button class="verse-tab" id="message-tab-btn" onclick="showVerseTab('message')">Message</button>
-                    </div>
-                    <div id="verse-picker">
-                        <input type="text" id="verse-search" placeholder="Search verses..." oninput="filterVerses(this.value)">
-                        <select id="verse-select" onchange="previewVerse()">
-                            <option value="">-- Select a verse (optional) --</option>
-                        </select>
-                        <div id="verse-preview" class="verse-preview hidden"></div>
-                    </div>
-                    <div id="message-input-area" class="hidden">
-                        <input type="text" id="post-message" placeholder="Share an encouraging word..." maxlength="200">
-                    </div>
-                </div>
-                <button class="btn btn-primary btn-full" id="post-submit-btn" onclick="submitPost()">Post</button>
-            </div>
-        </div>
-
-        <!-- Profile Tab -->
-        <section id="profile" class="tab-content">
-            <div class="card">
-                <h2>Your Profile</h2>
-                <div class="form-group">
-                    <label>Units</label>
-                    <div class="unit-toggle">
-                        <button class="unit-btn active" id="unit-imperial" onclick="setUnits('imperial')">Imperial (lbs/ft)</button>
-                        <button class="unit-btn" id="unit-metric" onclick="setUnits('metric')">Metric (kg/cm)</button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Haptic Feedback</label>
-                    <div class="unit-toggle">
-                        <button class="unit-btn active" id="haptics-on" onclick="setHaptics(true)">On</button>
-                        <button class="unit-btn" id="haptics-off" onclick="setHaptics(false)">Off</button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Cloud Backup</label>
-                    <div class="unit-toggle">
-                        <button class="unit-btn" id="cloud-on" onclick="enableCloudSync()">On</button>
-                        <button class="unit-btn active" id="cloud-off" onclick="disableCloudSync()">Off</button>
-                    </div>
-                    <div id="cloud-settings" class="hidden" style="margin-top:12px">
-                        <p id="cloud-sync-status" class="cloud-status">Not synced yet</p>
-                        <div class="form-row">
-                            <button class="btn btn-secondary btn-sm" onclick="manualSyncNow()">&#x2191; Back up now</button>
-                            <button class="btn btn-secondary btn-sm" onclick="manualRestoreNow()">&#x2193; Restore from cloud</button>
-                        </div>
-                        <p class="notif-note">Your workouts, meals, weights, routines, and prayer entries sync automatically while signed in. Sign in on the Social tab to enable.</p>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Reminders &amp; Notifications</label>
-                    <div class="unit-toggle">
-                        <button class="unit-btn" id="notif-on" onclick="enableNotifications()">On</button>
-                        <button class="unit-btn active" id="notif-off" onclick="disableNotifications()">Off</button>
-                    </div>
-                    <div id="notif-settings" class="hidden" style="margin-top:12px">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label style="font-size:11px">Workout reminder</label>
-                                <input type="time" id="notif-workout-time" onchange="updateNotifSettings()">
-                            </div>
-                            <div class="form-group">
-                                <label style="font-size:11px">Prayer reminder</label>
-                                <input type="time" id="notif-prayer-time" onchange="updateNotifSettings()">
-                            </div>
-                        </div>
-                        <label class="notif-check"><input type="checkbox" id="notif-streak" onchange="updateNotifSettings()"> Streak-saver alerts (evening warning if no workout yet)</label>
-                        <label class="notif-check"><input type="checkbox" id="notif-verse" onchange="updateNotifSettings()"> Daily verse notification</label>
-                        <p class="notif-note">Reminders fire while the app is open. For background notifications, install the app to your home screen.</p>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Name</label>
-                    <input type="text" id="profile-name" placeholder="Your name">
-                </div>
-                <div class="form-group">
-                    <label>Gender</label>
-                    <div class="unit-toggle">
-                        <button class="unit-btn active" id="gender-male" onclick="setGender('male')">Male</button>
-                        <button class="unit-btn" id="gender-female" onclick="setGender('female')">Female</button>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Age</label>
-                        <input type="number" id="profile-age" placeholder="Age">
-                    </div>
-                    <div class="form-group">
-                        <label id="weight-label">Weight (lbs)</label>
-                        <input type="number" id="profile-weight" placeholder="e.g., 180" step="0.1">
-                    </div>
-                </div>
-                <div class="form-group" id="height-group">
-                    <label>Height</label>
-                    <div class="form-row" id="height-imperial">
-                        <div class="height-input-group">
-                            <input type="number" id="profile-height-feet" placeholder="Feet" min="3" max="8">
-                            <span class="input-suffix">ft</span>
-                        </div>
-                        <div class="height-input-group">
-                            <input type="number" id="profile-height-inches" placeholder="Inches" min="0" max="11">
-                            <span class="input-suffix">in</span>
-                        </div>
-                    </div>
-                    <div class="height-input-group hidden" id="height-metric">
-                        <input type="number" id="profile-height-cm" placeholder="e.g., 175" step="1">
-                        <span class="input-suffix">cm</span>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Fitness Goal</label>
-                    <select id="profile-goal">
-                        <option value="lose">Lose Weight</option>
-                        <option value="maintain">Maintain Weight</option>
-                        <option value="gain">Build Muscle / Gain Weight</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Activity Level</label>
-                    <select id="profile-activity">
-                        <option value="sedentary">Sedentary (little exercise)</option>
-                        <option value="light">Lightly Active (1-3 days/week)</option>
-                        <option value="moderate">Moderately Active (3-5 days/week)</option>
-                        <option value="active">Very Active (6-7 days/week)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Daily Calorie Goal</label>
-                    <input type="number" id="profile-calories" placeholder="Auto-calculated or manual">
-                    <button class="btn btn-secondary btn-sm" onclick="calculateCalories()">Auto-Calculate</button>
-                </div>
-                <div class="form-group">
-                    <label>Daily Protein Goal (g)</label>
-                    <input type="number" id="profile-protein" placeholder="e.g., 150">
-                </div>
-                <button class="btn btn-primary btn-full" onclick="saveProfile()">Save Profile</button>
-            </div>
-
-            <div class="card">
-                <h2>Data Management</h2>
-                <div class="btn-row">
-                    <button class="btn btn-secondary" onclick="exportData()">Export Data</button>
-                    <button class="btn btn-secondary" onclick="document.getElementById('import-file').click()">Import Data</button>
-                    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
-                </div>
-                <div class="btn-row" style="margin-top:8px">
-                    <button class="btn btn-danger" onclick="clearAllData()">Clear All Data</button>
-                </div>
-            </div>
-
-            <div class="card">
-                <h2>About</h2>
-                <div class="about-links">
-                    <a href="privacy.html" target="_blank">Privacy Policy</a>
-                    <span class="about-sep">&middot;</span>
-                    <a href="terms.html" target="_blank">Terms of Service</a>
-                </div>
-                <p class="about-version">Iron Faith &middot; v1.0</p>
-                <p class="about-tagline">Strengthen your body. Strengthen your spirit.</p>
-            </div>
-        </section>
+            <p>&copy; 2026 Iron Faith. Built with care.</p>
+        </footer>
     </div>
-
-    <!-- Rest Timer -->
-    <div id="rest-timer" class="rest-timer">
-        <button class="rest-timer-toggle" onclick="toggleRestTimer()">
-            <span id="rest-timer-icon">&#x23F1;</span>
-            <span id="rest-timer-mini" class="rest-timer-mini hidden"></span>
-        </button>
-        <div class="rest-timer-panel hidden">
-            <div class="rest-timer-display">
-                <svg class="timer-ring" viewBox="0 0 100 100">
-                    <circle class="timer-ring-bg" cx="50" cy="50" r="45"/>
-                    <circle class="timer-ring-progress" id="timer-ring-progress" cx="50" cy="50" r="45"/>
-                </svg>
-                <span class="timer-time" id="timer-time">0:00</span>
-            </div>
-            <div class="rest-timer-presets">
-                <button onclick="startRestTimer(30)">0:30</button>
-                <button onclick="startRestTimer(60)">1:00</button>
-                <button onclick="startRestTimer(90)">1:30</button>
-                <button onclick="startRestTimer(120)">2:00</button>
-                <button onclick="startRestTimer(180)">3:00</button>
-            </div>
-            <button class="btn btn-secondary btn-sm" onclick="stopRestTimer()" id="stop-timer-btn" style="display:none;width:100%;margin-top:8px">Stop Timer</button>
-        </div>
-    </div>
-
-    <!-- Share Progress Modal -->
-    <!-- Exercise Info Modal -->
-    <div id="exercise-info-modal" class="exercise-info-modal hidden" onclick="closeExerciseInfo(event)">
-        <div class="exercise-info-content" onclick="event.stopPropagation()">
-            <button class="exercise-info-close" onclick="closeExerciseInfo()">&times;</button>
-            <h2 id="exercise-info-name"></h2>
-            <div id="exercise-info-body"></div>
-        </div>
-    </div>
-
-    <div id="share-modal" class="share-modal hidden">
-        <div class="share-modal-content">
-            <button class="share-modal-close" onclick="closeShareModal()">&times;</button>
-            <canvas id="progress-card-canvas" width="600" height="800"></canvas>
-            <div class="share-modal-actions">
-                <button class="btn btn-primary" onclick="shareCardImage()">Share</button>
-                <button class="btn btn-secondary" onclick="downloadCard()">Download</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="food-db.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <script src="food-db.js"></script>
-    <script src="routines.js"></script>
-    <script src="exercise-info.js"></script>
-    <script src="app.js"></script>
-    <script src="photos.js"></script>
-    <script src="coach.js"></script>
-    <script src="social.js"></script>
-    <script src="cloud-sync.js"></script>
 </body>
 </html>

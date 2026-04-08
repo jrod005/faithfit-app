@@ -1,7 +1,8 @@
-const CACHE_NAME = 'ironfaith-v30';
+const CACHE_NAME = 'ironfaith-v31';
 const ASSETS = [
     './',
     './index.html',
+    './app.html',
     './styles.css',
     './food-db.js',
     './routines.js',
