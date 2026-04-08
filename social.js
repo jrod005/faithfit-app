@@ -269,9 +269,37 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
         renderSocialTab();
         return;
     }
+
+    // FAST PATH: restore currentUser from localStorage immediately so the user
+    // appears logged in even if supabase-js is hung. Doesn't touch the library.
     try {
-        const { data: { session } } = await sb.auth.getSession();
-        if (session?.user) {
+        const stored = readStoredSession();
+        if (stored?.user) {
+            currentUser = stored.user;
+            renderSocialTab();
+            // Try to load the profile via direct REST in the background
+            directFetchProfile(currentUser.id).then(profile => {
+                if (profile) {
+                    userProfile = profile;
+                    renderSocialTab();
+                    if (typeof syncStatsToSupabase === 'function') {
+                        try { syncStatsToSupabase(); } catch (e) {}
+                    }
+                }
+            }).catch(e => console.error('directFetchProfile failed:', e));
+        }
+    } catch (e) {
+        console.error('Fast-path session restore failed:', e);
+    }
+
+    // SLOW PATH: also try the library with a tight timeout, in case it works
+    try {
+        const result = await Promise.race([
+            sb.auth.getSession(),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 2000))
+        ]);
+        const session = result?.data?.session;
+        if (session?.user && !currentUser) {
             currentUser = session.user;
             const { data } = await fetchProfileWithRetry(currentUser.id);
             if (data) {
@@ -284,10 +312,38 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
             subscribeToFriendRequests();
         }
     } catch (e) {
-        console.error('Initial auth check failed', e);
+        console.error('Initial auth check (lib) failed/timed out:', e);
     }
     renderSocialTab();
 })();
+
+// Direct REST profile fetch — works when supabase-js is hung
+async function directFetchProfile(uid) {
+    try {
+        const sessInfo = await getAccessTokenSafely();
+        const token = sessInfo?.token;
+        if (!token || !uid) return null;
+        const resp = await fetch(
+            SUPABASE_URL + '/rest/v1/profiles?id=eq.' + encodeURIComponent(uid) + '&select=*',
+            {
+                headers: {
+                    apikey: SUPABASE_ANON_KEY,
+                    Authorization: 'Bearer ' + token,
+                },
+                cache: 'no-store',
+            }
+        );
+        if (!resp.ok) {
+            console.error('directFetchProfile HTTP', resp.status);
+            return null;
+        }
+        const rows = await resp.json();
+        return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    } catch (e) {
+        console.error('directFetchProfile crashed:', e);
+        return null;
+    }
+}
 
 // ========== REALTIME SOCIAL ACTIVITY ==========
 let _friendReqChannel = null;
