@@ -772,9 +772,12 @@
                 <div class="card" style="text-align:center">
                     <div style="font-size:40px;margin-bottom:10px">&#x1F44B;</div>
                     <h2>Welcome, <span id="setup-display-name"></span>!</h2>
-                    <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px">Choose a username so friends can find you.</p>
+                    <p style="color:var(--text-muted);font-size:13px;margin-bottom:6px">Choose a username so friends can find you.</p>
+                    <p style="color:var(--text-muted);font-size:11px;margin-bottom:16px">Signed in as <span id="setup-account-email" style="opacity:0.85"></span></p>
                     <div class="form-group" style="text-align:left"><label>Username</label><input type="text" id="setup-username" placeholder="e.g., ironfaith_jared" maxlength="20" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'')"></div>
                     <button class="btn btn-primary btn-full" onclick="setupUsername()">Let's Go</button>
+                    <button class="btn btn-secondary btn-full" style="margin-top:8px" onclick="recoverExistingProfile()">I already have an account</button>
+                    <button class="btn btn-secondary btn-full" style="margin-top:8px" onclick="socialSignOut()">Sign out and use a different account</button>
                 </div>
             </div>
 

@@ -251,6 +251,36 @@ if (document.readyState === 'loading') {
 
 // ========== PROFILE ==========
 
+// Recovery: try to find an existing profile attached to this auth account
+// (handles the case where the row exists but the initial fetch failed/timed out
+// and the user is being shown the setup screen incorrectly).
+async function recoverExistingProfile() {
+    if (!sb) return showToast('Cannot connect to server');
+    if (!currentUser) return showToast('Sign in first');
+    showToast('Looking up your account...');
+    try {
+        const { data, error } = await sb.from('profiles')
+            .select('*')
+            .eq('id', currentUser.id)
+            .maybeSingle();
+        if (error) {
+            console.error('Recover error:', error);
+            showToast('Lookup failed: ' + error.message);
+            return;
+        }
+        if (data) {
+            userProfile = data;
+            renderSocialTab();
+            showToast('Welcome back, @' + data.username);
+            return;
+        }
+        showToast('No profile found for this email — pick a username to create one');
+    } catch (e) {
+        console.error('recoverExistingProfile crashed:', e);
+        showToast('Error: ' + (e.message || 'unknown'));
+    }
+}
+
 async function setupUsername() {
     if (!sb) return showToast('Cannot connect to server');
     if (!currentUser) return showToast('Not signed in');
@@ -298,7 +328,7 @@ async function setupUsername() {
             showToast('Check failed: ' + checkErr.message);
             return;
         }
-        if (existing) { showToast('Username taken'); return; }
+        if (existing && existing.id !== currentUser.id) { showToast('Username taken'); return; }
 
         const displayName = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || raw;
 
@@ -924,6 +954,8 @@ function renderSocialTab() {
         setupEl.classList.remove('hidden');
         const name = currentUser.user_metadata?.display_name || currentUser.email || '';
         document.getElementById('setup-display-name').textContent = name;
+        const emailEl = document.getElementById('setup-account-email');
+        if (emailEl) emailEl.textContent = currentUser.email || currentUser.id.slice(0, 8);
         return;
     }
 
