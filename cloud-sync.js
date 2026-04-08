@@ -359,11 +359,16 @@ async function checkPendingRestore() {
     if (typeof currentUser === 'undefined' || !currentUser) return;
     if (typeof sb === 'undefined' || !sb) return;
     try {
-        // Pull access token from supabase-js (this part doesn't hang)
-        const { data: sess } = await sb.auth.getSession();
-        const token = sess?.session?.access_token;
-        const uid = sess?.session?.user?.id || currentUser.id;
-        if (!token || !uid) return;
+        // Use the safe helper that falls back to localStorage if the lib hangs
+        const sessInfo = (typeof getAccessTokenSafely === 'function')
+            ? await getAccessTokenSafely()
+            : null;
+        const token = sessInfo?.token;
+        const uid = sessInfo?.user?.id || currentUser.id;
+        if (!token || !uid) {
+            if (typeof showToast === 'function') showToast('No session token — try logging in again');
+            return;
+        }
 
         const resp = await fetch(
             SUPABASE_URL + '/rest/v1/user_data?user_id=eq.' + encodeURIComponent(uid) + '&select=snapshot,local_modified',

@@ -138,15 +138,14 @@ async function directSignIn(email, pass) {
 
         currentUser = body.user;
 
-        // Try to attach to sb for future calls
+        // Try to attach to sb for future calls but don't await it — if the
+        // library is hung this can never resolve.
         try {
             if (sb && sb.auth && sb.auth.setSession) {
-                await Promise.race([
-                    sb.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token }),
-                    new Promise(r => setTimeout(r, 2000))
-                ]);
+                sb.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token })
+                    .catch(e => console.warn('setSession failed:', e));
             }
-        } catch (e) { console.warn('setSession failed:', e); }
+        } catch (e) { console.warn('setSession threw:', e); }
 
         // Now attempt to fetch/create profile via direct REST too
         showToast('Signed in! Loading your profile...');
@@ -384,17 +383,46 @@ if (document.readyState === 'loading') {
 // Recovery: try to find an existing profile attached to this auth account
 // (handles the case where the row exists but the initial fetch failed/timed out
 // and the user is being shown the setup screen incorrectly).
+// Read the supabase session straight from localStorage. Doesn't touch
+// supabase-js, so it works even when the library is hung.
+function readStoredSession() {
+    try {
+        const raw = localStorage.getItem('ironfaith-auth');
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        // supabase-js stores under .currentSession in some versions, root in others
+        const sess = parsed.currentSession || parsed;
+        if (sess && sess.access_token) return sess;
+        return null;
+    } catch (e) { return null; }
+}
+
+async function getAccessTokenSafely() {
+    // Try the library with a tight timeout, fall back to localStorage
+    if (sb && sb.auth && sb.auth.getSession) {
+        try {
+            const result = await Promise.race([
+                sb.auth.getSession(),
+                new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 1500))
+            ]);
+            const s = result?.data?.session;
+            if (s?.access_token) return { token: s.access_token, user: s.user };
+        } catch (e) { /* fall through */ }
+    }
+    const stored = readStoredSession();
+    if (stored?.access_token) return { token: stored.access_token, user: stored.user };
+    return null;
+}
+
 // Direct REST profile setup — bypasses supabase-js entirely.
 // Use this when the library is in a broken state (queries hanging, etc).
 async function directProfileSetup() {
-    if (!sb) return showToast('Supabase not loaded');
     showToast('Connecting directly...');
     try {
-        // Get the current access token from supabase-js (this part doesn't hang)
-        const { data: sess } = await sb.auth.getSession();
-        const token = sess?.session?.access_token;
-        const uid = sess?.session?.user?.id || currentUser?.id;
-        const email = sess?.session?.user?.email || currentUser?.email;
+        const sessInfo = await getAccessTokenSafely();
+        const token = sessInfo?.token;
+        const uid = sessInfo?.user?.id || currentUser?.id;
+        const email = sessInfo?.user?.email || currentUser?.email;
         if (!token || !uid) {
             showToast('Not signed in — please log in first');
             return;
