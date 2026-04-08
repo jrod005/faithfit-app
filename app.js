@@ -3,6 +3,12 @@
 // =============================================
 
 // --- Data Layer ---
+const SYNCED_KEYS = new Set([
+    'profile', 'workouts', 'meals', 'weights', 'myRoutines', 'customExercises',
+    'prayerEntries', 'goals', 'achievements', 'streakHistory', 'units',
+    'experience', 'equipment', 'onboarded', 'hapticsEnabled', 'notifSettings',
+    'bibleVersion', 'savedTemplates', 'progressPhotos', 'challenges', 'coachHistory'
+]);
 const DB = {
     get(key, fallback = null) {
         try {
@@ -11,7 +17,15 @@ const DB = {
         } catch { return fallback; }
     },
     set(key, value) {
-        localStorage.setItem('faithfit_' + key, JSON.stringify(value));
+        try {
+            localStorage.setItem('faithfit_' + key, JSON.stringify(value));
+        } catch (e) {
+            console.error('localStorage write failed', e);
+            return;
+        }
+        if (SYNCED_KEYS.has(key) && typeof scheduleCloudSync === 'function') {
+            scheduleCloudSync();
+        }
     }
 };
 
@@ -5146,6 +5160,7 @@ function init() {
     loadHapticsToggle();
     loadNotifToggle();
     scheduleNotifications();
+    if (typeof loadCloudSyncToggle === 'function') loadCloudSyncToggle();
     updateDashboard();
     updateTodaysExercises();
     updateOverloadDropdown();

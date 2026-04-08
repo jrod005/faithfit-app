@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <title>Iron Faith - Fitness & Faith Tracker</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -857,6 +857,21 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label>Cloud Backup</label>
+                    <div class="unit-toggle">
+                        <button class="unit-btn" id="cloud-on" onclick="enableCloudSync()">On</button>
+                        <button class="unit-btn active" id="cloud-off" onclick="disableCloudSync()">Off</button>
+                    </div>
+                    <div id="cloud-settings" class="hidden" style="margin-top:12px">
+                        <p id="cloud-sync-status" class="cloud-status">Not synced yet</p>
+                        <div class="form-row">
+                            <button class="btn btn-secondary btn-sm" onclick="manualSyncNow()">&#x2191; Back up now</button>
+                            <button class="btn btn-secondary btn-sm" onclick="manualRestoreNow()">&#x2193; Restore from cloud</button>
+                        </div>
+                        <p class="notif-note">Your workouts, meals, weights, routines, and prayer entries sync automatically while signed in. Sign in on the Social tab to enable.</p>
+                    </div>
+                </div>
+                <div class="form-group">
                     <label>Reminders &amp; Notifications</label>
                     <div class="unit-toggle">
                         <button class="unit-btn" id="notif-on" onclick="enableNotifications()">On</button>
@@ -956,6 +971,17 @@
                     <button class="btn btn-danger" onclick="clearAllData()">Clear All Data</button>
                 </div>
             </div>
+
+            <div class="card">
+                <h2>About</h2>
+                <div class="about-links">
+                    <a href="privacy.html" target="_blank">Privacy Policy</a>
+                    <span class="about-sep">&middot;</span>
+                    <a href="terms.html" target="_blank">Terms of Service</a>
+                </div>
+                <p class="about-version">Iron Faith &middot; v1.0</p>
+                <p class="about-tagline">Strengthen your body. Strengthen your spirit.</p>
+            </div>
         </section>
     </div>
 
@@ -1019,5 +1045,6 @@
     <script src="photos.js"></script>
     <script src="coach.js"></script>
     <script src="social.js"></script>
+    <script src="cloud-sync.js"></script>
 </body>
 </html>

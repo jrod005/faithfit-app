@@ -164,3 +164,22 @@ ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Anyone can view comments" ON comments FOR SELECT USING (true);
 CREATE POLICY "Users create own comments" ON comments FOR INSERT WITH CHECK (auth.uid() = uid);
 CREATE POLICY "Users delete own comments" ON comments FOR DELETE USING (auth.uid() = uid);
+
+
+-- =============================================
+-- USER DATA SYNC TABLE (cloud backup)
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS user_data (
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  data JSONB NOT NULL DEFAULT '{}',
+  local_modified BIGINT DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE user_data ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users read own data" ON user_data FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users insert own data" ON user_data FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users update own data" ON user_data FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users delete own data" ON user_data FOR DELETE USING (auth.uid() = user_id);
