@@ -8,7 +8,16 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let sb = null;
 try {
     if (window.supabase && typeof window.supabase.createClient === 'function') {
-        sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: {
+                persistSession: true,
+                autoRefreshToken: true,
+                detectSessionInUrl: true,
+                storage: window.localStorage,
+                storageKey: 'ironfaith-auth',
+                flowType: 'pkce',
+            }
+        });
     } else {
         console.error('Supabase library failed to load');
     }
@@ -94,14 +103,21 @@ async function socialSignOut() {
 
 // Auth state listener
 if (sb) sb.auth.onAuthStateChange(async (event, session) => {
-    if (session?.user) {
-        currentUser = session.user;
-        const { data } = await sb.from('profiles').select().eq('id', currentUser.id).single();
-        userProfile = data;
-        if (userProfile) syncStatsToSupabase();
-    } else {
-        currentUser = null;
-        userProfile = null;
+    try {
+        if (session?.user) {
+            currentUser = session.user;
+            const { data, error } = await sb.from('profiles').select().eq('id', currentUser.id).maybeSingle();
+            if (error) console.error('Profile fetch (auth change) error:', error);
+            userProfile = data || null;
+            if (userProfile) syncStatsToSupabase();
+            // Subscribe to friend requests once signed in
+            subscribeToFriendRequests();
+        } else if (event === 'SIGNED_OUT') {
+            currentUser = null;
+            userProfile = null;
+        }
+    } catch (e) {
+        console.error('onAuthStateChange handler crashed:', e);
     }
     renderSocialTab();
 });
@@ -116,9 +132,11 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
         const { data: { session } } = await sb.auth.getSession();
         if (session?.user) {
             currentUser = session.user;
-            const { data } = await sb.from('profiles').select().eq('id', currentUser.id).single();
-            userProfile = data;
+            const { data, error } = await sb.from('profiles').select().eq('id', currentUser.id).maybeSingle();
+            if (error) console.error('Profile fetch (initial) error:', error);
+            userProfile = data || null;
             if (userProfile) syncStatsToSupabase();
+            subscribeToFriendRequests();
         }
     } catch (e) {
         console.error('Initial auth check failed', e);
@@ -126,6 +144,29 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
     // Always render — shows auth UI when signed out, main UI when signed in
     renderSocialTab();
 })();
+
+// ========== REALTIME FRIEND REQUESTS ==========
+let _friendReqChannel = null;
+function subscribeToFriendRequests() {
+    if (!sb || !currentUser || _friendReqChannel) return;
+    try {
+        _friendReqChannel = sb.channel('friend-reqs-' + currentUser.id)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'friend_requests',
+                filter: `to_uid=eq.${currentUser.id}`
+            }, () => {
+                if (typeof renderFriendsView === 'function') {
+                    try { renderFriendsView(); } catch (e) { console.error(e); }
+                }
+                if (typeof showToast === 'function') showToast('New friend request!');
+            })
+            .subscribe();
+    } catch (e) {
+        console.error('subscribeToFriendRequests failed:', e);
+    }
+}
 
 // Also re-render whenever the user opens the Social tab (defensive)
 function attachSocialTabHook() {
@@ -148,47 +189,72 @@ if (document.readyState === 'loading') {
 // ========== PROFILE ==========
 
 async function setupUsername() {
-    if (!sb) return showToast('Cannot connect to server', 'error');
-    if (!currentUser) return showToast('Not signed in', 'error');
+    if (!sb) return showToast('Cannot connect to server');
+    if (!currentUser) return showToast('Not signed in');
     const input = document.getElementById('setup-username');
     if (!input) return;
     const raw = input.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
     if (raw.length < 3) return showToast('Username must be 3+ characters');
     if (raw.length > 20) return showToast('Username must be under 20 characters');
 
+    // Find the button and set a loading state so the user sees feedback
+    const btn = document.querySelector('#social-setup button.btn-primary');
+    const oldLabel = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
+
+    // Hard timeout so the button can never appear "frozen"
+    const withTimeout = (p, ms, label) => Promise.race([
+        p,
+        new Promise((_, rej) => setTimeout(() => rej(new Error(label + ' timed out')), ms))
+    ]);
+
     try {
-        // Check availability — maybeSingle() doesn't error on zero rows
-        const { data: existing, error: checkErr } = await sb.from('profiles')
-            .select('id').eq('username', raw).maybeSingle();
+        let stats = {};
+        try { stats = getPublicStats(); } catch (e) { console.error('getPublicStats failed:', e); }
+
+        const { data: existing, error: checkErr } = await withTimeout(
+            sb.from('profiles').select('id').eq('username', raw).maybeSingle(),
+            12000, 'Username check'
+        );
         if (checkErr) {
             console.error('Username check error:', checkErr);
-            return showToast('Check failed: ' + checkErr.message, 'error');
+            showToast('Check failed: ' + checkErr.message);
+            return;
         }
-        if (existing) return showToast('Username taken');
+        if (existing) { showToast('Username taken'); return; }
 
         const displayName = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || raw;
 
-        const { error } = await sb.from('profiles').insert({
-            id: currentUser.id,
-            username: raw,
-            display_name: displayName,
-            bio: '',
-            stats: getPublicStats(),
-            friends: [],
-        });
+        const { error } = await withTimeout(
+            sb.from('profiles').insert({
+                id: currentUser.id,
+                username: raw,
+                display_name: displayName,
+                bio: '',
+                stats,
+                friends: [],
+            }),
+            12000, 'Create profile'
+        );
 
         if (error) {
             console.error('Insert profile error:', error);
-            return showToast(error.message, 'error');
+            const hint = /relation|does not exist|column/i.test(error.message)
+                ? ' (Run supabase-setup.sql in your Supabase project)'
+                : '';
+            showToast('Save failed: ' + error.message + hint);
+            return;
         }
 
         const { data } = await sb.from('profiles').select().eq('id', currentUser.id).maybeSingle();
-        userProfile = data;
+        userProfile = data || null;
         renderSocialTab();
-        showToast('Profile created!', 'success');
+        showToast('Profile created!');
     } catch (e) {
         console.error('setupUsername crashed:', e);
-        showToast('Error: ' + (e.message || 'unknown'), 'error');
+        showToast('Error: ' + (e.message || 'unknown'));
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = oldLabel || "Let's Go"; }
     }
 }
 
@@ -246,6 +312,8 @@ async function updateBio() {
 async function uploadProfilePic(event) {
     const file = event.target.files[0];
     if (!file) return;
+    if (!sb) return showToast('Cannot connect to server');
+    if (!currentUser) return showToast('Sign in first');
 
     showToast('Uploading...');
     try {
@@ -255,17 +323,34 @@ async function uploadProfilePic(event) {
             contentType: 'image/jpeg',
             upsert: true
         });
-        if (upErr) throw upErr;
+        if (upErr) {
+            console.error('Avatar upload error:', upErr);
+            const msg = (upErr.message || '').toLowerCase();
+            if (msg.includes('bucket') || msg.includes('not found')) {
+                showToast('Avatars bucket missing — run supabase-setup.sql');
+            } else if (msg.includes('row-level') || msg.includes('policy')) {
+                showToast('Permission denied — re-run supabase-setup.sql');
+            } else {
+                showToast('Upload failed: ' + upErr.message);
+            }
+            return;
+        }
 
         const { data: urlData } = sb.storage.from('avatars').getPublicUrl(path);
         const profile_pic = urlData.publicUrl + '?t=' + Date.now();
 
-        await sb.from('profiles').update({ profile_pic }).eq('id', currentUser.id);
+        const { error: updErr } = await sb.from('profiles').update({ profile_pic }).eq('id', currentUser.id);
+        if (updErr) {
+            console.error('Profile update error:', updErr);
+            showToast('Saved photo but profile update failed: ' + updErr.message);
+            return;
+        }
         userProfile.profile_pic = profile_pic;
         renderProfileView();
         showToast('Profile picture updated!');
     } catch (e) {
-        showToast('Upload failed: ' + e.message);
+        console.error('uploadProfilePic crashed:', e);
+        showToast('Upload failed: ' + (e.message || 'unknown'));
     }
 }
 

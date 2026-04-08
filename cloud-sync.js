@@ -279,3 +279,69 @@ function initCloudSyncAuthHook() {
 }
 
 initCloudSyncAuthHook();
+
+// =============================================
+// Fresh-install restore prompt
+// On a brand-new PWA install (or fresh browser), if there is no local
+// onboarding data, offer to restore from cloud before onboarding starts.
+// =============================================
+const RESTORE_PROMPT_DISMISSED_KEY = 'restorePromptDismissed';
+
+function isStandalonePWA() {
+    return window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone === true;
+}
+
+function isFreshInstall() {
+    // No onboarding completed, no workouts, no profile name
+    const onboarded = DB.get('onboarded', false);
+    const workouts = DB.get('workouts', []);
+    const profile = DB.get('profile', {});
+    return !onboarded && (!workouts || workouts.length === 0) && !(profile && profile.name);
+}
+
+function showRestorePrompt() {
+    if (document.getElementById('restore-prompt-banner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'restore-prompt-banner';
+    banner.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(80px + env(safe-area-inset-bottom));background:var(--card-bg,#1a1a1a);color:var(--text,#fff);border:1px solid var(--border,#333);border-radius:14px;padding:16px;z-index:9998;box-shadow:0 8px 24px rgba(0,0,0,0.4);font-size:14px';
+    banner.innerHTML = `
+        <div style="font-weight:600;margin-bottom:6px">Welcome to Iron Faith</div>
+        <div style="opacity:0.85;margin-bottom:12px">Returning user? Sign in to restore your workouts, stats, and faith data from the cloud.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="restore-prompt-signin" style="flex:1;min-width:120px;background:var(--primary,#d4af37);color:#000;border:0;padding:10px 14px;border-radius:10px;font-weight:600;cursor:pointer">Sign in & restore</button>
+            <button id="restore-prompt-skip" style="flex:1;min-width:120px;background:transparent;color:var(--text,#fff);border:1px solid var(--border,#333);padding:10px 14px;border-radius:10px;cursor:pointer">Start fresh</button>
+        </div>
+    `;
+    document.body.appendChild(banner);
+    document.getElementById('restore-prompt-signin').onclick = () => {
+        DB.set(RESTORE_PROMPT_DISMISSED_KEY, true);
+        banner.remove();
+        // Hide onboarding so user can sign in first
+        const ob = document.getElementById('onboarding');
+        if (ob) ob.classList.add('hidden');
+        const tabBtn = document.querySelector('.tab-btn[data-tab="social"]');
+        if (tabBtn) tabBtn.click();
+        if (typeof showToast === 'function') showToast('Sign in, then enable Cloud Backup in Profile to restore');
+    };
+    document.getElementById('restore-prompt-skip').onclick = () => {
+        DB.set(RESTORE_PROMPT_DISMISSED_KEY, true);
+        banner.remove();
+    };
+}
+
+function maybeShowRestorePrompt() {
+    try {
+        if (DB.get(RESTORE_PROMPT_DISMISSED_KEY, false)) return;
+        if (!isStandalonePWA()) return;
+        if (!isFreshInstall()) return;
+        // Wait a moment for the app to settle
+        setTimeout(showRestorePrompt, 800);
+    } catch (e) { console.error('maybeShowRestorePrompt failed:', e); }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', maybeShowRestorePrompt);
+} else {
+    maybeShowRestorePrompt();
+}
