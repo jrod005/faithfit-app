@@ -247,6 +247,19 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
     try {
         if (session?.user) {
             currentUser = session.user;
+            // Persist to our own key so it survives PWA kill even if the
+            // library is hung on next launch. Written from EVERY sign-in path.
+            try {
+                const directSess = {
+                    access_token: session.access_token,
+                    refresh_token: session.refresh_token,
+                    expires_in: session.expires_in,
+                    expires_at: session.expires_at || (Math.floor(Date.now() / 1000) + (session.expires_in || 3600)),
+                    token_type: session.token_type || 'bearer',
+                    user: session.user,
+                };
+                localStorage.setItem('ironfaith-direct-session', JSON.stringify(directSess));
+            } catch (e) { console.warn('Failed to persist direct session:', e); }
             const { data } = await fetchProfileWithRetry(currentUser.id);
             if (data) {
                 userProfile = data;
