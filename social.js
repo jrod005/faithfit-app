@@ -118,18 +118,66 @@ async function fetchProfileWithRetry(uid, attempts = 3) {
     return { data: null, error: new Error('Profile fetch failed after retries') };
 }
 
+// Auto-create a profile row for a signed-in user who doesn't have one yet.
+// Skips the username setup prompt entirely; user can rename later from Profile.
+async function ensureProfileExists() {
+    if (!sb || !currentUser) return null;
+    try {
+        // Build a default username from the email prefix, sanitized
+        const emailPrefix = (currentUser.email || '').split('@')[0]
+            .toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 14);
+        let base = emailPrefix || 'lifter';
+        if (base.length < 3) base = 'lifter';
+
+        // Try a few candidates until one isn't taken
+        let username = base;
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const { data: clash } = await sb.from('profiles')
+                .select('id').eq('username', username).maybeSingle();
+            if (!clash || clash.id === currentUser.id) break;
+            username = base + Math.floor(Math.random() * 9000 + 1000);
+        }
+
+        const displayName = currentUser.user_metadata?.display_name
+            || currentUser.email?.split('@')[0]
+            || username;
+
+        let stats = {};
+        try { stats = getPublicStats(); } catch (e) { console.error('getPublicStats failed:', e); }
+
+        const { data, error } = await sb.from('profiles').upsert({
+            id: currentUser.id,
+            username,
+            display_name: displayName,
+            bio: '',
+            stats,
+            friends: [],
+        }, { onConflict: 'id' }).select().maybeSingle();
+
+        if (error) {
+            console.error('ensureProfileExists upsert error:', error);
+            return null;
+        }
+        return data;
+    } catch (e) {
+        console.error('ensureProfileExists crashed:', e);
+        return null;
+    }
+}
+
 // Auth state listener
 if (sb) sb.auth.onAuthStateChange(async (event, session) => {
     try {
         if (session?.user) {
             currentUser = session.user;
-            const { data, error } = await fetchProfileWithRetry(currentUser.id);
+            const { data } = await fetchProfileWithRetry(currentUser.id);
             if (data) {
                 userProfile = data;
                 syncStatsToSupabase();
-            } else if (!userProfile) {
-                // Only null out if we don't already have one — avoids "reset account" flicker
-                userProfile = null;
+            } else {
+                // No profile row yet — auto-create one so the user is never stuck on setup
+                const created = await ensureProfileExists();
+                if (created) userProfile = created;
             }
             subscribeToFriendRequests();
         } else if (event === 'SIGNED_OUT') {
@@ -156,6 +204,9 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
             if (data) {
                 userProfile = data;
                 syncStatsToSupabase();
+            } else {
+                const created = await ensureProfileExists();
+                if (created) userProfile = created;
             }
             subscribeToFriendRequests();
         }
@@ -231,15 +282,20 @@ function subscribeToFriendRequests() {
     }
 }
 
-// Also re-render whenever the user opens the Social tab (defensive)
+// Also re-render whenever the user opens the Social tab (defensive).
+// If we have a signed-in user but no profile yet, try once more to create one.
 function attachSocialTabHook() {
     const socialBtn = document.querySelector('.tab-btn[data-tab="social"]');
     if (socialBtn && !socialBtn.dataset.socialHooked) {
         socialBtn.dataset.socialHooked = '1';
-        socialBtn.addEventListener('click', () => {
-            if (typeof renderSocialTab === 'function') {
-                try { renderSocialTab(); } catch (e) { console.error('renderSocialTab failed', e); }
-            }
+        socialBtn.addEventListener('click', async () => {
+            try {
+                if (currentUser && !userProfile) {
+                    const created = await ensureProfileExists();
+                    if (created) userProfile = created;
+                }
+                if (typeof renderSocialTab === 'function') renderSocialTab();
+            } catch (e) { console.error('Social tab click handler failed', e); }
         });
     }
 }
