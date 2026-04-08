@@ -310,6 +310,87 @@ if (document.readyState === 'loading') {
 // Recovery: try to find an existing profile attached to this auth account
 // (handles the case where the row exists but the initial fetch failed/timed out
 // and the user is being shown the setup screen incorrectly).
+// Direct REST profile setup — bypasses supabase-js entirely.
+// Use this when the library is in a broken state (queries hanging, etc).
+async function directProfileSetup() {
+    if (!sb) return showToast('Supabase not loaded');
+    showToast('Connecting directly...');
+    try {
+        // Get the current access token from supabase-js (this part doesn't hang)
+        const { data: sess } = await sb.auth.getSession();
+        const token = sess?.session?.access_token;
+        const uid = sess?.session?.user?.id || currentUser?.id;
+        const email = sess?.session?.user?.email || currentUser?.email;
+        if (!token || !uid) {
+            showToast('Not signed in — please log in first');
+            return;
+        }
+
+        const headers = {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: 'Bearer ' + token,
+            'Content-Type': 'application/json',
+        };
+        const base = SUPABASE_URL + '/rest/v1/profiles';
+
+        // 1) Look up by id directly
+        const lookupResp = await fetch(`${base}?id=eq.${encodeURIComponent(uid)}&select=*`, { headers, cache: 'no-store' });
+        if (!lookupResp.ok) {
+            showToast('Lookup HTTP ' + lookupResp.status);
+            return;
+        }
+        const lookupRows = await lookupResp.json();
+        if (Array.isArray(lookupRows) && lookupRows.length > 0) {
+            userProfile = lookupRows[0];
+            renderSocialTab();
+            showToast('Welcome back, @' + userProfile.username);
+            return;
+        }
+
+        // 2) No row — create one with a username derived from email
+        const emailPrefix = (email || '').split('@')[0]
+            .toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 14) || 'lifter';
+        let username = emailPrefix;
+        // Try a few candidates if taken
+        for (let i = 0; i < 5; i++) {
+            const checkResp = await fetch(`${base}?username=eq.${encodeURIComponent(username)}&select=id`, { headers, cache: 'no-store' });
+            const rows = await checkResp.json();
+            if (!Array.isArray(rows) || rows.length === 0) break;
+            if (rows[0].id === uid) break; // already mine
+            username = emailPrefix + Math.floor(Math.random() * 9000 + 1000);
+        }
+
+        let stats = {};
+        try { stats = getPublicStats(); } catch (e) {}
+
+        const insertResp = await fetch(base, {
+            method: 'POST',
+            headers: { ...headers, Prefer: 'return=representation,resolution=merge-duplicates' },
+            body: JSON.stringify({
+                id: uid,
+                username,
+                display_name: email?.split('@')[0] || username,
+                bio: '',
+                stats,
+                friends: [],
+            }),
+        });
+        if (!insertResp.ok) {
+            const txt = await insertResp.text();
+            console.error('Direct insert failed:', insertResp.status, txt);
+            showToast('Create failed: HTTP ' + insertResp.status);
+            return;
+        }
+        const created = await insertResp.json();
+        userProfile = Array.isArray(created) ? created[0] : created;
+        renderSocialTab();
+        showToast('Profile created as @' + userProfile.username);
+    } catch (e) {
+        console.error('directProfileSetup crashed:', e);
+        showToast('Direct setup failed: ' + (e.message || 'unknown'));
+    }
+}
+
 async function recoverExistingProfile() {
     if (!sb) return showToast('Cannot connect to server');
     if (!currentUser) return showToast('Sign in first');
