@@ -2431,9 +2431,32 @@ window.addEventListener('appinstalled', () => {
 });
 
 // --- Service Worker Registration ---
+// Always check for an updated SW on load and force the new one to take over
+// immediately when found (fixes iOS PWAs being stuck on stale SW versions).
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
+    window.addEventListener('load', async () => {
+        try {
+            const reg = await navigator.serviceWorker.register('./sw.js');
+            // Check for updates right away
+            try { await reg.update(); } catch (e) {}
+            if (reg.waiting) {
+                reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                if (!newWorker) return;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        // New version installed — activate it
+                        newWorker.postMessage({ type: 'SKIP_WAITING' });
+                        if (typeof showToast === 'function') showToast('App updated — reloading');
+                        setTimeout(() => window.location.reload(), 800);
+                    }
+                });
+            });
+        } catch (e) {
+            console.error('SW registration failed', e);
+        }
     });
 }
 

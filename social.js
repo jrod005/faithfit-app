@@ -258,11 +258,15 @@ async function recoverExistingProfile() {
     if (!sb) return showToast('Cannot connect to server');
     if (!currentUser) return showToast('Sign in first');
     showToast('Looking up your account...');
+    const withTimeout = (p, ms) => Promise.race([
+        p,
+        new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), ms))
+    ]);
     try {
-        const { data, error } = await sb.from('profiles')
-            .select('*')
-            .eq('id', currentUser.id)
-            .maybeSingle();
+        const { data, error } = await withTimeout(
+            sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle(),
+            8000
+        );
         if (error) {
             console.error('Recover error:', error);
             showToast('Lookup failed: ' + error.message);
@@ -277,8 +281,54 @@ async function recoverExistingProfile() {
         showToast('No profile found for this email — pick a username to create one');
     } catch (e) {
         console.error('recoverExistingProfile crashed:', e);
-        showToast('Error: ' + (e.message || 'unknown'));
+        if (e.message === 'TIMEOUT') {
+            showToast('Timed out — old app cache is blocking. Tap Run Diagnostics.');
+        } else {
+            showToast('Error: ' + (e.message || 'unknown'));
+        }
     }
+}
+
+// Direct fetch to Supabase REST endpoint, bypassing the supabase-js client.
+// If THIS works but the client doesn't, the issue is library/auth state.
+// If this also fails, the issue is network/service-worker.
+async function runSocialDiagnostics() {
+    const lines = [];
+    const log = (s) => { lines.push(s); console.log('[diag]', s); };
+
+    log('SW controller: ' + (navigator.serviceWorker?.controller ? 'yes' : 'no'));
+    if (navigator.serviceWorker?.getRegistration) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        log('SW scope: ' + (reg?.scope || 'none'));
+        log('SW state: ' + (reg?.active?.state || 'none'));
+    }
+    log('Online: ' + navigator.onLine);
+    log('sb client: ' + (sb ? 'ok' : 'missing'));
+    log('currentUser: ' + (currentUser?.email || currentUser?.id?.slice(0,8) || 'none'));
+
+    // Direct REST fetch (bypasses supabase-js)
+    try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+        const resp = await fetch(
+            SUPABASE_URL + '/rest/v1/profiles?select=id&limit=1',
+            { headers: { apikey: SUPABASE_ANON_KEY }, signal: ctrl.signal, cache: 'no-store' }
+        );
+        clearTimeout(t);
+        log('Direct REST status: ' + resp.status);
+    } catch (e) {
+        log('Direct REST FAILED: ' + e.message);
+    }
+
+    // Show results in a modal-like banner
+    const existing = document.getElementById('diag-results');
+    if (existing) existing.remove();
+    const div = document.createElement('div');
+    div.id = 'diag-results';
+    div.style.cssText = 'position:fixed;left:12px;right:12px;top:12px;z-index:9999;background:#1a1a1a;color:#fff;border:1px solid #d4af37;border-radius:10px;padding:14px;font-family:monospace;font-size:12px;max-height:60vh;overflow:auto;white-space:pre-wrap';
+    div.textContent = lines.join('\n') + '\n\n[tap to dismiss]';
+    div.onclick = () => div.remove();
+    document.body.appendChild(div);
 }
 
 async function setupUsername() {

@@ -1,4 +1,11 @@
-const CACHE_NAME = 'ironfaith-v44';
+const CACHE_NAME = 'ironfaith-v45';
+
+// Allow the page to tell a waiting SW to take over immediately
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
+});
 const ASSETS = [
     './',
     './index.html',
