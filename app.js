@@ -2482,6 +2482,59 @@ function copyToClipboard(text, message) {
     });
 }
 
+// ========== CLIENT ERROR REPORTING ==========
+// Captures uncaught errors + unhandled promise rejections into a localStorage
+// ring buffer (last 50). Viewable via Profile → "View Error Log" or by typing
+// `viewErrorLog()` in the console. No external service, no PII collection.
+const ERROR_LOG_KEY = 'faithfit_error_log';
+const ERROR_LOG_MAX = 50;
+
+function logClientError(source, msg, stack) {
+    try {
+        const log = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
+        log.push({
+            t: Date.now(),
+            source,
+            msg: String(msg).slice(0, 500),
+            stack: stack ? String(stack).slice(0, 1000) : '',
+            url: location.pathname,
+        });
+        // Keep only the most recent N
+        while (log.length > ERROR_LOG_MAX) log.shift();
+        localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(log));
+    } catch (e) { /* swallow — error reporting must never throw */ }
+}
+
+window.addEventListener('error', (e) => {
+    logClientError('error', e.message || 'unknown', e.error?.stack);
+});
+window.addEventListener('unhandledrejection', (e) => {
+    const reason = e.reason;
+    const msg = reason?.message || (typeof reason === 'string' ? reason : JSON.stringify(reason));
+    logClientError('promise', msg, reason?.stack);
+});
+
+function viewErrorLog() {
+    try {
+        const log = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
+        if (log.length === 0) {
+            showToast('No errors logged');
+            return;
+        }
+        const lines = log.map(e => {
+            const when = new Date(e.t).toLocaleString();
+            return `[${when}] (${e.source}) ${e.msg}`;
+        }).join('\n\n');
+        // Render in a simple modal-style overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);color:#fff;z-index:99999;padding:20px;overflow:auto;font-family:monospace;font-size:11px;white-space:pre-wrap;line-height:1.4';
+        overlay.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><strong style="font-size:14px">Error Log (${log.length})</strong><div><button onclick="localStorage.removeItem('${ERROR_LOG_KEY}');this.closest('div').parentElement.parentElement.remove()" style="margin-right:8px;padding:6px 10px;background:#c00;color:#fff;border:none;border-radius:4px">Clear</button><button onclick="this.closest('div').parentElement.parentElement.remove()" style="padding:6px 10px;background:#444;color:#fff;border:none;border-radius:4px">Close</button></div></div><div>${lines.replace(/</g, '&lt;')}</div>`;
+        document.body.appendChild(overlay);
+    } catch (e) {
+        showToast('Could not read error log');
+    }
+}
+
 function showToast(message, type) {
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
