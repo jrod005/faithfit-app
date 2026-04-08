@@ -344,6 +344,7 @@ function ironfaithSocialBootstrap() {
                 if (profile) {
                     userProfile = profile;
                     try { renderSocialTab(); } catch (e) {}
+                    try { pullSocialNameToLocal(); } catch (e) {}
                     if (typeof syncStatsToSupabase === 'function') {
                         try { syncStatsToSupabase(); } catch (e) {}
                     }
@@ -1083,6 +1084,45 @@ async function syncStatsToSupabase() {
     const stats = getPublicStats();
     await directUpdate('profiles', 'id=eq.' + encodeURIComponent(currentUser.id), { stats });
     userProfile.stats = stats;
+}
+
+// Debounced version — called from DB.set whenever a stat-relevant key changes
+let _statsSyncTimer = null;
+function scheduleSocialStatsSync() {
+    if (!currentUser || !userProfile) return;
+    if (_statsSyncTimer) clearTimeout(_statsSyncTimer);
+    _statsSyncTimer = setTimeout(() => {
+        syncStatsToSupabase().catch(e => console.error('scheduleSocialStatsSync:', e));
+    }, 2500);
+}
+
+// Push the local profile.name to the social profile's display_name
+// (called from saveProfile in app.js when the local name changes)
+async function syncLocalNameToSocial(localName) {
+    if (!currentUser || !userProfile || !localName) return;
+    if (userProfile.display_name === localName) return;
+    const ok = await directUpdate(
+        'profiles',
+        'id=eq.' + encodeURIComponent(currentUser.id),
+        { display_name: localName }
+    );
+    if (ok) {
+        userProfile.display_name = localName;
+        if (typeof renderSocialTab === 'function') renderSocialTab();
+    }
+}
+
+// Pull the social display_name into the local profile if local profile has no name
+function pullSocialNameToLocal() {
+    if (!userProfile?.display_name) return;
+    try {
+        const local = JSON.parse(localStorage.getItem('faithfit_profile') || '{}');
+        if (!local.name) {
+            local.name = userProfile.display_name;
+            localStorage.setItem('faithfit_profile', JSON.stringify(local));
+            if (typeof loadProfile === 'function') loadProfile();
+        }
+    } catch (e) {}
 }
 
 async function updateBio() {

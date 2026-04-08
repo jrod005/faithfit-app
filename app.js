@@ -60,8 +60,15 @@ const DB = {
         if (SYNCED_KEYS.has(key) && typeof scheduleCloudSync === 'function') {
             scheduleCloudSync();
         }
+        // If a stat-relevant key changed, debounce a push to the social profile
+        if (STAT_KEYS.has(key) && typeof scheduleSocialStatsSync === 'function') {
+            scheduleSocialStatsSync();
+        }
     }
 };
+
+// Keys whose changes should trigger a social profile stats refresh
+const STAT_KEYS = new Set(['weights', 'workouts', 'prs', 'profile']);
 
 function today() {
     return new Date().toISOString().split('T')[0];
@@ -2108,6 +2115,10 @@ function saveProfile() {
     updateNutritionBars();
     drawWeightChart();
     checkAchievements();
+    // If signed in to social, push the local name to the social display_name
+    if (typeof syncLocalNameToSocial === 'function' && profile.name) {
+        syncLocalNameToSocial(profile.name);
+    }
 }
 
 function loadProfile() {
