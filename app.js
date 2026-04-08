@@ -782,6 +782,184 @@ function loadHapticsToggle() {
     if (offBtn) offBtn.classList.toggle('active', !enabled);
 }
 
+// ========== NOTIFICATIONS / REMINDERS ==========
+const NOTIF_KEY = 'notifSettings';
+const NOTIF_FIRED_KEY = 'notifFiredToday';
+let notifTimers = [];
+
+function getNotifSettings() {
+    return DB.get(NOTIF_KEY, {
+        enabled: false,
+        workoutTime: '',
+        prayerTime: '',
+        streakSaver: true,
+        verseDaily: false,
+    });
+}
+
+function saveNotifSettings(s) { DB.set(NOTIF_KEY, s); }
+
+function notifSupported() { return 'Notification' in window; }
+
+async function enableNotifications() {
+    if (!notifSupported()) {
+        showToast('Notifications not supported on this device', 'warn');
+        return;
+    }
+    let perm = Notification.permission;
+    if (perm === 'default') {
+        perm = await Notification.requestPermission();
+    }
+    if (perm !== 'granted') {
+        showToast('Permission denied — enable in browser settings', 'warn');
+        return;
+    }
+    const s = getNotifSettings();
+    s.enabled = true;
+    if (!s.workoutTime) s.workoutTime = '17:00';
+    if (!s.prayerTime) s.prayerTime = '08:00';
+    saveNotifSettings(s);
+    loadNotifToggle();
+    scheduleNotifications();
+    showToast('Reminders on', 'success');
+    fireNotification('Iron Faith reminders active', 'You\'ll get a heads-up at your set times.');
+}
+
+function disableNotifications() {
+    const s = getNotifSettings();
+    s.enabled = false;
+    saveNotifSettings(s);
+    loadNotifToggle();
+    clearNotifTimers();
+    showToast('Reminders off', 'info');
+}
+
+function updateNotifSettings() {
+    const s = getNotifSettings();
+    const wt = document.getElementById('notif-workout-time');
+    const pt = document.getElementById('notif-prayer-time');
+    const ss = document.getElementById('notif-streak');
+    const vd = document.getElementById('notif-verse');
+    if (wt) s.workoutTime = wt.value;
+    if (pt) s.prayerTime = pt.value;
+    if (ss) s.streakSaver = ss.checked;
+    if (vd) s.verseDaily = vd.checked;
+    saveNotifSettings(s);
+    scheduleNotifications();
+    showToast('Reminders updated', 'success');
+}
+
+function loadNotifToggle() {
+    const s = getNotifSettings();
+    const onBtn = document.getElementById('notif-on');
+    const offBtn = document.getElementById('notif-off');
+    const settingsBox = document.getElementById('notif-settings');
+    const enabled = s.enabled && notifSupported() && Notification.permission === 'granted';
+    if (onBtn) onBtn.classList.toggle('active', enabled);
+    if (offBtn) offBtn.classList.toggle('active', !enabled);
+    if (settingsBox) settingsBox.classList.toggle('hidden', !enabled);
+    const wt = document.getElementById('notif-workout-time');
+    const pt = document.getElementById('notif-prayer-time');
+    const ss = document.getElementById('notif-streak');
+    const vd = document.getElementById('notif-verse');
+    if (wt) wt.value = s.workoutTime || '17:00';
+    if (pt) pt.value = s.prayerTime || '08:00';
+    if (ss) ss.checked = !!s.streakSaver;
+    if (vd) vd.checked = !!s.verseDaily;
+}
+
+function clearNotifTimers() {
+    notifTimers.forEach(t => clearTimeout(t));
+    notifTimers = [];
+}
+
+function msUntilTimeToday(hhmm) {
+    if (!hhmm) return -1;
+    const [h, m] = hhmm.split(':').map(Number);
+    const target = new Date();
+    target.setHours(h, m, 0, 0);
+    return target.getTime() - Date.now();
+}
+
+function scheduleNotifications() {
+    clearNotifTimers();
+    const s = getNotifSettings();
+    if (!s.enabled || !notifSupported() || Notification.permission !== 'granted') return;
+
+    const fired = DB.get(NOTIF_FIRED_KEY, { date: '', items: {} });
+    if (fired.date !== today()) {
+        fired.date = today();
+        fired.items = {};
+        DB.set(NOTIF_FIRED_KEY, fired);
+    }
+
+    const schedule = (key, hhmm, title, body) => {
+        if (!hhmm) return;
+        if (fired.items[key]) return;
+        const ms = msUntilTimeToday(hhmm);
+        if (ms < 0) return; // already passed
+        const t = setTimeout(() => {
+            fireNotification(title, body);
+            const f = DB.get(NOTIF_FIRED_KEY, { date: today(), items: {} });
+            f.items[key] = true;
+            DB.set(NOTIF_FIRED_KEY, f);
+        }, ms);
+        notifTimers.push(t);
+    };
+
+    schedule('workout', s.workoutTime, '\u26A1 Time to train', 'Your workout is calling. Get after it.');
+    schedule('prayer', s.prayerTime, '\u2728 Prayer time', 'Take a moment to pray and read scripture.');
+
+    if (s.verseDaily) {
+        schedule('verse', '07:00', '\u2727 Verse of the day', getDailyVerse().text.slice(0, 100) + '\u2026');
+    }
+
+    // Streak-saver: check at 8pm if no workout logged today and user has a streak
+    if (s.streakSaver) {
+        schedule('streak', '20:00', '\u{1F525} Don\'t break your streak', 'You haven\'t logged a workout yet today. Even a quick session counts.');
+    }
+}
+
+function fireNotification(title, body) {
+    if (!notifSupported() || Notification.permission !== 'granted') return;
+    try {
+        // Streak-saver check at fire time — skip if already worked out
+        if (title.includes('streak')) {
+            const todayWorkouts = DB.get('workouts', []).filter(w => {
+                const d = new Date(w.timestamp); d.setHours(0,0,0,0);
+                const t = new Date(); t.setHours(0,0,0,0);
+                return d.getTime() === t.getTime();
+            });
+            if (todayWorkouts.length > 0) return;
+            // simple yesterday check — only nag if user worked out yesterday (real streak risk)
+            const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); yesterday.setHours(0,0,0,0);
+            const yEnd = new Date(yesterday); yEnd.setHours(23,59,59,999);
+            const yWorkouts = DB.get('workouts', []).filter(w => w.timestamp >= yesterday.getTime() && w.timestamp <= yEnd.getTime());
+            if (yWorkouts.length === 0) return;
+        }
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then(reg => {
+                reg.showNotification(title, {
+                    body,
+                    icon: './icons/icon-192.png',
+                    badge: './icons/icon-192.png',
+                    tag: title,
+                });
+            });
+        } else {
+            new Notification(title, { body });
+        }
+    } catch (e) {}
+}
+
+// On launch: catch up on missed reminders if any times have already passed today
+function checkMissedNotifications() {
+    const s = getNotifSettings();
+    if (!s.enabled || !notifSupported() || Notification.permission !== 'granted') return;
+    // scheduleNotifications already filters out past times — no catch-up by design
+    // (avoid annoying the user with stale reminders)
+}
+
 // --- Visual: count-up animation ---
 function animateCount(el, target, opts) {
     if (!el) return;
@@ -2015,6 +2193,69 @@ function updateDashboard() {
     renderMuscleHeatmap();
     renderAchievements();
     renderWeeklyReport();
+    renderDiscoveryHint();
+}
+
+// ========== DISCOVERY HINTS ==========
+function renderDiscoveryHint() {
+    const el = document.getElementById('discovery-hint');
+    if (!el) return;
+    if (DB.get('hintsDismissed', false)) { el.classList.add('hidden'); return; }
+
+    const hints = [];
+    const workouts = DB.get('workouts', []);
+    const meals = DB.get('meals', []);
+    const prayers = DB.get('prayerEntries', []);
+    const photos = DB.get('progressPhotos', []);
+    const coachUsed = DB.get('coachUsed', false);
+    const customRoutines = DB.get('myRoutines', []);
+    const notif = getNotifSettings();
+
+    if (!coachUsed && workouts.length >= 3) {
+        hints.push({ icon: '\u2605', title: 'Try the AI Coach', body: 'Ask for a personalized workout plan, meal plan, or progress analysis.', action: 'Open Coach', tab: 'coach' });
+    }
+    if (prayers.length === 0 && workouts.length >= 1) {
+        hints.push({ icon: '\u270D', title: 'Use the Prayer Journal', body: 'Capture what you\'re thankful for. Faith and fitness, side by side.', action: 'Scroll up', tab: null });
+    }
+    if (photos.length === 0 && workouts.length >= 5) {
+        hints.push({ icon: '\u{1F4F8}', title: 'Track progress photos', body: 'See physical changes the scale can\'t. Photos are stored locally and stay private.', action: 'Open Progress', tab: 'progress' });
+    }
+    if (!notif.enabled && workouts.length >= 3) {
+        hints.push({ icon: '\u{1F514}', title: 'Set workout reminders', body: 'Get a daily nudge so you never miss a session. Streak-saver alerts included.', action: 'Open Settings', tab: 'profile' });
+    }
+    if (customRoutines.length === 0 && workouts.length >= 2) {
+        hints.push({ icon: '\u{1F4CB}', title: 'Browse the routine library', body: 'PPL, Upper/Lower, Full Body, home & travel routines — pre-built and ready to start.', action: 'Open Workouts', tab: 'workout' });
+    }
+    if (meals.length === 0 && workouts.length >= 3) {
+        hints.push({ icon: '\u{1F37D}', title: 'Log your nutrition', body: 'Calories and protein are half the equation. Search the food database to log fast.', action: 'Open Nutrition', tab: 'nutrition' });
+    }
+
+    if (hints.length === 0) { el.classList.add('hidden'); return; }
+
+    // Pick one based on day of year for variety
+    const hint = hints[Math.floor(Date.now() / 86400000) % hints.length];
+    el.classList.remove('hidden');
+    el.innerHTML = `
+        <div class="discovery-icon">${hint.icon}</div>
+        <div class="discovery-body">
+            <div class="discovery-title">${hint.title}</div>
+            <div class="discovery-text">${hint.body}</div>
+        </div>
+        <div class="discovery-actions">
+            ${hint.tab ? `<button class="btn btn-sm btn-primary" onclick="goToTab('${hint.tab}')">${hint.action}</button>` : ''}
+            <button class="discovery-dismiss" onclick="dismissDiscoveryHints()" title="Dismiss">&times;</button>
+        </div>`;
+}
+
+function dismissDiscoveryHints() {
+    DB.set('hintsDismissed', true);
+    const el = document.getElementById('discovery-hint');
+    if (el) el.classList.add('hidden');
+}
+
+function goToTab(tabId) {
+    const btn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+    if (btn) btn.click();
 }
 
 function formatDuration(ms) {
@@ -2274,6 +2515,7 @@ function scheduleMidnightReset() {
         updateMealsList();
         updateNutritionBars();
         showToast('New day! Daily stats have been reset.');
+        scheduleNotifications();
         // Schedule the next midnight reset
         scheduleMidnightReset();
     }, msUntilMidnight);
@@ -2289,6 +2531,7 @@ document.addEventListener('visibilitychange', () => {
         updateMealsList();
         updateNutritionBars();
         showToast('New day! Daily stats have been reset.');
+        scheduleNotifications();
         scheduleMidnightReset();
     }
 });
@@ -4901,6 +5144,8 @@ function init() {
     loadProfile();
     loadUnits();
     loadHapticsToggle();
+    loadNotifToggle();
+    scheduleNotifications();
     updateDashboard();
     updateTodaysExercises();
     updateOverloadDropdown();

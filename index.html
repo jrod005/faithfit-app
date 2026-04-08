@@ -183,6 +183,8 @@
                 </div>
             </div>
 
+            <div id="discovery-hint" class="discovery-hint hidden"></div>
+
             <div class="card prayer-journal-card">
                 <div class="prayer-journal-header">
                     <h2>&#x270D; Prayer &amp; Gratitude</h2>
@@ -852,6 +854,28 @@
                     <div class="unit-toggle">
                         <button class="unit-btn active" id="haptics-on" onclick="setHaptics(true)">On</button>
                         <button class="unit-btn" id="haptics-off" onclick="setHaptics(false)">Off</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Reminders &amp; Notifications</label>
+                    <div class="unit-toggle">
+                        <button class="unit-btn" id="notif-on" onclick="enableNotifications()">On</button>
+                        <button class="unit-btn active" id="notif-off" onclick="disableNotifications()">Off</button>
+                    </div>
+                    <div id="notif-settings" class="hidden" style="margin-top:12px">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label style="font-size:11px">Workout reminder</label>
+                                <input type="time" id="notif-workout-time" onchange="updateNotifSettings()">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size:11px">Prayer reminder</label>
+                                <input type="time" id="notif-prayer-time" onchange="updateNotifSettings()">
+                            </div>
+                        </div>
+                        <label class="notif-check"><input type="checkbox" id="notif-streak" onchange="updateNotifSettings()"> Streak-saver alerts (evening warning if no workout yet)</label>
+                        <label class="notif-check"><input type="checkbox" id="notif-verse" onchange="updateNotifSettings()"> Daily verse notification</label>
+                        <p class="notif-note">Reminders fire while the app is open. For background notifications, install the app to your home screen.</p>
                     </div>
                 </div>
                 <div class="form-group">
