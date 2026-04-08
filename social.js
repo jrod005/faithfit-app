@@ -132,7 +132,11 @@ async function directSignIn(email, pass) {
             token_type: body.token_type || 'bearer',
             user: body.user,
         };
+        // Store under our own key that supabase-js doesn't touch, so it
+        // can't be cleared by the library re-init on next load.
         try {
+            localStorage.setItem('ironfaith-direct-session', JSON.stringify(session));
+            // Also try the supabase-js key as a courtesy, in case the lib works
             localStorage.setItem('ironfaith-auth', JSON.stringify({ currentSession: session, expiresAt: session.expires_at }));
         } catch (e) {}
 
@@ -274,6 +278,16 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
     // appears logged in even if supabase-js is hung. Doesn't touch the library.
     try {
         const stored = readStoredSession();
+        // Debug toast — tells us at a glance whether the session survived
+        setTimeout(() => {
+            try {
+                const hasDirect = !!localStorage.getItem('ironfaith-direct-session');
+                const hasLib = !!localStorage.getItem('ironfaith-auth');
+                if (typeof showToast === 'function') {
+                    showToast('Session check: direct=' + hasDirect + ' lib=' + hasLib + ' restored=' + !!stored?.user);
+                }
+            } catch (e) {}
+        }, 800);
         if (stored?.user) {
             currentUser = stored.user;
             renderSocialTab();
@@ -442,15 +456,29 @@ if (document.readyState === 'loading') {
 // Read the supabase session straight from localStorage. Doesn't touch
 // supabase-js, so it works even when the library is hung.
 function readStoredSession() {
+    // Try our own key first — supabase-js never touches it, so it can't be wiped
+    try {
+        const direct = localStorage.getItem('ironfaith-direct-session');
+        if (direct) {
+            const parsed = JSON.parse(direct);
+            if (parsed && parsed.access_token) {
+                // Check expiry — if expired, fall through to refresh attempt below
+                const now = Math.floor(Date.now() / 1000);
+                if (!parsed.expires_at || parsed.expires_at > now) {
+                    return parsed;
+                }
+            }
+        }
+    } catch (e) {}
+    // Fall back to the supabase-js key
     try {
         const raw = localStorage.getItem('ironfaith-auth');
         if (!raw) return null;
         const parsed = JSON.parse(raw);
-        // supabase-js stores under .currentSession in some versions, root in others
         const sess = parsed.currentSession || parsed;
         if (sess && sess.access_token) return sess;
-        return null;
-    } catch (e) { return null; }
+    } catch (e) {}
+    return null;
 }
 
 async function getAccessTokenSafely() {
