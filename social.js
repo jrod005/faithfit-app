@@ -71,12 +71,47 @@ async function socialSignUp() {
     if (!name || !email || !pass) return showToast('Fill in all fields');
     if (pass.length < 6) return showToast('Password must be 6+ characters');
 
-    const { error } = await sb.auth.signUp({
-        email, password: pass,
-        options: { data: { display_name: name } }
-    });
-    if (error) return showToast(error.message);
-    showToast('Account created! Check your email to confirm, or log in if confirmation is disabled.');
+    // Direct REST signup so it works even when supabase-js is hung
+    try {
+        const resp = await fetch(SUPABASE_URL + '/auth/v1/signup', {
+            method: 'POST',
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email,
+                password: pass,
+                data: { display_name: name },
+            }),
+            cache: 'no-store',
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+            return showToast(body.error_description || body.msg || ('Signup failed: HTTP ' + resp.status));
+        }
+        // If a session came back (confirmations disabled), persist it and sign in
+        if (body.access_token) {
+            const session = {
+                access_token: body.access_token,
+                refresh_token: body.refresh_token,
+                expires_in: body.expires_in,
+                expires_at: Math.floor(Date.now() / 1000) + (body.expires_in || 3600),
+                token_type: body.token_type || 'bearer',
+                user: body.user,
+            };
+            try {
+                localStorage.setItem('ironfaith-direct-session', JSON.stringify(session));
+            } catch (e) {}
+            currentUser = body.user;
+            showToast('Account created!');
+            await directProfileSetup();
+        } else {
+            showToast('Account created! Check your email to confirm, then log in.');
+        }
+    } catch (e) {
+        showToast('Signup failed: ' + (e.message || 'unknown'));
+    }
 }
 
 async function socialSignIn() {
@@ -341,6 +376,22 @@ function ironfaithSocialBootstrap() {
         }
         try { renderSocialTab(); } catch (e) {}
     })();
+
+    // Proactive token refresh: every 60s, check if the stored session is
+    // close to expiring and refresh it preemptively. Without this, a long
+    // idle session would die and the next user action would have to wait
+    // for a refresh round-trip.
+    setInterval(() => {
+        try {
+            const stored = readStoredSession();
+            if (!stored?.refresh_token) return;
+            // Refresh if expiring within the next 5 minutes
+            const now = Math.floor(Date.now() / 1000);
+            if (stored.expires_at && stored.expires_at - now < 300) {
+                directRefreshToken();
+            }
+        } catch (e) {}
+    }, 60000);
 
     // Belt-and-suspenders: every 5 seconds, if currentUser is set, persist
     // the session to our own key so it can survive PWA kill regardless of

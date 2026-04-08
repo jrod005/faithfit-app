@@ -66,7 +66,6 @@ function scheduleCloudSync() {
 }
 
 async function pushToCloud(silent) {
-    if (typeof sb === 'undefined' || !sb) return;
     if (typeof currentUser === 'undefined' || !currentUser) {
         if (!silent) showToast('Sign in to enable cloud backup', 'warn');
         return;
@@ -77,13 +76,27 @@ async function pushToCloud(silent) {
     try {
         const snapshot = getLocalSnapshot();
         const localModified = getLocalModified() || Date.now();
-        const { error } = await sb.from('user_data').upsert({
-            user_id: currentUser.id,
-            data: snapshot,
-            local_modified: localModified,
-            updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' });
-        if (error) throw error;
+        // Direct REST upsert: POST with Prefer: resolution=merge-duplicates
+        const headers = await directHeaders({
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates,return=minimal',
+        });
+        if (!headers) throw new Error('No auth token');
+        const resp = await fetch(SUPABASE_URL + '/rest/v1/user_data?on_conflict=user_id', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                user_id: currentUser.id,
+                data: snapshot,
+                local_modified: localModified,
+                updated_at: new Date().toISOString(),
+            }),
+            cache: 'no-store',
+        });
+        if (!resp.ok) {
+            const body = await resp.text().catch(() => '');
+            throw new Error('HTTP ' + resp.status + ' ' + body.slice(0, 100));
+        }
         setLastSync(Date.now());
         updateCloudSyncStatusUI();
         if (!silent) showToast('Backed up to cloud', 'success');
@@ -97,7 +110,6 @@ async function pushToCloud(silent) {
 }
 
 async function pullFromCloud(silent) {
-    if (typeof sb === 'undefined' || !sb) return;
     if (typeof currentUser === 'undefined' || !currentUser) {
         if (!silent) showToast('Sign in to restore from cloud', 'warn');
         return;
@@ -106,11 +118,12 @@ async function pullFromCloud(silent) {
     cloudSyncInProgress = true;
     updateCloudSyncStatusUI('Restoring\u2026');
     try {
-        const { data, error } = await sb.from('user_data')
-            .select('data, local_modified, updated_at')
-            .eq('user_id', currentUser.id)
-            .maybeSingle();
-        if (error) throw error;
+        const rows = await directSelect(
+            'user_data?user_id=eq.' + encodeURIComponent(currentUser.id) +
+            '&select=data,local_modified,updated_at'
+        );
+        if (rows === null) throw new Error('Network/auth failure');
+        const data = (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
         if (!data) {
             if (!silent) showToast('No cloud backup found', 'info');
             return null;
@@ -145,15 +158,14 @@ async function pullFromCloud(silent) {
 
 // On login, decide whether to push or pull based on timestamps
 async function reconcileOnLogin() {
-    if (typeof sb === 'undefined' || !sb) return;
     if (typeof currentUser === 'undefined' || !currentUser) return;
     if (!isCloudSyncEnabled()) return;
     try {
-        const { data, error } = await sb.from('user_data')
-            .select('local_modified, updated_at')
-            .eq('user_id', currentUser.id)
-            .maybeSingle();
-        if (error) throw error;
+        const rows = await directSelect(
+            'user_data?user_id=eq.' + encodeURIComponent(currentUser.id) +
+            '&select=local_modified,updated_at'
+        );
+        const data = (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
         const localMod = getLocalModified();
         const remoteMod = data?.local_modified || 0;
         const hasLocal = localStorage.getItem('faithfit_workouts') || localStorage.getItem('faithfit_profile');
@@ -250,37 +262,41 @@ function updateCloudSyncStatusUI(overrideText) {
     el.textContent = 'Last backup: ' + when;
 }
 
-// Hook into existing supabase auth state — wait for sb to be defined
+// Poll for currentUser instead of relying on supabase-js auth state events.
+// social.js sets currentUser via the direct-REST sign-in path, which never
+// fires onAuthStateChange when the library is hung.
+let _cloudHookFired = false;
 function initCloudSyncAuthHook() {
-    if (typeof sb === 'undefined') {
-        setTimeout(initCloudSyncAuthHook, 200);
-        return;
-    }
-    sb.auth.onAuthStateChange((event, session) => {
-        if (session?.user) {
-            // Wait a tick for currentUser to be set by social.js
-            setTimeout(() => {
-                loadCloudSyncToggle();
-                checkPendingRestore();
-                if (isCloudSyncEnabled()) reconcileOnLogin();
-            }, 700);
-        } else {
-            updateCloudSyncStatusUI();
+    const check = () => {
+        if (_cloudHookFired) return;
+        if (typeof currentUser !== 'undefined' && currentUser) {
+            _cloudHookFired = true;
+            loadCloudSyncToggle();
+            checkPendingRestore();
+            if (isCloudSyncEnabled()) reconcileOnLogin();
         }
-    });
-    // Initial check
-    sb.auth.getSession().then(({ data }) => {
-        if (data?.session?.user) {
-            setTimeout(() => {
-                loadCloudSyncToggle();
-                checkPendingRestore();
-                if (isCloudSyncEnabled()) reconcileOnLogin();
-            }, 700);
-        }
-    });
+    };
+    check();
+    // Re-check periodically in case sign-in happens later
+    const interval = setInterval(() => {
+        check();
+        if (_cloudHookFired) clearInterval(interval);
+    }, 1000);
+    // Stop polling after 60s either way
+    setTimeout(() => clearInterval(interval), 60000);
 }
 
-initCloudSyncAuthHook();
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCloudSyncAuthHook);
+} else {
+    setTimeout(initCloudSyncAuthHook, 0);
+}
+
+// Reset the hook so it re-runs on sign-out → sign-in
+function resetCloudSyncAuthHook() {
+    _cloudHookFired = false;
+    initCloudSyncAuthHook();
+}
 
 // =============================================
 // Fresh-install restore prompt
@@ -371,7 +387,7 @@ async function checkPendingRestore() {
         }
 
         const resp = await fetch(
-            SUPABASE_URL + '/rest/v1/user_data?user_id=eq.' + encodeURIComponent(uid) + '&select=snapshot,local_modified',
+            SUPABASE_URL + '/rest/v1/user_data?user_id=eq.' + encodeURIComponent(uid) + '&select=data,local_modified',
             {
                 headers: {
                     apikey: SUPABASE_ANON_KEY,
@@ -390,8 +406,8 @@ async function checkPendingRestore() {
         const rows = await resp.json();
         const data = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
 
-        if (data && data.snapshot && Object.keys(data.snapshot).length > 0) {
-            applySnapshot(data.snapshot);
+        if (data && data.data && Object.keys(data.data).length > 0) {
+            applySnapshot(data.data);
             setLastSync(Date.now());
             setCloudSyncEnabled(true);
             DB.set('pendingCloudRestore', false);
