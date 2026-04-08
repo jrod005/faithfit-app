@@ -977,7 +977,7 @@ function renderProfileView() {
             <div class="profile-header-row">
                 <div class="profile-avatar-wrapper" onclick="document.getElementById('avatar-upload').click()">
                     ${avatarContent}
-                    <div class="profile-avatar-edit">&#x1F4F7;</div>
+                    <div class="profile-avatar-edit" aria-label="Change photo"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></div>
                     <input type="file" id="avatar-upload" accept="image/*" onchange="uploadProfilePic(event)" style="display:none">
                 </div>
                 <div>
