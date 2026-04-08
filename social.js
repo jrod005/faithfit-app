@@ -148,33 +148,48 @@ if (document.readyState === 'loading') {
 // ========== PROFILE ==========
 
 async function setupUsername() {
+    if (!sb) return showToast('Cannot connect to server', 'error');
+    if (!currentUser) return showToast('Not signed in', 'error');
     const input = document.getElementById('setup-username');
+    if (!input) return;
     const raw = input.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
     if (raw.length < 3) return showToast('Username must be 3+ characters');
     if (raw.length > 20) return showToast('Username must be under 20 characters');
 
-    // Check availability
-    const { data: existing } = await sb.from('profiles').select('id').eq('username', raw).single();
-    if (existing) return showToast('Username taken');
+    try {
+        // Check availability — maybeSingle() doesn't error on zero rows
+        const { data: existing, error: checkErr } = await sb.from('profiles')
+            .select('id').eq('username', raw).maybeSingle();
+        if (checkErr) {
+            console.error('Username check error:', checkErr);
+            return showToast('Check failed: ' + checkErr.message, 'error');
+        }
+        if (existing) return showToast('Username taken');
 
-    const displayName = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || raw;
+        const displayName = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || raw;
 
-    const { error } = await sb.from('profiles').insert({
-        id: currentUser.id,
-        username: raw,
-        display_name: displayName,
-        bio: '',
-        stats: getPublicStats(),
-        friends: [],
-        is_public: true
-    });
+        const { error } = await sb.from('profiles').insert({
+            id: currentUser.id,
+            username: raw,
+            display_name: displayName,
+            bio: '',
+            stats: getPublicStats(),
+            friends: [],
+        });
 
-    if (error) return showToast(error.message);
+        if (error) {
+            console.error('Insert profile error:', error);
+            return showToast(error.message, 'error');
+        }
 
-    const { data } = await sb.from('profiles').select().eq('id', currentUser.id).single();
-    userProfile = data;
-    renderSocialTab();
-    showToast('Profile created!');
+        const { data } = await sb.from('profiles').select().eq('id', currentUser.id).maybeSingle();
+        userProfile = data;
+        renderSocialTab();
+        showToast('Profile created!', 'success');
+    } catch (e) {
+        console.error('setupUsername crashed:', e);
+        showToast('Error: ' + (e.message || 'unknown'), 'error');
+    }
 }
 
 function getPublicStats() {

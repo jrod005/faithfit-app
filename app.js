@@ -3235,6 +3235,7 @@ async function deleteTemplate(index) {
 
 function updateSaveTemplateBtn() {
     const btn = document.getElementById('save-template-btn');
+    if (!btn) return;
     const workouts = DB.get('workouts', []).filter(w => w.date === today());
     btn.style.display = workouts.length > 0 ? 'block' : 'none';
 }
@@ -5187,34 +5188,38 @@ function getCurrentUnits() {
     return DB.get('units', 'imperial');
 }
 
+function safeCall(label, fn) {
+    try { fn(); } catch (e) { console.error('[init] ' + label + ' failed:', e); }
+}
+
 function init() {
-    loadBibleVersion();
-    displayDailyVerse();
-    loadProfile();
-    loadUnits();
-    loadHapticsToggle();
-    loadNotifToggle();
-    scheduleNotifications();
-    if (typeof loadCloudSyncToggle === 'function') loadCloudSyncToggle();
-    updateDashboard();
-    updateTodaysExercises();
-    updateOverloadDropdown();
-    updateMealsList();
-    updateNutritionBars();
-    drawWeightChart();
-    renderAchievements();
-    renderCalendarHeatmap();
-    renderMuscleHeatmap();
-    scheduleMidnightReset();
-    renderRoutinesList();
-    renderTodaysWorkoutBanner();
-    updateSaveTemplateBtn();
-    updateRestTimerVisibility();
-    renderChallenges();
-    renderWeeklyReport();
-    renderCustomExercises();
-    refreshCustomExerciseIntegration();
-    showOnboarding();
+    safeCall('loadBibleVersion', loadBibleVersion);
+    safeCall('displayDailyVerse', displayDailyVerse);
+    safeCall('loadProfile', loadProfile);
+    safeCall('loadUnits', loadUnits);
+    safeCall('loadHapticsToggle', loadHapticsToggle);
+    safeCall('loadNotifToggle', loadNotifToggle);
+    safeCall('scheduleNotifications', scheduleNotifications);
+    safeCall('loadCloudSyncToggle', () => { if (typeof loadCloudSyncToggle === 'function') loadCloudSyncToggle(); });
+    safeCall('updateDashboard', updateDashboard);
+    safeCall('updateTodaysExercises', updateTodaysExercises);
+    safeCall('updateOverloadDropdown', updateOverloadDropdown);
+    safeCall('updateMealsList', updateMealsList);
+    safeCall('updateNutritionBars', updateNutritionBars);
+    safeCall('drawWeightChart', drawWeightChart);
+    safeCall('renderAchievements', renderAchievements);
+    safeCall('renderCalendarHeatmap', renderCalendarHeatmap);
+    safeCall('renderMuscleHeatmap', renderMuscleHeatmap);
+    safeCall('scheduleMidnightReset', scheduleMidnightReset);
+    safeCall('renderRoutinesList', renderRoutinesList);
+    safeCall('renderTodaysWorkoutBanner', renderTodaysWorkoutBanner);
+    safeCall('updateSaveTemplateBtn', updateSaveTemplateBtn);
+    safeCall('updateRestTimerVisibility', updateRestTimerVisibility);
+    safeCall('renderChallenges', renderChallenges);
+    safeCall('renderWeeklyReport', renderWeeklyReport);
+    safeCall('renderCustomExercises', renderCustomExercises);
+    safeCall('refreshCustomExerciseIntegration', refreshCustomExerciseIntegration);
+    safeCall('showOnboarding', showOnboarding);
 
     // Auto-fill exercise inputs from history when name changes
     const exNameEl = document.getElementById('exercise-name');
@@ -5225,9 +5230,11 @@ function init() {
 
     // Redraw charts on resize
     window.addEventListener('resize', () => {
-        drawWeightChart();
-        const exercise = document.getElementById('overload-exercise').value;
-        if (exercise) showOverloadData();
+        try {
+            drawWeightChart();
+            const overloadEl = document.getElementById('overload-exercise');
+            if (overloadEl && overloadEl.value) showOverloadData();
+        } catch (e) { console.error('resize handler failed', e); }
     });
 }
 
