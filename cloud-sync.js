@@ -335,7 +335,8 @@ function showRestorePrompt() {
 // Called from the first onboarding slide. Sends the user to Social/Cloud
 // sign-in, then auto-pulls their backup and dismisses onboarding.
 async function onboardingRestoreFromCloud() {
-    // Mark as "trying to restore" so we know to auto-pull after sign-in
+    // Mark onboarding as complete so the user never loops back here
+    DB.set('onboarded', true);
     DB.set('pendingCloudRestore', true);
     DB.set(RESTORE_PROMPT_DISMISSED_KEY, true);
 
@@ -351,16 +352,37 @@ async function onboardingRestoreFromCloud() {
     }
 }
 
-// Watch for sign-in after a pending restore was requested
+// Watch for sign-in after a pending restore was requested.
+// Uses direct REST so it works even when supabase-js is hung.
 async function checkPendingRestore() {
     if (!DB.get('pendingCloudRestore', false)) return;
     if (typeof currentUser === 'undefined' || !currentUser) return;
     if (typeof sb === 'undefined' || !sb) return;
     try {
-        const { data } = await sb.from('user_data')
-            .select('snapshot, local_modified')
-            .eq('user_id', currentUser.id)
-            .maybeSingle();
+        // Pull access token from supabase-js (this part doesn't hang)
+        const { data: sess } = await sb.auth.getSession();
+        const token = sess?.session?.access_token;
+        const uid = sess?.session?.user?.id || currentUser.id;
+        if (!token || !uid) return;
+
+        const resp = await fetch(
+            SUPABASE_URL + '/rest/v1/user_data?user_id=eq.' + encodeURIComponent(uid) + '&select=snapshot,local_modified',
+            {
+                headers: {
+                    apikey: SUPABASE_ANON_KEY,
+                    Authorization: 'Bearer ' + token,
+                },
+                cache: 'no-store',
+            }
+        );
+        if (!resp.ok) {
+            console.error('Pending restore HTTP', resp.status);
+            if (typeof showToast === 'function') showToast('Restore failed: HTTP ' + resp.status);
+            return;
+        }
+        const rows = await resp.json();
+        const data = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+
         if (data && data.snapshot && Object.keys(data.snapshot).length > 0) {
             applySnapshot(data.snapshot);
             setLastSync(Date.now());
@@ -368,7 +390,6 @@ async function checkPendingRestore() {
             DB.set('pendingCloudRestore', false);
             DB.set('onboarded', true);
             if (typeof showToast === 'function') showToast('Data restored from cloud!');
-            // Refresh UI
             if (typeof loadProfile === 'function') loadProfile();
             if (typeof updateDashboard === 'function') updateDashboard();
             if (typeof loadCloudSyncToggle === 'function') loadCloudSyncToggle();
@@ -381,6 +402,7 @@ async function checkPendingRestore() {
         }
     } catch (e) {
         console.error('checkPendingRestore failed:', e);
+        if (typeof showToast === 'function') showToast('Restore error: ' + (e.message || 'unknown'));
     }
 }
 

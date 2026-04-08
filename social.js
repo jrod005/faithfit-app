@@ -84,8 +84,82 @@ async function socialSignIn() {
     const pass = document.getElementById('login-password').value;
     if (!email || !pass) return showToast('Fill in all fields');
 
-    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-    if (error) return showToast(error.message);
+    // Try the library first with a short timeout; fall back to direct REST
+    // if it hangs (the library has been observed to hang on some iOS PWAs).
+    const libSignin = (async () => {
+        const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+        if (error) throw new Error(error.message);
+    })();
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('LIB_TIMEOUT')), 6000));
+
+    try {
+        await Promise.race([libSignin, timeout]);
+        return; // success via library
+    } catch (e) {
+        console.warn('Library signin failed/timed out, falling back to direct REST:', e.message);
+        // Fall through to direct
+    }
+
+    await directSignIn(email, pass);
+}
+
+// Direct REST sign-in. Bypasses supabase-js when its auth flow hangs.
+async function directSignIn(email, pass) {
+    showToast('Signing in (direct)...');
+    try {
+        const resp = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+            method: 'POST',
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password: pass }),
+            cache: 'no-store',
+        });
+        const body = await resp.json();
+        if (!resp.ok) {
+            showToast(body.error_description || body.msg || ('Login failed: HTTP ' + resp.status));
+            return;
+        }
+
+        // Manually store the session in the same key supabase-js uses, so the
+        // library picks it up on the next load.
+        const session = {
+            access_token: body.access_token,
+            refresh_token: body.refresh_token,
+            expires_in: body.expires_in,
+            expires_at: Math.floor(Date.now() / 1000) + (body.expires_in || 3600),
+            token_type: body.token_type || 'bearer',
+            user: body.user,
+        };
+        try {
+            localStorage.setItem('ironfaith-auth', JSON.stringify({ currentSession: session, expiresAt: session.expires_at }));
+        } catch (e) {}
+
+        currentUser = body.user;
+
+        // Try to attach to sb for future calls
+        try {
+            if (sb && sb.auth && sb.auth.setSession) {
+                await Promise.race([
+                    sb.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token }),
+                    new Promise(r => setTimeout(r, 2000))
+                ]);
+            }
+        } catch (e) { console.warn('setSession failed:', e); }
+
+        // Now attempt to fetch/create profile via direct REST too
+        showToast('Signed in! Loading your profile...');
+        await directProfileSetup();
+
+        // Trigger pending cloud restore if flagged from onboarding
+        if (typeof checkPendingRestore === 'function') {
+            setTimeout(() => checkPendingRestore(), 500);
+        }
+    } catch (e) {
+        console.error('directSignIn crashed:', e);
+        showToast('Login failed: ' + (e.message || 'unknown'));
+    }
 }
 
 async function socialGoogleSignIn() {
