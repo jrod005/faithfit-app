@@ -170,10 +170,19 @@ async function socialGoogleSignIn() {
 }
 
 async function socialSignOut() {
-    await sb.auth.signOut();
+    // Wipe direct session immediately so we're not depending on the lib
+    try { localStorage.removeItem('ironfaith-direct-session'); } catch (e) {}
+    try { localStorage.removeItem('ironfaith-auth'); } catch (e) {}
+    // Best-effort lib signOut, but don't await it
+    try {
+        if (sb && sb.auth && sb.auth.signOut) {
+            sb.auth.signOut().catch(() => {});
+        }
+    } catch (e) {}
     currentUser = null;
     userProfile = null;
     renderSocialTab();
+    showToast('Signed out');
 }
 
 // Fetch profile with retry — don't wipe an existing userProfile on transient errors
@@ -372,6 +381,192 @@ if (document.readyState === 'loading') {
 
 // Generic direct-REST SELECT. `path` is everything after /rest/v1/.
 // Example: directSelect('posts?uid=in.(uid1,uid2)&order=created_at.desc&limit=30')
+// Refresh an expired access token via direct REST. Returns new session or null.
+async function directRefreshToken() {
+    try {
+        const stored = readStoredSession();
+        if (!stored?.refresh_token) return null;
+        const resp = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+            method: 'POST',
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ refresh_token: stored.refresh_token }),
+            cache: 'no-store',
+        });
+        if (!resp.ok) {
+            console.error('directRefreshToken HTTP', resp.status);
+            return null;
+        }
+        const body = await resp.json();
+        const newSession = {
+            access_token: body.access_token,
+            refresh_token: body.refresh_token,
+            expires_in: body.expires_in,
+            expires_at: Math.floor(Date.now() / 1000) + (body.expires_in || 3600),
+            token_type: body.token_type || 'bearer',
+            user: body.user || stored.user,
+        };
+        try {
+            localStorage.setItem('ironfaith-direct-session', JSON.stringify(newSession));
+        } catch (e) {}
+        return newSession;
+    } catch (e) {
+        console.error('directRefreshToken crashed:', e);
+        return null;
+    }
+}
+
+// Common headers for direct REST calls
+async function directHeaders(extra) {
+    let sessInfo = await getAccessTokenSafely();
+    // If token is missing or expired, try to refresh
+    if (!sessInfo?.token) {
+        const refreshed = await directRefreshToken();
+        if (refreshed) sessInfo = { token: refreshed.access_token, user: refreshed.user };
+    }
+    if (!sessInfo?.token) return null;
+    return Object.assign({
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: 'Bearer ' + sessInfo.token,
+    }, extra || {});
+}
+
+// Direct REST INSERT. Returns inserted row(s) or null on error.
+async function directInsert(table, body) {
+    try {
+        const headers = await directHeaders({
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+        });
+        if (!headers) {
+            if (typeof showToast === 'function') showToast('Not signed in');
+            return null;
+        }
+        const resp = await fetch(SUPABASE_URL + '/rest/v1/' + table, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
+            cache: 'no-store',
+        });
+        if (!resp.ok) {
+            const err = await resp.text().catch(() => '');
+            console.error('directInsert HTTP', resp.status, table, err);
+            if (typeof showToast === 'function') showToast('Insert ' + resp.status + ': ' + err.slice(0, 60));
+            return null;
+        }
+        return await resp.json();
+    } catch (e) {
+        console.error('directInsert crashed:', table, e);
+        return null;
+    }
+}
+
+// Direct REST UPDATE. `filter` is a PostgREST query string like 'id=eq.xyz'.
+async function directUpdate(table, filter, body) {
+    try {
+        const headers = await directHeaders({
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+        });
+        if (!headers) return null;
+        const resp = await fetch(SUPABASE_URL + '/rest/v1/' + table + '?' + filter, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify(body),
+            cache: 'no-store',
+        });
+        if (!resp.ok) {
+            const err = await resp.text().catch(() => '');
+            console.error('directUpdate HTTP', resp.status, table, err);
+            if (typeof showToast === 'function') showToast('Update ' + resp.status);
+            return null;
+        }
+        return await resp.json();
+    } catch (e) {
+        console.error('directUpdate crashed:', e);
+        return null;
+    }
+}
+
+// Direct REST DELETE.
+async function directDelete(table, filter) {
+    try {
+        const headers = await directHeaders();
+        if (!headers) return false;
+        const resp = await fetch(SUPABASE_URL + '/rest/v1/' + table + '?' + filter, {
+            method: 'DELETE',
+            headers,
+            cache: 'no-store',
+        });
+        if (!resp.ok) {
+            console.error('directDelete HTTP', resp.status, table);
+            if (typeof showToast === 'function') showToast('Delete ' + resp.status);
+            return false;
+        }
+        return true;
+    } catch (e) {
+        console.error('directDelete crashed:', e);
+        return false;
+    }
+}
+
+// Direct REST RPC call (Postgres function).
+async function directRpc(fnName, args) {
+    try {
+        const headers = await directHeaders({
+            'Content-Type': 'application/json',
+        });
+        if (!headers) return null;
+        const resp = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + fnName, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(args || {}),
+            cache: 'no-store',
+        });
+        if (!resp.ok) {
+            const err = await resp.text().catch(() => '');
+            console.error('directRpc HTTP', resp.status, fnName, err);
+            if (typeof showToast === 'function') showToast('RPC ' + resp.status);
+            return null;
+        }
+        const text = await resp.text();
+        try { return text ? JSON.parse(text) : null; } catch (e) { return text; }
+    } catch (e) {
+        console.error('directRpc crashed:', fnName, e);
+        return null;
+    }
+}
+
+// Direct upload to Supabase storage. `file` is a Blob/File.
+async function directStorageUpload(bucket, path, file, contentType) {
+    try {
+        const headers = await directHeaders({
+            'Content-Type': contentType || 'application/octet-stream',
+            'x-upsert': 'true',
+        });
+        if (!headers) return null;
+        const resp = await fetch(SUPABASE_URL + '/storage/v1/object/' + bucket + '/' + path, {
+            method: 'POST',
+            headers,
+            body: file,
+            cache: 'no-store',
+        });
+        if (!resp.ok) {
+            const err = await resp.text().catch(() => '');
+            console.error('directStorageUpload HTTP', resp.status, err);
+            if (typeof showToast === 'function') showToast('Upload ' + resp.status);
+            return null;
+        }
+        // Public URL convention for public buckets
+        return SUPABASE_URL + '/storage/v1/object/public/' + bucket + '/' + path;
+    } catch (e) {
+        console.error('directStorageUpload crashed:', e);
+        return null;
+    }
+}
+
 async function directSelect(path) {
     try {
         const sessInfo = await getAccessTokenSafely();
@@ -524,22 +719,15 @@ if (document.readyState === 'loading') {
 // and the user is being shown the setup screen incorrectly).
 // Read the supabase session straight from localStorage. Doesn't touch
 // supabase-js, so it works even when the library is hung.
+// Read whatever's in localStorage, even if expired (refresh handled separately)
 function readStoredSession() {
-    // Try our own key first — supabase-js never touches it, so it can't be wiped
     try {
         const direct = localStorage.getItem('ironfaith-direct-session');
         if (direct) {
             const parsed = JSON.parse(direct);
-            if (parsed && parsed.access_token) {
-                // Check expiry — if expired, fall through to refresh attempt below
-                const now = Math.floor(Date.now() / 1000);
-                if (!parsed.expires_at || parsed.expires_at > now) {
-                    return parsed;
-                }
-            }
+            if (parsed && parsed.access_token) return parsed;
         }
     } catch (e) {}
-    // Fall back to the supabase-js key
     try {
         const raw = localStorage.getItem('ironfaith-auth');
         if (!raw) return null;
@@ -550,8 +738,26 @@ function readStoredSession() {
     return null;
 }
 
+function isSessionExpired(sess) {
+    if (!sess?.expires_at) return false;
+    // 60-second buffer so we refresh before the token actually dies
+    return sess.expires_at <= Math.floor(Date.now() / 1000) + 60;
+}
+
 async function getAccessTokenSafely() {
-    // Try the library with a tight timeout, fall back to localStorage
+    // Prefer localStorage (instant, never hangs)
+    let stored = readStoredSession();
+    if (stored?.access_token && !isSessionExpired(stored)) {
+        return { token: stored.access_token, user: stored.user };
+    }
+    // Token expired or missing — try to refresh via direct REST
+    if (stored?.refresh_token) {
+        const refreshed = await directRefreshToken();
+        if (refreshed?.access_token) {
+            return { token: refreshed.access_token, user: refreshed.user };
+        }
+    }
+    // Last resort: try the library with a tight timeout
     if (sb && sb.auth && sb.auth.getSession) {
         try {
             const result = await Promise.race([
@@ -562,7 +768,6 @@ async function getAccessTokenSafely() {
             if (s?.access_token) return { token: s.access_token, user: s.user };
         } catch (e) { /* fall through */ }
     }
-    const stored = readStoredSession();
     if (stored?.access_token) return { token: stored.access_token, user: stored.user };
     return null;
 }
@@ -846,13 +1051,14 @@ function getPublicStats() {
 async function syncStatsToSupabase() {
     if (!currentUser || !userProfile) return;
     const stats = getPublicStats();
-    await sb.from('profiles').update({ stats }).eq('id', currentUser.id);
+    await directUpdate('profiles', 'id=eq.' + encodeURIComponent(currentUser.id), { stats });
     userProfile.stats = stats;
 }
 
 async function updateBio() {
     const bio = document.getElementById('profile-bio-input').value.trim().slice(0, 150);
-    await sb.from('profiles').update({ bio }).eq('id', currentUser.id);
+    const ok = await directUpdate('profiles', 'id=eq.' + encodeURIComponent(currentUser.id), { bio });
+    if (!ok) return;
     userProfile.bio = bio;
     showToast('Bio updated');
 }
@@ -868,31 +1074,18 @@ async function uploadProfilePic(event) {
     showToast('Uploading...');
     try {
         const compressed = await compressImage(file);
-        const path = `${currentUser.id}/avatar.jpg`;
-        const { error: upErr } = await sb.storage.from('avatars').upload(path, compressed, {
-            contentType: 'image/jpeg',
-            upsert: true
-        });
-        if (upErr) {
-            console.error('Avatar upload error:', upErr);
-            const msg = (upErr.message || '').toLowerCase();
-            if (msg.includes('bucket') || msg.includes('not found')) {
-                showToast('Avatars bucket missing — run supabase-setup.sql');
-            } else if (msg.includes('row-level') || msg.includes('policy')) {
-                showToast('Permission denied — re-run supabase-setup.sql');
-            } else {
-                showToast('Upload failed: ' + upErr.message);
-            }
-            return;
-        }
+        const path = currentUser.id + '/avatar.jpg';
+        const baseUrl = await directStorageUpload('avatars', path, compressed, 'image/jpeg');
+        if (!baseUrl) return;
+        const profile_pic = baseUrl + '?t=' + Date.now();
 
-        const { data: urlData } = sb.storage.from('avatars').getPublicUrl(path);
-        const profile_pic = urlData.publicUrl + '?t=' + Date.now();
-
-        const { error: updErr } = await sb.from('profiles').update({ profile_pic }).eq('id', currentUser.id);
-        if (updErr) {
-            console.error('Profile update error:', updErr);
-            showToast('Saved photo but profile update failed: ' + updErr.message);
+        const ok = await directUpdate(
+            'profiles',
+            'id=eq.' + encodeURIComponent(currentUser.id),
+            { profile_pic }
+        );
+        if (!ok) {
+            showToast('Saved photo but profile update failed');
             return;
         }
         userProfile.profile_pic = profile_pic;
@@ -907,7 +1100,12 @@ async function uploadProfilePic(event) {
 // ========== PRIVACY ==========
 
 async function toggleAccountPrivacy(isPublic) {
-    await sb.from('profiles').update({ is_public: isPublic }).eq('id', currentUser.id);
+    const ok = await directUpdate(
+        'profiles',
+        'id=eq.' + encodeURIComponent(currentUser.id),
+        { is_public: isPublic }
+    );
+    if (!ok) return;
     userProfile.is_public = isPublic;
     showToast(isPublic ? 'Account set to public' : 'Account set to private');
 }
@@ -974,13 +1172,13 @@ async function searchUsers() {
     if (query.length < 2) return;
     const container = document.getElementById('search-results');
 
-    const { data, error } = await sb.from('profiles')
-        .select('id, username, display_name, is_public, profile_pic')
-        .ilike('username', `${query}%`)
-        .neq('id', currentUser.id)
-        .limit(10);
+    const data = await directSelect(
+        'profiles?username=ilike.' + encodeURIComponent(query + '*') +
+        '&id=neq.' + encodeURIComponent(currentUser.id) +
+        '&select=id,username,display_name,is_public,profile_pic&limit=10'
+    );
 
-    if (error || !data || data.length === 0) {
+    if (!data || data.length === 0) {
         container.innerHTML = '<p class="empty-state">No users found</p>';
         return;
     }
@@ -1009,62 +1207,60 @@ async function searchUsers() {
 }
 
 async function sendFriendRequest(toUid, toUsername) {
-    // Check for existing pending request
-    const { data: existing } = await sb.from('friend_requests')
-        .select('id')
-        .eq('from_uid', currentUser.id)
-        .eq('to_uid', toUid)
-        .eq('status', 'pending');
-
+    const existing = await directSelect(
+        'friend_requests?from_uid=eq.' + encodeURIComponent(currentUser.id) +
+        '&to_uid=eq.' + encodeURIComponent(toUid) +
+        '&status=eq.pending&select=id'
+    );
     if (existing && existing.length > 0) return showToast('Request already sent');
 
-    // Check if they sent us one — auto-accept
-    const { data: reverse } = await sb.from('friend_requests')
-        .select('id')
-        .eq('from_uid', toUid)
-        .eq('to_uid', currentUser.id)
-        .eq('status', 'pending');
-
+    const reverse = await directSelect(
+        'friend_requests?from_uid=eq.' + encodeURIComponent(toUid) +
+        '&to_uid=eq.' + encodeURIComponent(currentUser.id) +
+        '&status=eq.pending&select=id'
+    );
     if (reverse && reverse.length > 0) {
         await sbAcceptFriendRequest(reverse[0].id);
         return;
     }
 
-    const { error } = await sb.from('friend_requests').insert({
+    const result = await directInsert('friend_requests', {
         from_uid: currentUser.id,
         to_uid: toUid,
         from_username: userProfile.username,
-        from_display_name: userProfile.display_name
+        from_display_name: userProfile.display_name,
     });
-
-    if (error) return showToast(error.message);
-    showToast(`Request sent to @${toUsername}`);
+    if (!result) return;
+    showToast('Request sent to @' + toUsername);
 }
 
 async function sbAcceptFriendRequest(requestId) {
-    const { error } = await sb.rpc('accept_friend_request', { request_id: requestId });
-    if (error) return showToast(error.message);
-
-    // Reload profile to get updated friends
-    const { data } = await sb.from('profiles').select().eq('id', currentUser.id).single();
-    userProfile = data;
+    const result = await directRpc('accept_friend_request', { request_id: requestId });
+    if (result === null) return;
+    // Reload profile via direct REST
+    const fresh = await directFetchProfile(currentUser.id);
+    if (fresh) userProfile = fresh;
     showToast('Friend added!');
     renderFriendsView();
 }
 
 async function sbDeclineFriendRequest(requestId) {
-    await sb.from('friend_requests').update({ status: 'declined' }).eq('id', requestId);
+    const ok = await directUpdate(
+        'friend_requests',
+        'id=eq.' + encodeURIComponent(requestId),
+        { status: 'declined' }
+    );
+    if (!ok) return;
     showToast('Request declined');
     renderFriendsView();
 }
 
 async function sbRemoveFriend(friendUid) {
     if (!confirm('Remove this friend?')) return;
-    const { error } = await sb.rpc('remove_friend', { friend_uid: friendUid });
-    if (error) return showToast(error.message);
-
-    const { data } = await sb.from('profiles').select().eq('id', currentUser.id).single();
-    userProfile = data;
+    const result = await directRpc('remove_friend', { friend_uid: friendUid });
+    if (result === null) return;
+    const fresh = await directFetchProfile(currentUser.id);
+    if (fresh) userProfile = fresh;
     renderFriendsView();
     showToast('Friend removed');
 }
@@ -1164,18 +1360,15 @@ async function submitPost() {
         let photo_url = '';
         if (file) {
             const compressed = await compressImage(file);
-            const path = `${currentUser.id}/${Date.now()}.jpg`;
-            const { error: upErr } = await sb.storage.from('posts').upload(path, compressed, {
-                contentType: 'image/jpeg'
-            });
-            if (upErr) throw upErr;
-            const { data: urlData } = sb.storage.from('posts').getPublicUrl(path);
-            photo_url = urlData.publicUrl;
+            const path = currentUser.id + '/' + Date.now() + '.jpg';
+            const url = await directStorageUpload('posts', path, compressed, 'image/jpeg');
+            if (!url) throw new Error('Upload failed');
+            photo_url = url;
         }
 
         const stats = getTodayWorkoutStats();
         const verseOrMessage = getVerseOrMessage();
-        const { error } = await sb.from('posts').insert({
+        const result = await directInsert('posts', {
             uid: currentUser.id,
             username: userProfile.username,
             display_name: userProfile.display_name,
@@ -1183,10 +1376,9 @@ async function submitPost() {
             caption,
             workout: stats,
             likes: [],
-            verse_or_message: verseOrMessage
+            verse_or_message: verseOrMessage,
         });
-
-        if (error) throw error;
+        if (!result) throw new Error('Insert failed');
 
         closePostModal();
         showToast('Posted!');
@@ -1299,14 +1491,15 @@ async function loadFeed() {
 }
 
 async function sbToggleLike(postId) {
-    const { error } = await sb.rpc('toggle_like', { post_id: postId });
-    if (error) return showToast(error.message);
+    const result = await directRpc('toggle_like', { post_id: postId });
+    if (result === null) return;
     loadFeed();
 }
 
 async function deletePost(postId) {
     if (!confirm('Delete this post?')) return;
-    await sb.from('posts').delete().eq('id', postId);
+    const ok = await directDelete('posts', 'id=eq.' + encodeURIComponent(postId));
+    if (!ok) return;
     loadFeed();
     showToast('Post deleted');
 }
@@ -1316,10 +1509,10 @@ async function deletePost(postId) {
 async function loadComments(postId) {
     const container = document.getElementById('comments-' + postId);
     if (!container) return;
-    const { data: comments } = await sb.from('comments')
-        .select()
-        .eq('post_id', postId)
-        .order('created_at', { ascending: true });
+    const comments = await directSelect(
+        'comments?post_id=eq.' + encodeURIComponent(postId) +
+        '&order=created_at.asc&select=*'
+    );
 
     if (!comments || comments.length === 0) {
         container.innerHTML = '<p class="comments-empty">Be the first to comment</p>';
@@ -1349,20 +1542,20 @@ async function submitComment(postId) {
     const input = document.getElementById('comment-input-' + postId);
     const text = input.value.trim();
     if (!text) return;
-    const { error } = await sb.from('comments').insert({
+    const result = await directInsert('comments', {
         post_id: postId,
         uid: currentUser.id,
         username: userProfile.username,
         display_name: userProfile.display_name,
-        text
+        text,
     });
-    if (error) return showToast(error.message);
+    if (!result) return;
     input.value = '';
     loadComments(postId);
 }
 
 async function deleteComment(commentId, postId) {
-    await sb.from('comments').delete().eq('id', commentId);
+    await directDelete('comments', 'id=eq.' + encodeURIComponent(commentId));
     loadComments(postId);
 }
 
