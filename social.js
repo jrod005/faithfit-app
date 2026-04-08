@@ -137,12 +137,7 @@ async function directSignIn(email, pass) {
         try {
             localStorage.setItem('ironfaith-direct-session', JSON.stringify(session));
             localStorage.setItem('ironfaith-auth', JSON.stringify({ currentSession: session, expiresAt: session.expires_at }));
-            // Verify the write actually persisted
-            const verify = localStorage.getItem('ironfaith-direct-session');
-            showToast('Session saved: ' + (verify ? 'YES len=' + verify.length : 'NO'));
-        } catch (e) {
-            showToast('Session save FAILED: ' + e.message);
-        }
+        } catch (e) { console.warn('Session save failed:', e); }
 
         currentUser = body.user;
 
@@ -284,39 +279,24 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
     renderSocialTab();
 });
 
-// Also check on load
-(async () => {
+// Bootstrap on load — defer to avoid racing with app.js's DOM bindings
+function ironfaithSocialBootstrap() {
     if (!sb) {
-        renderSocialTab();
+        try { renderSocialTab(); } catch (e) {}
         return;
     }
 
-    // FAST PATH: restore currentUser from localStorage immediately so the user
-    // appears logged in even if supabase-js is hung. Doesn't touch the library.
+    // FAST PATH: restore currentUser from localStorage synchronously.
     try {
         const stored = readStoredSession();
-        // Debug toast — tells us at a glance whether the session survived
-        setTimeout(() => {
-            try {
-                const hasDirect = !!localStorage.getItem('ironfaith-direct-session');
-                const hasLib = !!localStorage.getItem('ironfaith-auth');
-                const totalKeys = localStorage.length;
-                const hasFaithfit = !!localStorage.getItem('faithfit_onboarded');
-                if (typeof showToast === 'function') {
-                    showToast('LS keys=' + totalKeys + ' direct=' + hasDirect + ' lib=' + hasLib + ' onboarded=' + hasFaithfit);
-                }
-            } catch (e) {
-                if (typeof showToast === 'function') showToast('LS read failed: ' + e.message);
-            }
-        }, 800);
         if (stored?.user) {
             currentUser = stored.user;
-            renderSocialTab();
-            // Try to load the profile via direct REST in the background
+            try { renderSocialTab(); } catch (e) {}
+            // Background profile fetch via direct REST
             directFetchProfile(currentUser.id).then(profile => {
                 if (profile) {
                     userProfile = profile;
-                    renderSocialTab();
+                    try { renderSocialTab(); } catch (e) {}
                     if (typeof syncStatsToSupabase === 'function') {
                         try { syncStatsToSupabase(); } catch (e) {}
                     }
@@ -327,30 +307,68 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
         console.error('Fast-path session restore failed:', e);
     }
 
-    // SLOW PATH: also try the library with a tight timeout, in case it works
-    try {
-        const result = await Promise.race([
-            sb.auth.getSession(),
-            new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 2000))
-        ]);
-        const session = result?.data?.session;
-        if (session?.user && !currentUser) {
-            currentUser = session.user;
-            const { data } = await fetchProfileWithRetry(currentUser.id);
-            if (data) {
-                userProfile = data;
-                syncStatsToSupabase();
-            } else {
-                const created = await ensureProfileExists();
-                if (created) userProfile = created;
+    // SLOW PATH: also try the library on a 2s race
+    (async () => {
+        try {
+            const result = await Promise.race([
+                sb.auth.getSession(),
+                new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 2000))
+            ]);
+            const session = result?.data?.session;
+            if (session?.user && !currentUser) {
+                currentUser = session.user;
+                const { data } = await fetchProfileWithRetry(currentUser.id);
+                if (data) {
+                    userProfile = data;
+                    syncStatsToSupabase();
+                } else {
+                    const created = await ensureProfileExists();
+                    if (created) userProfile = created;
+                }
+                subscribeToFriendRequests();
             }
-            subscribeToFriendRequests();
+        } catch (e) {
+            console.error('Initial auth check (lib) failed/timed out:', e);
         }
-    } catch (e) {
-        console.error('Initial auth check (lib) failed/timed out:', e);
-    }
-    renderSocialTab();
-})();
+        try { renderSocialTab(); } catch (e) {}
+    })();
+
+    // Belt-and-suspenders: every 5 seconds, if currentUser is set, persist
+    // the session to our own key so it can survive PWA kill regardless of
+    // which sign-in path was used.
+    setInterval(() => {
+        try {
+            if (!currentUser) return;
+            // Try lib session first
+            if (sb && sb.auth && sb.auth.getSession) {
+                Promise.race([
+                    sb.auth.getSession(),
+                    new Promise((_, rej) => setTimeout(() => rej(), 1000))
+                ]).then(result => {
+                    const s = result?.data?.session;
+                    if (s?.access_token) {
+                        const directSess = {
+                            access_token: s.access_token,
+                            refresh_token: s.refresh_token,
+                            expires_in: s.expires_in,
+                            expires_at: s.expires_at || (Math.floor(Date.now() / 1000) + (s.expires_in || 3600)),
+                            token_type: s.token_type || 'bearer',
+                            user: s.user,
+                        };
+                        localStorage.setItem('ironfaith-direct-session', JSON.stringify(directSess));
+                    }
+                }).catch(() => {});
+            }
+        } catch (e) {}
+    }, 5000);
+}
+
+// Run after DOM is parsed so app.js has bound its handlers first
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ironfaithSocialBootstrap);
+} else {
+    setTimeout(ironfaithSocialBootstrap, 0);
+}
 
 // Direct REST profile fetch — works when supabase-js is hung
 async function directFetchProfile(uid) {
