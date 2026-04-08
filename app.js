@@ -3096,6 +3096,7 @@ function saveTemplates(t) { DB.set('templates', t); }
 
 function renderRoutinesList() {
     const container = document.getElementById('routines-list');
+    if (!container) return;
     const templates = getTemplates();
     if (templates.length === 0) {
         container.innerHTML = '<p class="empty-state">No routines saved yet. Complete a session and save it as a routine!</p>';
