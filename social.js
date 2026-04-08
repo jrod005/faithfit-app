@@ -136,9 +136,13 @@ async function directSignIn(email, pass) {
         // can't be cleared by the library re-init on next load.
         try {
             localStorage.setItem('ironfaith-direct-session', JSON.stringify(session));
-            // Also try the supabase-js key as a courtesy, in case the lib works
             localStorage.setItem('ironfaith-auth', JSON.stringify({ currentSession: session, expiresAt: session.expires_at }));
-        } catch (e) {}
+            // Verify the write actually persisted
+            const verify = localStorage.getItem('ironfaith-direct-session');
+            showToast('Session saved: ' + (verify ? 'YES len=' + verify.length : 'NO'));
+        } catch (e) {
+            showToast('Session save FAILED: ' + e.message);
+        }
 
         currentUser = body.user;
 
@@ -296,10 +300,14 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
             try {
                 const hasDirect = !!localStorage.getItem('ironfaith-direct-session');
                 const hasLib = !!localStorage.getItem('ironfaith-auth');
+                const totalKeys = localStorage.length;
+                const hasFaithfit = !!localStorage.getItem('faithfit_onboarded');
                 if (typeof showToast === 'function') {
-                    showToast('Session check: direct=' + hasDirect + ' lib=' + hasLib + ' restored=' + !!stored?.user);
+                    showToast('LS keys=' + totalKeys + ' direct=' + hasDirect + ' lib=' + hasLib + ' onboarded=' + hasFaithfit);
                 }
-            } catch (e) {}
+            } catch (e) {
+                if (typeof showToast === 'function') showToast('LS read failed: ' + e.message);
+            }
         }, 800);
         if (stored?.user) {
             currentUser = stored.user;
