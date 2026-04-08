@@ -261,8 +261,9 @@ function initCloudSyncAuthHook() {
             // Wait a tick for currentUser to be set by social.js
             setTimeout(() => {
                 loadCloudSyncToggle();
+                checkPendingRestore();
                 if (isCloudSyncEnabled()) reconcileOnLogin();
-            }, 500);
+            }, 700);
         } else {
             updateCloudSyncStatusUI();
         }
@@ -272,8 +273,9 @@ function initCloudSyncAuthHook() {
         if (data?.session?.user) {
             setTimeout(() => {
                 loadCloudSyncToggle();
+                checkPendingRestore();
                 if (isCloudSyncEnabled()) reconcileOnLogin();
-            }, 500);
+            }, 700);
         }
     });
 }
@@ -330,6 +332,60 @@ function showRestorePrompt() {
     };
 }
 
+// Called from the first onboarding slide. Sends the user to Social/Cloud
+// sign-in, then auto-pulls their backup and dismisses onboarding.
+async function onboardingRestoreFromCloud() {
+    // Mark as "trying to restore" so we know to auto-pull after sign-in
+    DB.set('pendingCloudRestore', true);
+    DB.set(RESTORE_PROMPT_DISMISSED_KEY, true);
+
+    // Hide onboarding overlay
+    const ob = document.getElementById('onboarding');
+    if (ob) ob.classList.add('hidden');
+
+    // Jump to Social tab so they can sign in
+    const tabBtn = document.querySelector('.tab-btn[data-tab="social"]');
+    if (tabBtn) tabBtn.click();
+    if (typeof showToast === 'function') {
+        showToast('Sign in below to restore your data');
+    }
+}
+
+// Watch for sign-in after a pending restore was requested
+async function checkPendingRestore() {
+    if (!DB.get('pendingCloudRestore', false)) return;
+    if (typeof currentUser === 'undefined' || !currentUser) return;
+    if (typeof sb === 'undefined' || !sb) return;
+    try {
+        const { data } = await sb.from('user_data')
+            .select('snapshot, local_modified')
+            .eq('user_id', currentUser.id)
+            .maybeSingle();
+        if (data && data.snapshot && Object.keys(data.snapshot).length > 0) {
+            applySnapshot(data.snapshot);
+            setLastSync(Date.now());
+            setCloudSyncEnabled(true);
+            DB.set('pendingCloudRestore', false);
+            DB.set('onboarded', true);
+            if (typeof showToast === 'function') showToast('Data restored from cloud!');
+            // Refresh UI
+            if (typeof loadProfile === 'function') loadProfile();
+            if (typeof updateDashboard === 'function') updateDashboard();
+            if (typeof loadCloudSyncToggle === 'function') loadCloudSyncToggle();
+            setTimeout(() => window.location.reload(), 1200);
+        } else {
+            DB.set('pendingCloudRestore', false);
+            if (typeof showToast === 'function') {
+                showToast('No cloud backup found for this account');
+            }
+        }
+    } catch (e) {
+        console.error('checkPendingRestore failed:', e);
+    }
+}
+
+// Hook into the cloud-sync auth state listener
+const _origInit = initCloudSyncAuthHook;
 function maybeShowRestorePrompt() {
     try {
         if (DB.get(RESTORE_PROMPT_DISMISSED_KEY, false)) return;
