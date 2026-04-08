@@ -12,10 +12,9 @@ try {
             auth: {
                 persistSession: true,
                 autoRefreshToken: true,
-                detectSessionInUrl: true,
+                detectSessionInUrl: false,
                 storage: window.localStorage,
                 storageKey: 'ironfaith-auth',
-                flowType: 'pkce',
             }
         });
     } else {
@@ -101,16 +100,37 @@ async function socialSignOut() {
     renderSocialTab();
 }
 
+// Fetch profile with retry — don't wipe an existing userProfile on transient errors
+async function fetchProfileWithRetry(uid, attempts = 3) {
+    for (let i = 0; i < attempts; i++) {
+        try {
+            const { data, error } = await sb.from('profiles').select().eq('id', uid).maybeSingle();
+            if (error) {
+                console.error(`Profile fetch attempt ${i + 1} error:`, error);
+            } else {
+                return { data, error: null };
+            }
+        } catch (e) {
+            console.error(`Profile fetch attempt ${i + 1} crashed:`, e);
+        }
+        await new Promise(r => setTimeout(r, 600 * (i + 1)));
+    }
+    return { data: null, error: new Error('Profile fetch failed after retries') };
+}
+
 // Auth state listener
 if (sb) sb.auth.onAuthStateChange(async (event, session) => {
     try {
         if (session?.user) {
             currentUser = session.user;
-            const { data, error } = await sb.from('profiles').select().eq('id', currentUser.id).maybeSingle();
-            if (error) console.error('Profile fetch (auth change) error:', error);
-            userProfile = data || null;
-            if (userProfile) syncStatsToSupabase();
-            // Subscribe to friend requests once signed in
+            const { data, error } = await fetchProfileWithRetry(currentUser.id);
+            if (data) {
+                userProfile = data;
+                syncStatsToSupabase();
+            } else if (!userProfile) {
+                // Only null out if we don't already have one — avoids "reset account" flicker
+                userProfile = null;
+            }
             subscribeToFriendRequests();
         } else if (event === 'SIGNED_OUT') {
             currentUser = null;
@@ -132,16 +152,16 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
         const { data: { session } } = await sb.auth.getSession();
         if (session?.user) {
             currentUser = session.user;
-            const { data, error } = await sb.from('profiles').select().eq('id', currentUser.id).maybeSingle();
-            if (error) console.error('Profile fetch (initial) error:', error);
-            userProfile = data || null;
-            if (userProfile) syncStatsToSupabase();
+            const { data } = await fetchProfileWithRetry(currentUser.id);
+            if (data) {
+                userProfile = data;
+                syncStatsToSupabase();
+            }
             subscribeToFriendRequests();
         }
     } catch (e) {
         console.error('Initial auth check failed', e);
     }
-    // Always render — shows auth UI when signed out, main UI when signed in
     renderSocialTab();
 })();
 
@@ -212,6 +232,20 @@ async function setupUsername() {
         let stats = {};
         try { stats = getPublicStats(); } catch (e) { console.error('getPublicStats failed:', e); }
 
+        // First check if THIS user already has a profile (e.g. re-launch lost session, fetched stale)
+        const { data: mine } = await withTimeout(
+            sb.from('profiles').select().eq('id', currentUser.id).maybeSingle(),
+            12000, 'Profile lookup'
+        );
+        if (mine) {
+            // Profile already exists for this account — just use it, no duplicate insert
+            userProfile = mine;
+            renderSocialTab();
+            showToast('Welcome back, @' + mine.username);
+            return;
+        }
+
+        // Username availability check
         const { data: existing, error: checkErr } = await withTimeout(
             sb.from('profiles').select('id').eq('username', raw).maybeSingle(),
             12000, 'Username check'
@@ -225,20 +259,21 @@ async function setupUsername() {
 
         const displayName = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || raw;
 
+        // Use upsert so a leftover row from a previous attempt won't cause a PK conflict
         const { error } = await withTimeout(
-            sb.from('profiles').insert({
+            sb.from('profiles').upsert({
                 id: currentUser.id,
                 username: raw,
                 display_name: displayName,
                 bio: '',
                 stats,
                 friends: [],
-            }),
+            }, { onConflict: 'id' }),
             12000, 'Create profile'
         );
 
         if (error) {
-            console.error('Insert profile error:', error);
+            console.error('Upsert profile error:', error);
             const hint = /relation|does not exist|column/i.test(error.message)
                 ? ' (Run supabase-setup.sql in your Supabase project)'
                 : '';
