@@ -497,6 +497,52 @@ function generateWorkoutPlan(ctx) {
     return html;
 }
 
+// --- Weekly Schedule Generator ---
+function generateWeeklySchedule(ctx) {
+    const goal = ctx.profile.goal || 'gain';
+    let level = 'beginner';
+    if (ctx.workouts.length > 100) level = 'advanced';
+    else if (ctx.workouts.length > 30) level = 'intermediate';
+
+    // Decide training days/week based on level
+    const cfg = {
+        beginner:    { days: 3, pattern: ['Workout A', 'Rest', 'Workout B', 'Rest', 'Workout A', 'Rest', 'Active Recovery'] },
+        intermediate:{ days: 4, pattern: ['Upper', 'Lower', 'Rest', 'Push', 'Pull', 'Rest', 'Active Recovery'] },
+        advanced:    { days: 5, pattern: ['Push', 'Pull', 'Legs', 'Rest', 'Upper', 'Lower', 'Active Recovery'] },
+    }[level];
+
+    const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    const todayIdx = (new Date().getDay() + 6) % 7; // Mon=0
+
+    let html = `<h3>&#x1F4C5; Your Week at a Glance</h3>`;
+    html += insightHtml(`Based on your <strong>${level}</strong> level and <strong>${goal}</strong> goal — ${cfg.days} training days this week.`);
+
+    html += `<div style="display:flex;flex-direction:column;gap:6px;margin:12px 0;">`;
+    cfg.pattern.forEach((label, i) => {
+        const isToday = i === todayIdx;
+        const isRest = /rest|recovery/i.test(label);
+        const bg = isToday ? 'var(--primary)' : 'var(--card)';
+        const fg = isToday ? '#000' : 'var(--text)';
+        const tag = isRest ? '&#x1F634;' : '&#x1F4AA;';
+        html += `<div style="display:flex;align-items:center;justify-content:space-between;background:${bg};color:${fg};padding:10px 14px;border-radius:10px;border:1px solid var(--border);">
+            <span style="font-weight:600">${days[i]}${isToday ? ' &middot; Today' : ''}</span>
+            <span style="opacity:0.85">${tag} ${label}</span>
+        </div>`;
+    });
+    html += `</div>`;
+
+    html += insightHtml(`Tap <strong>Workout Plan</strong> below for the actual exercises, sets and reps for each session.`);
+
+    // Suggest verse on a rest day for faith link
+    const restToday = /rest|recovery/i.test(cfg.pattern[todayIdx]);
+    if (restToday) {
+        html += `<div class="data-insight">Today is a rest day — recovery is when growth happens. Use the time to read, pray, or stretch.</div>`;
+    }
+
+    html += verseHtml();
+    return html;
+}
+
 // --- Meal Plan Generator ---
 function generateMealPlan(ctx) {
     const goal = ctx.profile.goal || 'maintain';
@@ -676,6 +722,11 @@ function analyzeProgress(ctx) {
 const TOPIC_RESPONSES = {
     // Each topic: array of { keywords: [], handler: function }
     topics: [
+        {
+            id: 'plan_my_week',
+            keywords: ['plan my week', '7-day', '7 day', 'weekly schedule', 'weekly plan', 'this week.*plan', 'week.*schedule', 'schedule.*week'],
+            handler: (ctx) => generateWeeklySchedule(ctx),
+        },
         {
             id: 'workout_plan',
             keywords: ['workout plan', 'training plan', 'program', 'routine', 'split', 'generate.*plan', 'create.*plan', 'make.*plan', 'give me a plan', 'workout for me', 'what should i do.*gym'],
@@ -2239,6 +2290,61 @@ function removeTyping() {
 function coachAsk(text) {
     document.getElementById('coach-input').value = '';
     processCoachInput(text);
+}
+
+// --- Voice input (Web Speech API) ---
+let _coachRecognition = null;
+let _coachRecognizing = false;
+function toggleCoachVoice() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+        showToast('Voice input not supported on this device');
+        return;
+    }
+    const btn = document.getElementById('coach-mic-btn');
+    if (_coachRecognizing && _coachRecognition) {
+        try { _coachRecognition.stop(); } catch (e) {}
+        return;
+    }
+    try {
+        _coachRecognition = new SR();
+        _coachRecognition.lang = 'en-US';
+        _coachRecognition.interimResults = true;
+        _coachRecognition.maxAlternatives = 1;
+        _coachRecognition.continuous = false;
+
+        _coachRecognition.onstart = () => {
+            _coachRecognizing = true;
+            if (btn) btn.classList.add('listening');
+            showToast('Listening...');
+        };
+        _coachRecognition.onresult = (ev) => {
+            let transcript = '';
+            for (let i = ev.resultIndex; i < ev.results.length; i++) {
+                transcript += ev.results[i][0].transcript;
+            }
+            const input = document.getElementById('coach-input');
+            if (input) input.value = transcript;
+            if (ev.results[ev.results.length - 1].isFinal && transcript.trim()) {
+                setTimeout(() => sendCoachMessage(), 200);
+            }
+        };
+        _coachRecognition.onerror = (ev) => {
+            console.error('Speech recognition error:', ev.error);
+            if (ev.error === 'not-allowed') showToast('Microphone permission denied');
+            else if (ev.error !== 'aborted') showToast('Voice error: ' + ev.error);
+        };
+        _coachRecognition.onend = () => {
+            _coachRecognizing = false;
+            if (btn) btn.classList.remove('listening');
+        };
+        _coachRecognition.start();
+    } catch (e) {
+        console.error('Voice init failed:', e);
+        showToast('Voice input failed to start');
+        _coachRecognizing = false;
+        if (btn) btn.classList.remove('listening');
+    }
 }
 
 function sendCoachMessage() {

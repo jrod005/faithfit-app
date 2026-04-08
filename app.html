@@ -705,6 +705,7 @@
             </div>
 
             <div class="quick-actions">
+                <button class="quick-btn" onclick="coachAsk('Plan my week — give me a 7-day workout schedule')">Plan My Week</button>
                 <button class="quick-btn" onclick="coachAsk('Generate a workout plan for me')">Workout Plan</button>
                 <button class="quick-btn" onclick="coachAsk('Create a meal plan for me')">Meal Plan</button>
                 <button class="quick-btn" onclick="coachAsk('What should I eat to fill my macros')">What to Eat</button>
@@ -728,6 +729,7 @@
                 <button class="btn btn-secondary coach-photo-btn" onclick="document.getElementById('coach-photo-input').click()" title="Add photo">&#x1F4F7;</button>
                 <input type="file" id="coach-photo-input" accept="image/*" style="display:none" onchange="handleCoachPhoto(event)">
                 <input type="text" id="coach-input" placeholder="Ask your coach anything..." onkeydown="if(event.key==='Enter')sendCoachMessage()">
+                <button id="coach-mic-btn" class="btn btn-secondary coach-mic-btn" onclick="toggleCoachVoice()" title="Voice input">&#x1F3A4;</button>
                 <button class="btn btn-primary coach-send-btn" onclick="sendCoachMessage()">&#x27A4;</button>
             </div>
             <div id="coach-photo-preview" class="coach-photo-preview hidden">

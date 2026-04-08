@@ -5015,7 +5015,7 @@ function completeSet(exIdx, sIdx) {
             }
         }
     }
-    startRestTimer(ex.rest || 90);
+    startActiveRestTimer(ex.rest || 90);
 }
 
 function startWorkoutTimer() {
@@ -5032,7 +5032,7 @@ function startWorkoutTimer() {
     activeWorkoutTimer = setInterval(update, 1000);
 }
 
-function startRestTimer(seconds) {
+function startActiveRestTimer(seconds) {
     if (activeRestTimer) clearInterval(activeRestTimer);
     const endsAt = Date.now() + seconds * 1000;
     const el = document.getElementById('active-rest-timer');

@@ -165,24 +165,67 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
     renderSocialTab();
 })();
 
-// ========== REALTIME FRIEND REQUESTS ==========
+// ========== REALTIME SOCIAL ACTIVITY ==========
 let _friendReqChannel = null;
+let _activityChannel = null;
 function subscribeToFriendRequests() {
-    if (!sb || !currentUser || _friendReqChannel) return;
+    if (!sb || !currentUser) return;
     try {
-        _friendReqChannel = sb.channel('friend-reqs-' + currentUser.id)
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'friend_requests',
-                filter: `to_uid=eq.${currentUser.id}`
-            }, () => {
-                if (typeof renderFriendsView === 'function') {
-                    try { renderFriendsView(); } catch (e) { console.error(e); }
-                }
-                if (typeof showToast === 'function') showToast('New friend request!');
-            })
-            .subscribe();
+        if (!_friendReqChannel) {
+            _friendReqChannel = sb.channel('friend-reqs-' + currentUser.id)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'friend_requests',
+                    filter: `to_uid=eq.${currentUser.id}`
+                }, () => {
+                    if (typeof renderFriendsView === 'function') {
+                        try { renderFriendsView(); } catch (e) { console.error(e); }
+                    }
+                    if (typeof showToast === 'function') showToast('New friend request!');
+                })
+                .subscribe();
+        }
+
+        // New comments on the user's own posts
+        if (!_activityChannel) {
+            _activityChannel = sb.channel('activity-' + currentUser.id)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'comments'
+                }, async (payload) => {
+                    try {
+                        const c = payload.new;
+                        if (!c || c.uid === currentUser.id) return; // ignore own comments
+                        // Only notify if the comment is on a post owned by current user
+                        const { data: post } = await sb.from('posts').select('uid').eq('id', c.post_id).maybeSingle();
+                        if (post && post.uid === currentUser.id) {
+                            showToast(`@${c.username} commented on your post`);
+                            if (socialView === 'feed' && typeof loadFeed === 'function') loadFeed();
+                        }
+                    } catch (e) { console.error(e); }
+                })
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'posts',
+                    filter: `uid=eq.${currentUser.id}`
+                }, (payload) => {
+                    try {
+                        const before = payload.old?.likes || [];
+                        const after = payload.new?.likes || [];
+                        if (after.length > before.length) {
+                            const newLiker = after.find(u => !before.includes(u));
+                            if (newLiker && newLiker !== currentUser.id) {
+                                showToast('Someone liked your post');
+                                if (socialView === 'feed' && typeof loadFeed === 'function') loadFeed();
+                            }
+                        }
+                    } catch (e) { console.error(e); }
+                })
+                .subscribe();
+        }
     } catch (e) {
         console.error('subscribeToFriendRequests failed:', e);
     }
