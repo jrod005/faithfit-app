@@ -220,19 +220,11 @@ async function socialSignOut() {
     showToast('Signed out');
 }
 
-// Fetch profile with retry — don't wipe an existing userProfile on transient errors
+// Fetch profile with retry — direct REST so it works when supabase-js is hung
 async function fetchProfileWithRetry(uid, attempts = 3) {
     for (let i = 0; i < attempts; i++) {
-        try {
-            const { data, error } = await sb.from('profiles').select().eq('id', uid).maybeSingle();
-            if (error) {
-                console.error(`Profile fetch attempt ${i + 1} error:`, error);
-            } else {
-                return { data, error: null };
-            }
-        } catch (e) {
-            console.error(`Profile fetch attempt ${i + 1} crashed:`, e);
-        }
+        const profile = await directFetchProfile(uid);
+        if (profile) return { data: profile, error: null };
         await new Promise(r => setTimeout(r, 600 * (i + 1)));
     }
     return { data: null, error: new Error('Profile fetch failed after retries') };
@@ -241,20 +233,20 @@ async function fetchProfileWithRetry(uid, attempts = 3) {
 // Auto-create a profile row for a signed-in user who doesn't have one yet.
 // Skips the username setup prompt entirely; user can rename later from Profile.
 async function ensureProfileExists() {
-    if (!sb || !currentUser) return null;
+    if (!currentUser) return null;
     try {
-        // Build a default username from the email prefix, sanitized
         const emailPrefix = (currentUser.email || '').split('@')[0]
             .toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 14);
         let base = emailPrefix || 'lifter';
         if (base.length < 3) base = 'lifter';
 
-        // Try a few candidates until one isn't taken
+        // Try a few candidates until one isn't taken — direct REST
         let username = base;
         for (let attempt = 0; attempt < 5; attempt++) {
-            const { data: clash } = await sb.from('profiles')
-                .select('id').eq('username', username).maybeSingle();
-            if (!clash || clash.id === currentUser.id) break;
+            const clash = await directSelect(
+                'profiles?username=eq.' + encodeURIComponent(username) + '&select=id'
+            );
+            if (!clash || clash.length === 0 || clash[0].id === currentUser.id) break;
             username = base + Math.floor(Math.random() * 9000 + 1000);
         }
 
@@ -265,20 +257,31 @@ async function ensureProfileExists() {
         let stats = {};
         try { stats = getPublicStats(); } catch (e) { console.error('getPublicStats failed:', e); }
 
-        const { data, error } = await sb.from('profiles').upsert({
-            id: currentUser.id,
-            username,
-            display_name: displayName,
-            bio: '',
-            stats,
-            friends: [],
-        }, { onConflict: 'id' }).select().maybeSingle();
-
-        if (error) {
-            console.error('ensureProfileExists upsert error:', error);
+        // Direct REST upsert via Prefer: resolution=merge-duplicates
+        const headers = await directHeaders({
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates,return=representation',
+        });
+        if (!headers) return null;
+        const resp = await fetch(SUPABASE_URL + '/rest/v1/profiles?on_conflict=id', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                id: currentUser.id,
+                username,
+                display_name: displayName,
+                bio: '',
+                stats,
+                friends: [],
+            }),
+            cache: 'no-store',
+        });
+        if (!resp.ok) {
+            console.error('ensureProfileExists HTTP', resp.status);
             return null;
         }
-        return data;
+        const rows = await resp.json();
+        return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
     } catch (e) {
         console.error('ensureProfileExists crashed:', e);
         return null;
@@ -708,7 +711,8 @@ function subscribeToFriendRequests() {
                         const c = payload.new;
                         if (!c || c.uid === currentUser.id) return; // ignore own comments
                         // Only notify if the comment is on a post owned by current user
-                        const { data: post } = await sb.from('posts').select('uid').eq('id', c.post_id).maybeSingle();
+                        const rows = await directSelect('posts?id=eq.' + encodeURIComponent(c.post_id) + '&select=uid');
+                        const post = (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
                         if (post && post.uid === currentUser.id) {
                             showToast(`@${c.username} commented on your post`);
                             if (socialView === 'feed' && typeof loadFeed === 'function') loadFeed();
@@ -903,37 +907,20 @@ async function directProfileSetup() {
 }
 
 async function recoverExistingProfile() {
-    if (!sb) return showToast('Cannot connect to server');
     if (!currentUser) return showToast('Sign in first');
     showToast('Looking up your account...');
-    const withTimeout = (p, ms) => Promise.race([
-        p,
-        new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), ms))
-    ]);
     try {
-        const { data, error } = await withTimeout(
-            sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle(),
-            8000
-        );
-        if (error) {
-            console.error('Recover error:', error);
-            showToast('Lookup failed: ' + error.message);
-            return;
-        }
-        if (data) {
-            userProfile = data;
+        const profile = await directFetchProfile(currentUser.id);
+        if (profile) {
+            userProfile = profile;
             renderSocialTab();
-            showToast('Welcome back, @' + data.username);
+            showToast('Welcome back, @' + profile.username);
             return;
         }
         showToast('No profile found for this email — pick a username to create one');
     } catch (e) {
         console.error('recoverExistingProfile crashed:', e);
-        if (e.message === 'TIMEOUT') {
-            showToast('Timed out — old app cache is blocking. Tap Run Diagnostics.');
-        } else {
-            showToast('Error: ' + (e.message || 'unknown'));
-        }
+        showToast('Error: ' + (e.message || 'unknown'));
     }
 }
 
@@ -993,67 +980,59 @@ async function setupUsername() {
     const oldLabel = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Creating...'; }
 
-    // Hard timeout so the button can never appear "frozen"
-    const withTimeout = (p, ms, label) => Promise.race([
-        p,
-        new Promise((_, rej) => setTimeout(() => rej(new Error(label + ' timed out')), ms))
-    ]);
-
     try {
         let stats = {};
         try { stats = getPublicStats(); } catch (e) { console.error('getPublicStats failed:', e); }
 
-        // First check if THIS user already has a profile (e.g. re-launch lost session, fetched stale)
-        const { data: mine } = await withTimeout(
-            sb.from('profiles').select().eq('id', currentUser.id).maybeSingle(),
-            12000, 'Profile lookup'
-        );
+        // If THIS user already has a profile, just use it
+        const mine = await directFetchProfile(currentUser.id);
         if (mine) {
-            // Profile already exists for this account — just use it, no duplicate insert
             userProfile = mine;
             renderSocialTab();
             showToast('Welcome back, @' + mine.username);
             return;
         }
 
-        // Username availability check
-        const { data: existing, error: checkErr } = await withTimeout(
-            sb.from('profiles').select('id').eq('username', raw).maybeSingle(),
-            12000, 'Username check'
+        // Username availability check via direct REST
+        const existing = await directSelect(
+            'profiles?username=eq.' + encodeURIComponent(raw) + '&select=id'
         );
-        if (checkErr) {
-            console.error('Username check error:', checkErr);
-            showToast('Check failed: ' + checkErr.message);
+        if (existing && existing.length > 0 && existing[0].id !== currentUser.id) {
+            showToast('Username taken');
             return;
         }
-        if (existing && existing.id !== currentUser.id) { showToast('Username taken'); return; }
 
         const displayName = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || raw;
 
-        // Use upsert so a leftover row from a previous attempt won't cause a PK conflict
-        const { error } = await withTimeout(
-            sb.from('profiles').upsert({
+        // Direct REST upsert
+        const headers = await directHeaders({
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates,return=representation',
+        });
+        if (!headers) { showToast('No auth token'); return; }
+        const resp = await fetch(SUPABASE_URL + '/rest/v1/profiles?on_conflict=id', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
                 id: currentUser.id,
                 username: raw,
                 display_name: displayName,
                 bio: '',
                 stats,
                 friends: [],
-            }, { onConflict: 'id' }),
-            12000, 'Create profile'
-        );
-
-        if (error) {
-            console.error('Upsert profile error:', error);
-            const hint = /relation|does not exist|column/i.test(error.message)
+            }),
+            cache: 'no-store',
+        });
+        if (!resp.ok) {
+            const body = await resp.text().catch(() => '');
+            const hint = /relation|does not exist|column/i.test(body)
                 ? ' (Run supabase-setup.sql in your Supabase project)'
                 : '';
-            showToast('Save failed: ' + error.message + hint);
+            showToast('Save failed: HTTP ' + resp.status + hint);
             return;
         }
-
-        const { data } = await sb.from('profiles').select().eq('id', currentUser.id).maybeSingle();
-        userProfile = data || null;
+        const rows = await resp.json();
+        userProfile = (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
         renderSocialTab();
         showToast('Profile created!');
     } catch (e) {
