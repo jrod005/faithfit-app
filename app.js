@@ -2615,6 +2615,23 @@ function showIosInstallSheet() {
 
 document.addEventListener('DOMContentLoaded', maybeShowIosInstallPrompt);
 
+// --- Universal modal-backdrop dismiss + Esc close ---
+document.addEventListener('click', (e) => {
+    // Tap on the .share-modal backdrop itself (not its content) closes it
+    if (e.target.classList && e.target.classList.contains('share-modal')) {
+        e.target.classList.add('hidden');
+    }
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        // Close the topmost visible share-modal
+        const open = Array.from(document.querySelectorAll('.share-modal:not(.hidden)'));
+        if (open.length) {
+            open[open.length - 1].classList.add('hidden');
+        }
+    }
+});
+
 // --- Offline detection banner ---
 function updateOfflineBanner() {
     const el = document.getElementById('offline-banner');
@@ -2707,7 +2724,13 @@ function viewErrorLog() {
     }
 }
 
+let _lastToast = { msg: '', at: 0 };
 function showToast(message, type) {
+    // Dedupe: don't repeat the same toast within 1.5s
+    const now = Date.now();
+    if (_lastToast.msg === message && (now - _lastToast.at) < 1500) return;
+    _lastToast = { msg: message, at: now };
+
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
 
@@ -2723,9 +2746,13 @@ function showToast(message, type) {
     const toast = document.createElement('div');
     toast.className = `toast toast-${t}`;
     toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-msg">${message}</span>`;
+    toast.addEventListener('click', () => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    });
     document.body.appendChild(toast);
 
-    setTimeout(() => toast.classList.add('show'), 10);
+    requestAnimationFrame(() => toast.classList.add('show'));
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);

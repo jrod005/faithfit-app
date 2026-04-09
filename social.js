@@ -1493,7 +1493,21 @@ async function loadFeed() {
     const container = document.getElementById('feed-posts');
     if (!container) return;
 
-    container.innerHTML = '<p class="empty-state">Loading feed...</p>';
+    // Skeleton loader (3 placeholder cards)
+    container.innerHTML = Array(3).fill(0).map(() => `
+        <div class="post-card skeleton-post">
+            <div class="skeleton-row">
+                <div class="skeleton skeleton-avatar"></div>
+                <div style="flex:1">
+                    <div class="skeleton skeleton-line" style="width:40%"></div>
+                    <div class="skeleton skeleton-line" style="width:25%;margin-top:6px"></div>
+                </div>
+            </div>
+            <div class="skeleton skeleton-img"></div>
+            <div class="skeleton skeleton-line" style="width:80%;margin-top:12px"></div>
+            <div class="skeleton skeleton-line" style="width:60%;margin-top:6px"></div>
+        </div>
+    `).join('');
 
     const friends = (userProfile && userProfile.friends) || [];
     const uids = [currentUser.id, ...friends].slice(0, 30);
