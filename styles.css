@@ -198,6 +198,28 @@ button:disabled {
     flex-shrink: 0;
 }
 
+/* Daily coach insight card */
+.daily-insight { margin: 12px 0; }
+.daily-insight.hidden { display: none; }
+.daily-insight-inner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(135deg, rgba(220,38,38,0.10), rgba(124,58,237,0.10));
+    border: 1px solid rgba(220,38,38,0.30);
+    border-radius: 14px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.daily-insight-inner:active { transform: scale(0.98); }
+.daily-insight-inner:hover { border-color: rgba(220,38,38,0.55); }
+.daily-insight-icon { font-size: 26px; flex-shrink: 0; }
+.daily-insight-text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.daily-insight-text strong { font-size: 14px; font-weight: 700; color: var(--text); }
+.daily-insight-text span { font-size: 12px; color: var(--text-muted); }
+.daily-insight-arrow { font-size: 22px; color: var(--text-muted); flex-shrink: 0; }
+
 /* Username inline edit */
 .username-edit-btn {
     background: rgba(220,38,38,0.12);

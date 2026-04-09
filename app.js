@@ -2389,6 +2389,158 @@ function renderBackupHealth() {
     el.classList.remove('hidden');
 }
 
+// ========== DAILY COACH INSIGHT ==========
+// Auto-generates a contextual tip every day based on the user's data.
+// Tapped → opens coach with the matching prompt prefilled.
+function renderDailyInsight() {
+    const el = document.getElementById('daily-insight');
+    if (!el) return;
+    const insight = getDailyInsight();
+    if (!insight) { el.classList.add('hidden'); return; }
+    el.innerHTML = `
+        <div class="daily-insight-inner" onclick="openCoachWithPrompt('${(insight.prompt || '').replace(/'/g, "\\'")}')">
+            <div class="daily-insight-icon">${insight.icon}</div>
+            <div class="daily-insight-text">
+                <strong>${insight.title}</strong>
+                <span>${insight.body}</span>
+            </div>
+            <div class="daily-insight-arrow">&rsaquo;</div>
+        </div>
+    `;
+    el.classList.remove('hidden');
+}
+
+function getDailyInsight() {
+    try {
+        const workouts = DB.get('workouts', []);
+        const meals = DB.get('meals', []).filter(m => m.date === today());
+        const weights = DB.get('weights', []);
+        const profile = DB.get('profile', {});
+        const hour = new Date().getHours();
+
+        // Pick a deterministic insight per day so it doesn't flicker
+        const seed = parseInt(today().replace(/-/g, ''), 10);
+        const todaysWorkouts = workouts.filter(w => w.date === today());
+
+        const candidates = [];
+
+        // No workouts ever → onboarding nudge
+        if (workouts.length === 0) {
+            candidates.push({
+                icon: '\uD83D\uDCAA',
+                title: 'Ready to start?',
+                body: 'Tap here and I\u2019ll build your first workout plan.',
+                prompt: 'Generate a workout plan for me'
+            });
+        }
+
+        // Logged today already → progress hype
+        if (todaysWorkouts.length > 0) {
+            candidates.push({
+                icon: '\uD83D\uDD25',
+                title: 'Crushing it today',
+                body: 'Want a breakdown of how today stacks up against your average?',
+                prompt: 'Analyze my progress'
+            });
+        }
+
+        // No workout yet today + it's not late → suggest one
+        if (todaysWorkouts.length === 0 && hour < 20 && workouts.length > 0) {
+            candidates.push({
+                icon: '\uD83C\uDFAF',
+                title: 'What\u2019s on the menu?',
+                body: 'Need help picking what to train today?',
+                prompt: 'What should I work on next?'
+            });
+        }
+
+        // Calorie tracking gap
+        const calTotal = meals.reduce((s, m) => s + (m.calories || 0), 0);
+        if ((profile.calorieGoal || 0) > 0 && calTotal === 0 && hour >= 11) {
+            candidates.push({
+                icon: '\uD83C\uDF7D\uFE0F',
+                title: 'Don\u2019t forget to log',
+                body: 'You haven\u2019t logged any meals yet today.',
+                prompt: 'What should I eat today?'
+            });
+        }
+
+        // Weight check-in gap
+        if (weights.length > 0) {
+            const lastWeight = weights[weights.length - 1];
+            const daysSince = Math.floor((Date.now() - new Date(lastWeight.date).getTime()) / 86400000);
+            if (daysSince >= 7) {
+                candidates.push({
+                    icon: '\u2696\uFE0F',
+                    title: 'Time to weigh in',
+                    body: `It\u2019s been ${daysSince} days since your last weigh-in.`,
+                    prompt: 'How is my progress?'
+                });
+            }
+        }
+
+        // Consistency check
+        const last7 = workouts.filter(w => {
+            const d = new Date(w.date);
+            return (Date.now() - d.getTime()) < 7 * 86400000;
+        });
+        const uniqueDays = new Set(last7.map(w => w.date)).size;
+        if (uniqueDays >= 5) {
+            candidates.push({
+                icon: '\uD83C\uDFC6',
+                title: 'Recovery matters',
+                body: `${uniqueDays} workout days this week \u2014 want recovery tips?`,
+                prompt: 'How is my recovery?'
+            });
+        } else if (uniqueDays <= 1 && workouts.length > 5) {
+            candidates.push({
+                icon: '\uD83D\uDCC5',
+                title: 'Let\u2019s get back on it',
+                body: 'You\u2019ve been quiet this week. Need a kickstart?',
+                prompt: 'How can I stay consistent?'
+            });
+        }
+
+        // Universal tips so we always have something to show
+        candidates.push({
+            icon: '\uD83D\uDCA7',
+            title: 'Hydration tip',
+            body: 'Tap to see how much water you should drink today.',
+            prompt: 'How much water should I drink?'
+        });
+        candidates.push({
+            icon: '\uD83D\uDCA4',
+            title: 'Recovery 101',
+            body: 'Sleep is the missing piece for most lifters.',
+            prompt: 'How can I sleep better?'
+        });
+        candidates.push({
+            icon: '\uD83D\uDCD0',
+            title: 'Form check',
+            body: 'Want a quick form refresher on your big lifts?',
+            prompt: 'Form tips'
+        });
+
+        if (candidates.length === 0) return null;
+        return candidates[seed % candidates.length];
+    } catch (e) {
+        return null;
+    }
+}
+
+function openCoachWithPrompt(prompt) {
+    try {
+        switchTab('coach');
+        setTimeout(() => {
+            const input = document.getElementById('coach-input');
+            if (input) {
+                input.value = prompt;
+                if (typeof sendCoachMessage === 'function') sendCoachMessage();
+            }
+        }, 250);
+    } catch (e) { /* noop */ }
+}
+
 // ========== SHARE APP ==========
 function shareApp() {
     const url = 'https://ironfa.it';
@@ -2429,6 +2581,7 @@ function updateDashboard() {
     updateStreak();
     renderStreakProtector();
     renderBackupHealth();
+    renderDailyInsight();
     updateRecentWorkouts();
     renderProgressCharts();
     renderCalendarHeatmap();
