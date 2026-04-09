@@ -5688,6 +5688,43 @@ function renderWeeklyReport() {
 let currentDetailRoutine = null;
 let activeWorkout = null; // { routineName, dayName, exercises: [{name,sets,reps,rest,logged:[{w,r}]}], startedAt, restEndsAt }
 let activeWorkoutTimer = null;
+
+// ----- Active workout crash recovery -----
+// Persist activeWorkout to localStorage on every mutation so a swipe-kill,
+// browser crash, or device reboot doesn't lose an in-progress session.
+const ACTIVE_WORKOUT_KEY = 'faithfit_active_workout';
+function persistActiveWorkout() {
+    try {
+        if (activeWorkout) {
+            localStorage.setItem(ACTIVE_WORKOUT_KEY, JSON.stringify(activeWorkout));
+        } else {
+            localStorage.removeItem(ACTIVE_WORKOUT_KEY);
+        }
+    } catch (e) { /* quota or private mode — silent */ }
+}
+function restoreActiveWorkout() {
+    try {
+        const raw = localStorage.getItem(ACTIVE_WORKOUT_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        if (!saved || !saved.startedAt) return;
+        // Stale guard: drop sessions older than 24h
+        if (Date.now() - saved.startedAt > 24 * 60 * 60 * 1000) {
+            localStorage.removeItem(ACTIVE_WORKOUT_KEY);
+            return;
+        }
+        activeWorkout = saved;
+        const hub = document.getElementById('workout-hub-card');
+        if (hub) hub.classList.add('hidden');
+        const aw = document.getElementById('active-workout');
+        if (aw) aw.classList.remove('hidden');
+        const titleEl = document.getElementById('active-workout-title');
+        if (titleEl) titleEl.textContent = saved.dayName || 'Workout';
+        renderActiveWorkout();
+        startWorkoutTimer();
+        showToast('Workout restored', 'success');
+    } catch (e) { /* corrupt — ignore */ }
+}
 let activeRestTimer = null;
 
 function getMyRoutines() { return DB.get('myRoutines', []); }
@@ -5926,6 +5963,7 @@ function startActiveWorkout(routine, day) {
     document.getElementById('active-workout-title').textContent = day.name;
     renderActiveWorkout();
     startWorkoutTimer();
+    persistActiveWorkout();
 }
 
 function startEmptyWorkout() {
@@ -5940,6 +5978,7 @@ function startEmptyWorkout() {
     document.getElementById('active-workout-title').textContent = 'Free Session';
     renderActiveWorkout();
     startWorkoutTimer();
+    persistActiveWorkout();
 }
 
 function renderActiveWorkout() {
@@ -5993,11 +6032,13 @@ function renderActiveWorkout() {
 function updateActiveSet(exIdx, sIdx, field, value) {
     if (!activeWorkout) return;
     activeWorkout.exercises[exIdx].logged[sIdx][field] = value;
+    persistActiveWorkout();
 }
 
 function addSetToActive(exIdx) {
     activeWorkout.exercises[exIdx].logged.push({ w: '', r: '' });
     renderActiveWorkout();
+    persistActiveWorkout();
 }
 
 function removeSetFromActive(exIdx, sIdx) {
@@ -6008,6 +6049,7 @@ function removeSetFromActive(exIdx, sIdx) {
     }
     ex.logged.splice(sIdx, 1);
     renderActiveWorkout();
+    persistActiveWorkout();
 }
 
 function addExerciseToActive() {
@@ -6021,7 +6063,9 @@ function addExerciseToActive() {
         rest: 90,
         logged: [{ w: '', r: '' }, { w: '', r: '' }, { w: '', r: '' }]
     });
+    input.value = '';
     renderActiveWorkout();
+    persistActiveWorkout();
 }
 
 function completeSet(exIdx, sIdx) {
@@ -6089,6 +6133,7 @@ async function endActiveWorkout() {
     const ok = await confirmDialog('End workout without saving?', { danger: true, okText: 'Discard' });
     if (!ok) return;
     activeWorkout = null;
+    persistActiveWorkout();
     if (activeWorkoutTimer) clearInterval(activeWorkoutTimer);
     if (activeRestTimer) clearInterval(activeRestTimer);
     document.getElementById('active-workout').classList.add('hidden');
@@ -6140,6 +6185,7 @@ async function finishActiveWorkout() {
     };
 
     activeWorkout = null;
+    persistActiveWorkout();
     if (activeWorkoutTimer) clearInterval(activeWorkoutTimer);
     if (activeRestTimer) clearInterval(activeRestTimer);
     document.getElementById('active-workout').classList.add('hidden');
@@ -6298,6 +6344,7 @@ function init() {
     safeCall('renderCustomExercises', renderCustomExercises);
     safeCall('refreshCustomExerciseIntegration', refreshCustomExerciseIntegration);
     safeCall('installMuscleAwareSearch', installMuscleAwareSearch);
+    safeCall('restoreActiveWorkout', restoreActiveWorkout);
     safeCall('showOnboarding', showOnboarding);
 
     // Auto-fill exercise inputs from history when name changes
