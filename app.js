@@ -5634,6 +5634,7 @@ function renderActiveWorkout() {
                 <span>&times;</span>
                 <input type="number" placeholder="Reps" value="${s.r}" oninput="updateActiveSet(${exIdx},${sIdx},'r',this.value)">
                 <button class="active-done-btn" onclick="completeSet(${exIdx},${sIdx})">&#x2713;</button>
+                <button class="active-remove-set-btn" aria-label="Remove set" onclick="removeSetFromActive(${exIdx},${sIdx})">&times;</button>
             </div>`;
         });
 
@@ -5661,6 +5662,16 @@ function updateActiveSet(exIdx, sIdx, field, value) {
 
 function addSetToActive(exIdx) {
     activeWorkout.exercises[exIdx].logged.push({ w: '', r: '' });
+    renderActiveWorkout();
+}
+
+function removeSetFromActive(exIdx, sIdx) {
+    if (!activeWorkout || !activeWorkout.exercises[exIdx]) return;
+    const ex = activeWorkout.exercises[exIdx];
+    if (ex.logged.length <= 1) {
+        return showToast('At least one set required', 'warn');
+    }
+    ex.logged.splice(sIdx, 1);
     renderActiveWorkout();
 }
 

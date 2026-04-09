@@ -3717,6 +3717,20 @@ canvas {
     font-size: 14px;
 }
 .active-done-btn:hover { background: rgba(74,222,128,0.2); }
+.active-remove-set-btn {
+    width: 28px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid rgba(220,38,38,0.35);
+    background: rgba(220,38,38,0.10);
+    color: #f87171;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0;
+    flex-shrink: 0;
+}
+.active-remove-set-btn:hover { background: rgba(220,38,38,0.18); }
 .active-add-ex {
     display: flex;
     gap: 6px;
