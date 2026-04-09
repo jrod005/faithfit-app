@@ -1219,7 +1219,12 @@ function renderPrayerHistory() {
     if (!wrap || wrap.classList.contains('hidden')) return;
     const entries = getPrayerEntries().slice().reverse();
     if (entries.length === 0) {
-        wrap.innerHTML = '<p class="empty-state">No entries yet.</p>';
+        wrap.innerHTML = `
+            <div class="empty-state-card">
+                <div class="empty-state-icon">&#x270D;</div>
+                <p class="empty-state-title">No prayers logged yet</p>
+                <p class="empty-state-sub">Write your first prayer or gratitude above &mdash; even one line counts.</p>
+            </div>`;
         return;
     }
     wrap.innerHTML = entries.map(e => `
@@ -2228,6 +2233,59 @@ function updateStreak() {
     }
 }
 
+// Returns the current streak even if user hasn't worked out today yet,
+// by counting back from yesterday. Used by the streak protector banner.
+function getPendingStreak() {
+    const workouts = DB.get('workouts', []);
+    const dates = new Set(workouts.map(w => w.date));
+    if (dates.has(today())) return 0; // already safe today
+    let streak = 0;
+    const checkDate = new Date();
+    checkDate.setDate(checkDate.getDate() - 1);
+    for (let i = 0; i < 365; i++) {
+        const ds = checkDate.toISOString().split('T')[0];
+        if (dates.has(ds)) {
+            streak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+            break;
+        }
+    }
+    return streak;
+}
+
+function renderStreakProtector() {
+    const el = document.getElementById('streak-protector');
+    if (!el) return;
+    const dismissedToday = localStorage.getItem('streak-protector-dismissed') === today();
+    const pending = getPendingStreak();
+    const hour = new Date().getHours();
+    // Show only if: pending streak ≥ 2 days, no workout today, after 3pm, not dismissed
+    if (pending >= 2 && hour >= 15 && !dismissedToday) {
+        const hoursLeft = 24 - hour;
+        el.innerHTML = `
+            <div class="streak-protector-inner">
+                <div class="streak-protector-icon">&#x1F525;</div>
+                <div class="streak-protector-text">
+                    <strong>${pending}-day streak at risk</strong>
+                    <span>${hoursLeft}h left to log a workout today</span>
+                </div>
+                <button class="streak-protector-cta" onclick="switchTab('workouts')">Save it</button>
+                <button class="streak-protector-close" aria-label="Dismiss" onclick="dismissStreakProtector()">&times;</button>
+            </div>
+        `;
+        el.classList.remove('hidden');
+    } else {
+        el.classList.add('hidden');
+    }
+}
+
+function dismissStreakProtector() {
+    localStorage.setItem('streak-protector-dismissed', today());
+    const el = document.getElementById('streak-protector');
+    if (el) el.classList.add('hidden');
+}
+
 // --- Dashboard ---
 function updateDashboard() {
     const workouts = DB.get('workouts', []).filter(w => w.date === today());
@@ -2246,6 +2304,7 @@ function updateDashboard() {
     }
 
     updateStreak();
+    renderStreakProtector();
     updateRecentWorkouts();
     renderProgressCharts();
     renderCalendarHeatmap();
@@ -2356,12 +2415,52 @@ function updateRecentWorkouts() {
                 </div>
                 <div class="workout-item-actions">
                     <span class="workout-item-vol">${parseFloat(lbsToDisplay(totalVol)).toLocaleString()} ${wu()}</span>
+                    <button class="workout-item-share" title="Share this workout" onclick="shareHistoryWorkout(${ts})">&#x1F4F7;</button>
                     <button class="workout-item-again" title="Log this again" onclick="logAgain(${ts})">&#x21BB;</button>
                     <button class="workout-item-del" title="Delete" onclick="deleteWorkout(${ts})">&times;</button>
                 </div>
             </div>
         `;
     }).join('');
+}
+
+// Share a past workout session as a card. Aggregates all exercises that
+// share the same date AND were logged within ~3 hours of this entry.
+function shareHistoryWorkout(timestamp) {
+    if (!timestamp) return;
+    const all = DB.get('workouts', []);
+    const anchor = all.find(w => w.timestamp === timestamp);
+    if (!anchor) return showToast('Workout not found');
+
+    // Group: same date, timestamp within 3h window of anchor (best-effort session group)
+    const windowMs = 3 * 60 * 60 * 1000;
+    const session = all.filter(w =>
+        w.date === anchor.date &&
+        Math.abs((w.timestamp || 0) - timestamp) <= windowMs
+    );
+
+    let totalVolume = 0, setCount = 0;
+    let topLift = { name: '', weight: 0, reps: 0 };
+    session.forEach(w => {
+        w.sets.forEach(s => {
+            totalVolume += s.weight * s.reps;
+            setCount++;
+            if (s.weight > topLift.weight) topLift = { name: w.name, weight: s.weight, reps: s.reps };
+        });
+    });
+
+    // Best-effort session name + duration
+    const sessionName = session.length === 1 ? anchor.name : `${session.length} Exercises`;
+    const durationMs = anchor.durationMs || 0;
+
+    openWorkoutShareModal({
+        sessionName,
+        durationMs,
+        exerciseCount: session.length,
+        setCount,
+        totalVolume,
+        topLift
+    });
 }
 
 async function deleteWorkout(timestamp) {
@@ -2759,12 +2858,63 @@ function checkForPR(exerciseName, newSets, allWorkouts) {
 }
 
 function showPRToast(exercise, prs) {
+    // Big celebration: backdrop, trophy, stats, confetti burst, share CTA
     const el = document.createElement('div');
-    el.className = 'pr-toast';
-    el.innerHTML = `<span class="pr-trophy">&#x1F3C6;</span><strong>NEW PR!</strong><br>${escapeHtml(exercise)}<br>${prs.join(' | ')}`;
+    el.className = 'pr-celebration';
+    el.innerHTML = `
+        <div class="pr-celebration-card">
+            <div class="pr-confetti"></div>
+            <div class="pr-trophy-big">&#x1F3C6;</div>
+            <div class="pr-headline">NEW PR!</div>
+            <div class="pr-exercise">${escapeHtml(exercise)}</div>
+            <div class="pr-stats">${prs.map(p => `<div class="pr-stat-line">${escapeHtml(p)}</div>`).join('')}</div>
+            <div class="pr-verse">"I press on toward the goal." — Philippians 3:14</div>
+            <button class="btn btn-primary pr-dismiss-btn">Let's Go!</button>
+        </div>
+    `;
     document.body.appendChild(el);
-    setTimeout(() => el.classList.add('show'), 10);
-    setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 400); }, 3500);
+
+    // Confetti pieces
+    const confettiEl = el.querySelector('.pr-confetti');
+    const colors = ['#dc2626', '#fbbf24', '#fff', '#f87171', '#fcd34d'];
+    for (let i = 0; i < 36; i++) {
+        const piece = document.createElement('span');
+        piece.className = 'pr-confetti-piece';
+        piece.style.left = Math.random() * 100 + '%';
+        piece.style.background = colors[i % colors.length];
+        piece.style.animationDelay = (Math.random() * 0.4) + 's';
+        piece.style.animationDuration = (1.4 + Math.random() * 1.2) + 's';
+        piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+        confettiEl.appendChild(piece);
+    }
+
+    requestAnimationFrame(() => el.classList.add('show'));
+
+    // Haptic + sound
+    if (typeof haptic === 'function') haptic(150);
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [523, 659, 784, 1047].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.frequency.value = freq;
+            osc.type = 'triangle';
+            gain.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.08);
+            gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + i * 0.08 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.08 + 0.25);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(ctx.currentTime + i * 0.08);
+            osc.stop(ctx.currentTime + i * 0.08 + 0.25);
+        });
+    } catch (e) {}
+
+    const dismiss = () => {
+        el.classList.remove('show');
+        setTimeout(() => el.remove(), 400);
+    };
+    el.querySelector('.pr-dismiss-btn').addEventListener('click', dismiss);
+    el.addEventListener('click', e => { if (e.target === el) dismiss(); });
+    setTimeout(dismiss, 6500);
 }
 
 // --- Achievement Badges ---
@@ -3248,7 +3398,12 @@ function renderRoutinesList() {
     if (!container) return;
     const templates = getTemplates();
     if (templates.length === 0) {
-        container.innerHTML = '<p class="empty-state">No routines saved yet. Complete a session and save it as a routine!</p>';
+        container.innerHTML = `
+            <div class="empty-state-card">
+                <div class="empty-state-icon">&#x1F4CB;</div>
+                <p class="empty-state-title">No saved routines</p>
+                <p class="empty-state-sub">Build your own with the Routine Builder, or browse Explore for proven splits like PPL and Upper/Lower.</p>
+            </div>`;
         return;
     }
     container.innerHTML = templates.map((t, i) => `
@@ -4883,7 +5038,12 @@ function renderCustomExercises() {
     if (!container) return;
     const exercises = getCustomExercises();
     if (exercises.length === 0) {
-        container.innerHTML = '<p class="empty-state">No custom exercises yet. Add your own above!</p>';
+        container.innerHTML = `
+            <div class="empty-state-card">
+                <div class="empty-state-icon">&#x2B50;</div>
+                <p class="empty-state-title">No custom exercises</p>
+                <p class="empty-state-sub">Use the form above to add your own moves &mdash; they&rsquo;ll show up everywhere you log workouts.</p>
+            </div>`;
         return;
     }
     container.innerHTML = exercises.map((e, i) => `

@@ -1505,11 +1505,22 @@ async function loadFeed() {
     );
 
     if (posts === null) {
-        container.innerHTML = '<p class="empty-state">Couldn\'t load feed (network or auth). Pull to retry.</p>';
+        container.innerHTML = `
+            <div class="empty-state-card">
+                <div class="empty-state-icon">&#x26A0;</div>
+                <p class="empty-state-title">Couldn&rsquo;t load your feed</p>
+                <p class="empty-state-sub">Check your connection and tap below to try again.</p>
+                <button class="btn btn-secondary btn-sm" onclick="loadFeed()" style="margin-top:10px">Retry</button>
+            </div>`;
         return;
     }
     if (posts.length === 0) {
-        container.innerHTML = '<p class="empty-state">No posts yet. Be the first — post a lift!</p>';
+        container.innerHTML = `
+            <div class="empty-state-card">
+                <div class="empty-state-icon">&#x1F4F8;</div>
+                <p class="empty-state-title">Your feed is quiet</p>
+                <p class="empty-state-sub">Add friends or post your first workout &mdash; everything you share here only goes to people you connect with.</p>
+            </div>`;
         return;
     }
 
@@ -1782,7 +1793,12 @@ async function renderFriendsView() {
     const friends = userProfile.friends || [];
     html += '<div class="card"><h2>My Friends</h2>';
     if (friends.length === 0) {
-        html += '<p class="empty-state">No friends yet. Search for users above!</p>';
+        html += `
+            <div class="empty-state-card">
+                <div class="empty-state-icon">&#x1F91D;</div>
+                <p class="empty-state-title">No friends yet</p>
+                <p class="empty-state-sub">Search by username above to send your first friend request and start sharing workouts.</p>
+            </div>`;
     } else {
         const friendProfiles = await directSelect(
             'profiles?id=in.(' + friends.join(',') +
