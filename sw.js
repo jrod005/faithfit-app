@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ironfaith-v77';
+const CACHE_NAME = 'ironfaith-v78';
 
 // Allow the page to tell a waiting SW to take over immediately
 self.addEventListener('message', (event) => {

@@ -1964,6 +1964,266 @@ const TOPIC_RESPONSES = {
             },
         },
         {
+            id: 'get_stronger',
+            keywords: ['stronger', 'get strong', 'build strength', 'increase strength', 'strength training', 'strength program', 'powerlifting', 'power lifting', 'how.*strong', 'gain strength', 'more strength', 'strength gains', 'raw strength', 'absolute strength'],
+            handler: (ctx) => {
+                const unit = wu();
+                let html = `<h3>How to Actually Get Stronger</h3>`;
+
+                // Personalized hook based on current data
+                if (ctx.workouts.length === 0) {
+                    html += insightHtml(`I don't see any logged workouts yet. Start by logging your big lifts (squat, bench, deadlift, overhead press) for 2 weeks so I can track real progression for you.`);
+                } else {
+                    // Find the user's strongest big lift
+                    const bigLifts = ['Bench Press','Squat','Deadlift','Overhead Press','Barbell Row','Front Squat','Romanian Deadlift'];
+                    let topLift = null;
+                    bigLifts.forEach(name => {
+                        const sets = ctx.workouts.filter(w => w.name === name).flatMap(w => w.sets);
+                        if (sets.length === 0) return;
+                        const best = sets.reduce((b, s) => (s.weight > (b ? b.weight : 0) ? s : b), null);
+                        if (best && (!topLift || best.weight > topLift.weight)) {
+                            topLift = { name, weight: best.weight, reps: best.reps };
+                        }
+                    });
+                    if (topLift) {
+                        // Brzycki 1RM estimate
+                        const e1rm = Math.round(topLift.weight * (36 / (37 - Math.min(topLift.reps, 10))));
+                        html += insightHtml(`Your top recorded lift is <strong>${escapeHtml(topLift.name)}</strong> at ${lbsToDisplay(topLift.weight)}${unit} \u00d7 ${topLift.reps} (\u2248 ${lbsToDisplay(e1rm)}${unit} 1RM). The plan below is built around pushing that number up.`);
+                    }
+                }
+
+                html += `<h3>The 4 Rules of Getting Stronger</h3><ol>`;
+                html += `<li><strong>Progressive overload, every session.</strong> Add 2.5\u20135${unit} or one rep to your top set every workout. Tiny jumps compound fast.</li>`;
+                html += `<li><strong>Train in low reps for max strength.</strong> 3\u20135 reps per set on your main lifts. Higher reps build size; low reps build raw force.</li>`;
+                html += `<li><strong>Rest LONG between heavy sets.</strong> 3\u20135 minutes. Cutting rest sabotages strength \u2014 your nervous system needs the recovery to lift heavy again.</li>`;
+                html += `<li><strong>Focus on the big 5.</strong> Squat, bench, deadlift, overhead press, row. Everything else is accessory.</li>`;
+                html += `</ol>`;
+
+                html += `<h3>A Proven Weekly Layout</h3><ul>`;
+                html += `<li><strong>Day 1 \u2014 Heavy lower:</strong> Squat 5\u00d75, RDL 4\u00d76, walking lunges 3\u00d710/leg</li>`;
+                html += `<li><strong>Day 2 \u2014 Heavy upper:</strong> Bench 5\u00d75, barbell row 5\u00d75, overhead press 4\u00d76, chin-ups 3\u00d7max</li>`;
+                html += `<li><strong>Day 3 \u2014 Pull/posterior:</strong> Deadlift 3\u00d73, pull-ups 4\u00d78, hip thrust 4\u00d78, face pulls 3\u00d715</li>`;
+                html += `<li><strong>Day 4 \u2014 Volume upper:</strong> Incline bench 4\u00d78, dumbbell row 4\u00d78, lateral raises 4\u00d712, dips 3\u00d7max</li>`;
+                html += `</ul>`;
+
+                html += `<h3>The Loading Scheme that Works</h3><ul>`;
+                html += `<li><strong>Top set:</strong> 1 set of 3\u20135 reps at the heaviest weight you can move with good form. This is the strength driver.</li>`;
+                html += `<li><strong>Back-off sets:</strong> 3\u20134 sets at 85\u201390% of that weight for 5 reps. Builds work capacity.</li>`;
+                html += `<li><strong>Add weight when you complete all reps with 1 rep in reserve.</strong> If the top set felt grindy, repeat the weight next session.</li>`;
+                html += `</ul>`;
+
+                html += `<h3>The Stuff That Wrecks Strength</h3><ul>`;
+                html += `<li><strong>Skipping sleep</strong> \u2014 less than 7 hrs and your CNS is fried. Sleep is a strength supplement.</li>`;
+                html += `<li><strong>Eating in a deficit</strong> \u2014 you can't get meaningfully stronger while losing weight aggressively. Eat at maintenance or slight surplus.</li>`;
+                html += `<li><strong>Random programs</strong> \u2014 stick with one for at least 8\u201312 weeks. Program hopping = no progress.</li>`;
+                html += `<li><strong>Form breakdown</strong> \u2014 a missed rep or rounded back deload week. Pull back to 90% and rebuild.</li>`;
+                html += `</ul>`;
+
+                html += verseHtml({ text: "I can do all this through him who gives me strength.", ref: "Philippians 4:13" });
+                return html;
+            },
+        },
+        {
+            id: 'mobility',
+            keywords: ['mobility', 'flexibility', 'flexible', 'tight hip', 'tight shoulder', 'tight ankle', 'stiff', 'range of motion', 'rom', 'stretching routine', 'limber', 'loosen up', 'mobility work'],
+            handler: () => {
+                let html = `<h3>Mobility That Actually Helps Lifts</h3>`;
+                html += `<p>Ignore the influencer stretching circus. Lifters need <strong>specific</strong> mobility \u2014 the kind that unlocks better positions in the squat, bench, and overhead press.</p>`;
+
+                html += `<h3>The 5-Minute Daily Routine</h3><ol>`;
+                html += `<li><strong>90/90 hip switches</strong> \u2014 2 minutes. Fixes tight hips, opens squat depth.</li>`;
+                html += `<li><strong>Couch stretch</strong> \u2014 60 sec each side. Lengthens hip flexors, fixes anterior pelvic tilt.</li>`;
+                html += `<li><strong>Thoracic spine extensions over a foam roller</strong> \u2014 10 reps. Unlocks overhead pressing.</li>`;
+                html += `<li><strong>Wall slides</strong> \u2014 10 reps. Restores shoulder mechanics.</li>`;
+                html += `<li><strong>Ankle wall mobs</strong> \u2014 10 each side. Bigger ankle ROM = deeper squat.</li>`;
+                html += `</ol>`;
+
+                html += `<h3>Pre-Workout Mobility (lift-specific)</h3><ul>`;
+                html += `<li><strong>Squat day:</strong> 90/90 hip switches + ankle mobs + bodyweight squats x10</li>`;
+                html += `<li><strong>Bench day:</strong> band pull-aparts x20 + wall slides x10 + scap push-ups x10</li>`;
+                html += `<li><strong>Deadlift day:</strong> cat-cow x10 + hip airplanes x5/leg + light RDLs x10</li>`;
+                html += `<li><strong>Overhead day:</strong> thoracic extensions + wall slides + dead hang 30 sec</li>`;
+                html += `</ul>`;
+
+                html += `<h3>What NOT to Do</h3><ul>`;
+                html += `<li><strong>Don't static stretch before lifting</strong> \u2014 reduces force output. Save it for after.</li>`;
+                html += `<li><strong>Don't chase mobility you don't need.</strong> If your squat is fine, you don't need to do the splits.</li>`;
+                html += `<li><strong>Don't expect overnight changes.</strong> Mobility is a 4-8 week project, not a one-session fix.</li>`;
+                html += `</ul>`;
+
+                html += verseHtml({ text: "It is God who arms me with strength and keeps my way secure. He makes my feet like the feet of a deer.", ref: "Psalm 18:32-33" });
+                return html;
+            },
+        },
+        {
+            id: 'sleep',
+            keywords: ['sleep', 'insomnia', 'can\'t sleep', 'sleep quality', 'sleep better', 'how much sleep', 'sleep tips', 'rest at night', 'sleeping'],
+            handler: () => {
+                let html = `<h3>Sleep: The Most Underrated Performance Lever</h3>`;
+                html += insightHtml(`Lifters who sleep 5\u20136 hrs lose strength <strong>2x faster</strong> in cuts and gain muscle <strong>~30% slower</strong> in bulks. Sleep isn't optional.`);
+
+                html += `<h3>Targets</h3><ul>`;
+                html += `<li><strong>7\u20139 hours</strong> per night, every night.</li>`;
+                html += `<li><strong>Same bedtime \u00b1 30 min</strong>, even on weekends.</li>`;
+                html += `<li><strong>Cool, dark, quiet</strong> room. 65\u201368\u00b0F is ideal.</li>`;
+                html += `</ul>`;
+
+                html += `<h3>Things That Crush Your Sleep</h3><ul>`;
+                html += `<li><strong>Caffeine after 2 PM</strong> \u2014 half-life is 6 hours. Your "I sleep fine on coffee" is a lie your body tells you.</li>`;
+                html += `<li><strong>Late workouts</strong> \u2014 if you train past 8 PM, give yourself 90 min to wind down.</li>`;
+                html += `<li><strong>Phone in bed</strong> \u2014 blue light + dopamine hits = trash sleep.</li>`;
+                html += `<li><strong>Alcohol</strong> \u2014 puts you out fast, wrecks REM and deep sleep stages.</li>`;
+                html += `</ul>`;
+
+                html += `<h3>Things That Help</h3><ul>`;
+                html += `<li><strong>Magnesium glycinate (300\u2013400 mg)</strong> 1 hr before bed.</li>`;
+                html += `<li><strong>10-min wind-down ritual</strong> \u2014 dim lights, read, journal.</li>`;
+                html += `<li><strong>Morning sunlight</strong> within 30 min of waking sets your circadian rhythm.</li>`;
+                html += `</ul>`;
+
+                html += verseHtml({ text: "In peace I will lie down and sleep, for you alone, LORD, make me dwell in safety.", ref: "Psalm 4:8" });
+                return html;
+            },
+        },
+        {
+            id: 'hydration',
+            keywords: ['hydrat', 'water intake', 'how much water', 'drink water', 'electrolyte', 'thirsty', 'dehydrat'],
+            handler: (ctx) => {
+                const lbs = ctx.currentWeight || 180;
+                const oz = Math.round(lbs * 0.6);
+                const liters = (oz * 0.0295735).toFixed(1);
+                let html = `<h3>Hydration for Lifters</h3>`;
+                html += insightHtml(`At your bodyweight, target roughly <strong>${oz} oz (${liters} L)</strong> of water per day, plus 16\u201320 oz extra for every hour of training.`);
+
+                html += `<h3>The Rules</h3><ul>`;
+                html += `<li><strong>Pee should be pale yellow.</strong> Clear = overhydrated. Dark = behind.</li>`;
+                html += `<li><strong>Pre-workout:</strong> 16 oz, 30 min before lifting.</li>`;
+                html += `<li><strong>During workout:</strong> sip 16\u201324 oz over the session.</li>`;
+                html += `<li><strong>Post-workout:</strong> drink another 16 oz with electrolytes if you sweat heavily.</li>`;
+                html += `</ul>`;
+
+                html += `<h3>Why It Matters for Lifting</h3><ul>`;
+                html += `<li><strong>2% dehydration</strong> drops strength output measurably. You'll feel weaker without knowing why.</li>`;
+                html += `<li><strong>Cramps</strong> are usually electrolyte deficits (sodium + potassium), not just water.</li>`;
+                html += `<li><strong>Joint comfort</strong> \u2014 hydrated cartilage = less crackly knees and shoulders.</li>`;
+                html += `</ul>`;
+
+                html += verseHtml({ text: "Whoever believes in me, as Scripture has said, rivers of living water will flow from within them.", ref: "John 7:38" });
+                return html;
+            },
+        },
+        {
+            id: 'core_abs',
+            keywords: ['ab workout', 'six pack', 'six.pack', 'abs', 'core training', 'how.*abs', 'flatter stomach', 'midsection', 'six-pack'],
+            handler: () => {
+                let html = `<h3>Building Visible Abs</h3>`;
+                html += insightHtml(`Hard truth: abs are revealed by body fat %, not by how many crunches you do. You need <strong>~12% body fat (men)</strong> or <strong>~20% (women)</strong> for them to show.`);
+
+                html += `<h3>The Two-Lever Approach</h3><ol>`;
+                html += `<li><strong>Build the muscle</strong> \u2014 train abs 2\u20133x/week with weighted, progressive moves.</li>`;
+                html += `<li><strong>Lower body fat</strong> \u2014 the kitchen, not the gym, is where your six-pack lives.</li>`;
+                html += `</ol>`;
+
+                html += `<h3>The Best Ab Exercises</h3><ul>`;
+                html += `<li><strong>Hanging leg raises</strong> \u2014 the king. 3\u00d78\u201312.</li>`;
+                html += `<li><strong>Cable crunches</strong> \u2014 weighted, progressive. 3\u00d710\u201315.</li>`;
+                html += `<li><strong>Ab wheel rollouts</strong> \u2014 brutal, builds anti-extension strength. 3\u00d75\u201310.</li>`;
+                html += `<li><strong>Pallof press</strong> \u2014 anti-rotation, fixes obliques. 3\u00d710/side.</li>`;
+                html += `<li><strong>Plank variations</strong> \u2014 endurance, not size. 3\u00d745\u201360 sec.</li>`;
+                html += `</ul>`;
+
+                html += `<h3>Skip These</h3><ul>`;
+                html += `<li><strong>1000 crunches a day</strong> \u2014 no carryover, hurts your back.</li>`;
+                html += `<li><strong>"Spot reduction"</strong> \u2014 you can't burn belly fat by training abs. Doesn't work, never has.</li>`;
+                html += `<li><strong>Sit-ups with arched back</strong> \u2014 wrecks your lumbar. Use crunches or leg raises instead.</li>`;
+                html += `</ul>`;
+                html += verseHtml();
+                return html;
+            },
+        },
+        {
+            id: 'home_workout',
+            keywords: ['no gym', 'home workout', 'no equipment', 'bodyweight', 'home gym', 'travel workout', 'hotel workout', 'workout at home', 'work out at home', 'no weights'],
+            handler: () => {
+                let html = `<h3>Train Hard With Zero Equipment</h3>`;
+                html += `<p>You don't need a gym to get strong. You need progressive overload \u2014 and bodyweight work scales further than people think.</p>`;
+
+                html += `<h3>The Full-Body Routine (30 min)</h3><ol>`;
+                html += `<li><strong>Push-ups</strong> \u2014 4 sets, AMRAP. Progress: incline \u2192 standard \u2192 decline \u2192 archer \u2192 one-arm.</li>`;
+                html += `<li><strong>Bulgarian split squats</strong> \u2014 4\u00d710/leg. Hold a backpack for load.</li>`;
+                html += `<li><strong>Inverted rows (under a table)</strong> \u2014 4\u00d78\u201312. Or use a pull-up bar.</li>`;
+                html += `<li><strong>Pike push-ups</strong> \u2014 3\u00d78. Builds shoulders without weights.</li>`;
+                html += `<li><strong>Walking lunges</strong> \u2014 3\u00d720 steps.</li>`;
+                html += `<li><strong>Hollow body holds</strong> \u2014 3\u00d730 sec. Crushes core.</li>`;
+                html += `</ol>`;
+
+                html += `<h3>Bodyweight Progression Tricks</h3><ul>`;
+                html += `<li><strong>Tempo:</strong> slow the eccentric to 4 seconds. Suddenly push-ups feel brutal.</li>`;
+                html += `<li><strong>Pause reps:</strong> 2-second pause at the bottom. Removes momentum.</li>`;
+                html += `<li><strong>Unilateral progressions:</strong> two legs \u2192 one leg, two arms \u2192 archer \u2192 one arm.</li>`;
+                html += `<li><strong>Density:</strong> same workout in less time = more intensity.</li>`;
+                html += `</ul>`;
+                html += verseHtml();
+                return html;
+            },
+        },
+        {
+            id: 'fasting',
+            keywords: ['intermittent fasting', 'fasting', '16:8', '16/8', 'omad', 'skip breakfast', 'fasted', 'fasted training', 'fasted cardio', 'eating window'],
+            handler: () => {
+                let html = `<h3>Intermittent Fasting + Lifting</h3>`;
+                html += insightHtml(`IF is a calorie-control tool, not a magic fat-loss switch. It works because you eat less, not because of metabolic voodoo.`);
+
+                html += `<h3>What it's good for</h3><ul>`;
+                html += `<li><strong>Cutting:</strong> easier to hit a deficit when you skip a meal.</li>`;
+                html += `<li><strong>Simplicity:</strong> fewer decisions about food.</li>`;
+                html += `<li><strong>Digestive comfort:</strong> some people just feel better not eating early.</li>`;
+                html += `</ul>`;
+
+                html += `<h3>Where it gets you in trouble</h3><ul>`;
+                html += `<li><strong>Bulking on IF is hard.</strong> Eating 3500+ calories in an 8-hour window is uncomfortable.</li>`;
+                html += `<li><strong>Heavy strength training fasted</strong> usually feels worse than fed. Try eating 1\u20132 hrs pre-lift.</li>`;
+                html += `<li><strong>Protein distribution suffers</strong> \u2014 you want 4\u20135 protein hits across the day; IF cuts you to 2\u20133.</li>`;
+                html += `</ul>`;
+
+                html += `<h3>If you want to try it</h3><ul>`;
+                html += `<li>Start with <strong>14:10</strong> (skip breakfast, eat 10am\u20138pm). Easier than jumping straight to 16:8.</li>`;
+                html += `<li>Time your eating window so you can <strong>eat post-workout</strong>.</li>`;
+                html += `<li>Hit your protein. 0.8\u20131g per lb bodyweight, no exceptions.</li>`;
+                html += `</ul>`;
+                html += verseHtml();
+                return html;
+            },
+        },
+        {
+            id: 'injury_prevention',
+            keywords: ['avoid injury', 'prevent injury', 'lifting safe', 'safe lift', 'tweaked', 'tweak.*back', 'tweak.*knee', 'low.?back pain', 'shoulder pain', 'knee pain', 'elbow pain', 'wrist pain', 'lifting hurt'],
+            handler: () => {
+                let html = `<h3>Lift for the Long Game</h3>`;
+                html += `<p>Your goal is <strong>40+ years of lifting</strong>, not crushing yourself this month. The strongest lifters are the ones still healthy in their 50s and 60s.</p>`;
+
+                html += `<h3>The Non-Negotiables</h3><ul>`;
+                html += `<li><strong>Warm up properly</strong> \u2014 2\u20133 ramping sets before your top weight, every time.</li>`;
+                html += `<li><strong>Leave 1\u20132 reps in the tank</strong> on most working sets. Save the all-out grinders for once a week.</li>`;
+                html += `<li><strong>Track form fatigue.</strong> If your bar speed drops or form breaks down, the set is over.</li>`;
+                html += `<li><strong>Deload every 6\u20138 weeks</strong> \u2014 a full week at 60\u201370% intensity. Your joints will thank you.</li>`;
+                html += `</ul>`;
+
+                html += `<h3>If Something Hurts</h3><ol>`;
+                html += `<li><strong>Sharp pain = stop.</strong> Dull soreness = train through, but lighter.</li>`;
+                html += `<li><strong>Swap, don't skip.</strong> Sore back? Swap deadlift for hip thrust. Bad shoulder? Swap overhead press for landmine press.</li>`;
+                html += `<li><strong>3+ days of pain = see a physio.</strong> Don't tough it out. Cheap injuries become chronic problems.</li>`;
+                html += `<li><strong>Return at 50%.</strong> When you come back, start at half your pre-injury weight and rebuild over 3\u20134 weeks.</li>`;
+                html += `</ol>`;
+
+                html += `<h3>The Most Underrated Tip</h3>`;
+                html += insightHtml(`<strong>Strengthen the weak link, don't just rest it.</strong> Sore knees? Build your VMO with split squats. Sore lower back? Build it with hyperextensions and RDLs. Rest alone rarely fixes anything.`);
+
+                html += verseHtml({ text: "He gives strength to the weary and increases the power of the weak.", ref: "Isaiah 40:29" });
+                return html;
+            },
+        },
+        {
             id: 'greeting',
             keywords: ['hello', 'hi', 'hey', 'sup', 'what\'s up', 'good morning', 'good evening', 'howdy'],
             handler: (ctx) => {
@@ -2395,22 +2655,16 @@ function processCoachInput(text, photoData) {
     setTimeout(() => {
         removeTyping();
         const ctx = getCoachContext();
-        const lower = text.toLowerCase();
 
         // Reset plan capture before handler runs
         window._lastCoachPlanId = null;
 
-        // Find matching topic
+        // Score every topic against the question and pick the best match.
+        // This is much more forgiving than the old "first regex hit wins" loop.
+        const best = scoreCoachIntent(text);
         let response = null;
-        for (const topic of TOPIC_RESPONSES.topics) {
-            for (const kw of topic.keywords) {
-                const regex = new RegExp(kw, 'i');
-                if (regex.test(lower)) {
-                    response = topic.handler(ctx, text);
-                    break;
-                }
-            }
-            if (response) break;
+        if (best && best.topic) {
+            response = best.topic.handler(ctx, text);
         }
 
         if (!response) {
@@ -2422,6 +2676,121 @@ function processCoachInput(text, photoData) {
         addBotMessage(response, { suggestions, planId });
         window._lastCoachPlanId = null;
     }, 400 + Math.random() * 600);
+}
+
+// ========== INTENT SCORING ==========
+// Synonym groups: any token in a group counts as a hit for any other token in
+// the same group. This lets the matcher catch paraphrases like "get jacked"
+// → "build muscle", "loosen up" → "mobility", etc.
+const COACH_SYNONYMS = [
+    ['stronger','strength','strong','powerful','power','jacked','beast','force','strongman','powerlift','powerlifting'],
+    ['build','gain','grow','increase','add','boost','more','bigger','growing','building','gaining'],
+    ['muscle','muscles','mass','size','hypertrophy','swole','jacked','gains','bulk','bulking'],
+    ['lose','cut','cutting','shred','lean','slim','drop','burn','trim'],
+    ['fat','weight','pounds','lbs','belly','gut','flab','chub'],
+    ['workout','training','program','routine','split','plan','session','lift','lifting'],
+    ['food','eat','eating','meal','diet','nutrition','calories','macros','protein','carbs','carb','fats'],
+    ['rest','recovery','recover','sleep','sore','soreness','tired','exhausted','overtraining','deload'],
+    ['cardio','running','run','hiit','liss','treadmill','bike','cycling','endurance','stamina','conditioning'],
+    ['form','technique','how to','proper','correct','cue','setup','position'],
+    ['warm','warmup','warm-up','warm up','prime','prep'],
+    ['mobility','flexibility','flexible','stretch','stretching','tight','stiff','loosen','limber','range'],
+    ['progress','progression','improve','improving','better','gains','results','analyze','analysis','review','recap','report','summary','overview'],
+    ['plateau','stuck','stalled','stall','frozen','flat'],
+    ['motivation','motivated','tired','lazy','quit','giving up','discouraged','burnout','burned out','unmotivated'],
+    ['weak','weakness','lagging','imbalance','underdeveloped','behind','asymmetry','asymmetric','weak point','weakpoint'],
+    ['1rm','max','maximum','heaviest','top','best','pr','personal record','one rep'],
+    ['hydrate','hydration','water','drink','thirsty','dehydrated','electrolyte'],
+    ['streak','consistency','consistent','discipline','habits','attendance','show up'],
+    ['supplement','supplements','creatine','whey','bcaa','preworkout','pre-workout','vitamin','vitamins'],
+    ['plan','planning','schedule','week','weekly','this week'],
+    ['ab','abs','core','six pack','six-pack','sixpack','midsection','stomach','tummy'],
+    ['home','no gym','no equipment','bodyweight','travel','hotel','garage'],
+    ['fasting','fasted','intermittent','16:8','omad','eating window','skip meals'],
+    ['injury','hurt','pain','tweaked','tweak','sharp pain','sore back','sore knee','sore shoulder','prevent','safe'],
+    ['shoulders','shoulder','delt','delts','overhead'],
+    ['chest','pec','pecs','bench','pectoral'],
+    ['back','lat','lats','row','rowing','pull','traps','trap'],
+    ['legs','leg','quad','quads','squat','lunge','hamstring','hams','glute','glutes','calf','calves','butt'],
+    ['biceps','bicep','curl','curls','arm','arms'],
+    ['triceps','tricep','pushdown','dip','dips'],
+];
+
+const COACH_SYNONYM_INDEX = (() => {
+    const map = {};
+    COACH_SYNONYMS.forEach((group, idx) => {
+        group.forEach(word => {
+            if (!map[word]) map[word] = new Set();
+            map[word].add(idx);
+        });
+    });
+    return map;
+})();
+
+const COACH_STOPWORDS = new Set([
+    'a','an','and','are','as','at','be','but','by','can','do','does','for','from','get',
+    'have','how','i','if','in','is','it','its','just','me','my','no','not','of','on','or',
+    'should','so','that','the','this','to','was','we','what','when','where','which','will',
+    'with','you','your','yours','am','any','do','doing','done','please','tell','give','about',
+    'really','some','more','some','need','want','help','best','good','better','want','wants',
+    'good','great','tip','tips','way','ways'
+]);
+
+function tokenizeForCoach(text) {
+    if (!text) return [];
+    return String(text).toLowerCase()
+        .replace(/[^a-z0-9\s\-:/]/g, ' ')
+        .split(/\s+/)
+        .filter(t => t && !COACH_STOPWORDS.has(t));
+}
+
+function expandTokensWithSynonyms(tokens) {
+    const groupHits = new Set();
+    const wordHits = new Set(tokens);
+    tokens.forEach(t => {
+        const groups = COACH_SYNONYM_INDEX[t];
+        if (groups) groups.forEach(g => groupHits.add(g));
+    });
+    return { wordHits, groupHits };
+}
+
+function scoreCoachIntent(text) {
+    if (!text || !TOPIC_RESPONSES || !TOPIC_RESPONSES.topics) return null;
+    const lower = text.toLowerCase();
+    const tokens = tokenizeForCoach(text);
+    if (tokens.length === 0) return null;
+    const { wordHits, groupHits } = expandTokensWithSynonyms(tokens);
+
+    let bestTopic = null;
+    let bestScore = 0;
+
+    TOPIC_RESPONSES.topics.forEach(topic => {
+        let score = 0;
+        for (const kw of topic.keywords) {
+            // Strong signal: full keyword/phrase appears literally
+            try {
+                if (new RegExp(kw, 'i').test(lower)) score += 5;
+            } catch (e) { /* invalid regex — skip */ }
+            // Token-level overlap
+            const kwTokens = tokenizeForCoach(kw.replace(/[\\.*+?^${}()|[\]]/g, ' '));
+            kwTokens.forEach(kt => {
+                if (wordHits.has(kt)) score += 2;
+                const groups = COACH_SYNONYM_INDEX[kt];
+                if (groups) groups.forEach(g => { if (groupHits.has(g)) score += 1; });
+            });
+        }
+        // Slight penalty for the greeting topic so it doesn't steal questions
+        // that happen to contain "hi" inside another word.
+        if (topic.id === 'greeting' && tokens.length > 2) score -= 4;
+        if (score > bestScore) {
+            bestScore = score;
+            bestTopic = topic;
+        }
+    });
+
+    // Threshold: at least one solid signal (literal match worth 5, or 3+ token overlaps)
+    if (bestScore >= 3) return { topic: bestTopic, score: bestScore };
+    return null;
 }
 
 function addUserMessageWithPhoto(text, photoData) {
