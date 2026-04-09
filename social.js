@@ -1932,10 +1932,44 @@ function renderProfileView() {
                 </label>
             </div>
             <p class="privacy-hint">When private, only friends can see your posts</p>
-            <button class="btn btn-secondary btn-full" style="margin-top:12px" onclick="syncStatsToSupabase().then(()=>{showToast('Stats synced!');renderProfileView();})">Sync Stats Now</button>
+            <button class="btn btn-secondary btn-full" style="margin-top:12px" onclick="changeUsernamePrompt()">Change Username</button>
+            <button class="btn btn-secondary btn-full" style="margin-top:8px" onclick="syncStatsToSupabase().then(()=>{showToast('Stats synced!');renderProfileView();})">Sync Stats Now</button>
             <button class="btn btn-danger btn-full" style="margin-top:8px" onclick="socialSignOut()">Sign Out</button>
         </div>
     `;
+}
+
+// ========== CHANGE USERNAME ==========
+async function changeUsernamePrompt() {
+    if (!currentUser || !userProfile) return showToast('Sign in first');
+    const current = userProfile.username || '';
+    const next = prompt(
+        'Choose a new username (3–20 chars, letters/numbers/underscore only):',
+        current
+    );
+    if (next === null) return; // cancelled
+    const cleaned = next.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (cleaned === current) return; // no change
+    if (cleaned.length < 3) return showToast('Username must be 3+ characters');
+    if (cleaned.length > 20) return showToast('Username must be under 20 characters');
+
+    // Availability check
+    const existing = await directSelect(
+        'profiles?username=eq.' + encodeURIComponent(cleaned) + '&select=id'
+    );
+    if (existing && existing.length > 0 && existing[0].id !== currentUser.id) {
+        return showToast('That username is taken');
+    }
+
+    const ok = await directUpdate(
+        'profiles',
+        'id=eq.' + encodeURIComponent(currentUser.id),
+        { username: cleaned }
+    );
+    if (!ok) return; // toast already shown by directUpdate
+    userProfile.username = cleaned;
+    showToast('Username changed to @' + cleaned, 'success');
+    renderSocialTab();
 }
 
 function timeAgo(ms) {
