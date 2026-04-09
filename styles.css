@@ -264,8 +264,9 @@ button:disabled {
     padding: 16px;
 }
 .ios-install-card {
-    background: #161616;
-    border: 1px solid #2a2a2a;
+    background: var(--card-bg, #161616);
+    color: var(--text, #f0f0f0);
+    border: 1px solid var(--border, #2a2a2a);
     border-radius: 20px 20px 16px 16px;
     padding: 28px 24px 24px;
     max-width: 440px;
@@ -288,17 +289,17 @@ button:disabled {
     line-height: 1;
 }
 .ios-install-icon { font-size: 38px; color: #dc2626; margin-bottom: 6px; }
-.ios-install-card h3 { margin: 0 0 8px; font-size: 22px; color: #fff; }
-.ios-install-card p { margin: 0 0 16px; color: #aaa; font-size: 14px; line-height: 1.5; }
+.ios-install-card h3 { margin: 0 0 8px; font-size: 22px; color: var(--text, #fff); }
+.ios-install-card p { margin: 0 0 16px; color: var(--text-secondary, #aaa); font-size: 14px; line-height: 1.5; }
 .ios-install-card ol {
     text-align: left;
     margin: 0 0 18px;
     padding-left: 22px;
-    color: #ddd;
+    color: var(--text, #ddd);
     font-size: 14px;
     line-height: 1.7;
 }
-.ios-install-card ol strong { color: #fff; }
+.ios-install-card ol strong { color: var(--text, #fff); }
 .ios-share-icon {
     display: inline-block;
     background: #1d4ed8;
@@ -2804,6 +2805,22 @@ canvas {
     max-height: 400px;
     object-fit: cover;
     display: block;
+    background: linear-gradient(90deg, #1a1a1a 25%, #262626 50%, #1a1a1a 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    min-height: 200px;
+}
+.post-photo.loaded {
+    opacity: 1;
+    background: none;
+    animation: none;
+    min-height: 0;
+}
+[data-theme="light"] .post-photo {
+    background: linear-gradient(90deg, #e8e8e8 25%, #f4f4f4 50%, #e8e8e8 75%);
+    background-size: 200% 100%;
 }
 .post-workout-stats {
     padding: 10px 16px;

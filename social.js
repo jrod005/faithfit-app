@@ -1355,7 +1355,10 @@ async function sbDeclineFriendRequest(requestId) {
 }
 
 async function sbRemoveFriend(friendUid) {
-    if (!confirm('Remove this friend?')) return;
+    const ok = (typeof confirmDialog === 'function')
+        ? await confirmDialog('Remove this friend?', { danger: true, okText: 'Remove' })
+        : confirm('Remove this friend?');
+    if (!ok) return;
     const result = await directRpc('remove_friend', { friend_uid: friendUid });
     if (result === null) return;
     const fresh = await directFetchProfile(currentUser.id);
@@ -1565,7 +1568,7 @@ async function loadFeed() {
 
         const authorPic = avatarMap[p.uid];
         const avatarHtml = authorPic
-            ? `<img class="post-avatar" src="${authorPic}" alt="">`
+            ? `<img class="post-avatar" src="${authorPic}" alt="" loading="lazy" decoding="async">`
             : `<div class="post-avatar-letter">${(p.display_name || '?')[0].toUpperCase()}</div>`;
 
         let verseHtml = '';
@@ -1591,7 +1594,7 @@ async function loadFeed() {
                 </div>
                 ${isOwn ? `<button class="delete-btn" onclick="deletePost('${p.id}')">&times;</button>` : ''}
             </div>
-            ${p.photo_url ? `<img class="post-photo" src="${p.photo_url}" loading="lazy">` : ''}
+            ${p.photo_url ? `<img class="post-photo" src="${p.photo_url}" loading="lazy" decoding="async" onload="this.classList.add('loaded')">` : ''}
             ${statsHtml}
             ${p.caption ? `<p class="post-caption">${escapeHtml(p.caption)}</p>` : ''}
             ${verseHtml}
@@ -1621,9 +1624,12 @@ async function sbToggleLike(postId) {
 }
 
 async function deletePost(postId) {
-    if (!confirm('Delete this post?')) return;
-    const ok = await directDelete('posts', 'id=eq.' + encodeURIComponent(postId));
+    const ok = (typeof confirmDialog === 'function')
+        ? await confirmDialog('Delete this post? This cannot be undone.', { danger: true, okText: 'Delete' })
+        : confirm('Delete this post?');
     if (!ok) return;
+    const result = await directDelete('posts', 'id=eq.' + encodeURIComponent(postId));
+    if (!result) return;
     loadFeed();
     showToast('Post deleted');
 }
