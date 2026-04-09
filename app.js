@@ -1016,6 +1016,13 @@ function checkMissedNotifications() {
 }
 
 // --- Visual: count-up animation ---
+function fmtNum(val, decimals) {
+    const d = decimals || 0;
+    if (!isFinite(val)) return '0';
+    if (d === 0) return Math.round(val).toLocaleString();
+    return parseFloat(val.toFixed(d)).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
 function animateCount(el, target, opts) {
     if (!el) return;
     const o = opts || {};
@@ -1024,7 +1031,7 @@ function animateCount(el, target, opts) {
     const decimals = o.decimals || 0;
     const start = parseFloat(el.dataset.countCurrent || '0') || 0;
     if (start === target) {
-        el.textContent = `${target.toFixed(decimals)}${suffix}`;
+        el.textContent = `${fmtNum(target, decimals)}${suffix}`;
         return;
     }
     const startTime = performance.now();
@@ -1033,7 +1040,7 @@ function animateCount(el, target, opts) {
         const elapsed = now - startTime;
         const t = Math.min(elapsed / duration, 1);
         const val = start + (target - start) * ease(t);
-        el.textContent = `${val.toFixed(decimals)}${suffix}`;
+        el.textContent = `${fmtNum(val, decimals)}${suffix}`;
         if (t < 1) {
             el._countRaf = requestAnimationFrame(step);
         } else {
@@ -2286,6 +2293,87 @@ function dismissStreakProtector() {
     if (el) el.classList.add('hidden');
 }
 
+// ========== BACKUP HEALTH INDICATOR ==========
+function renderBackupHealth() {
+    const el = document.getElementById('backup-health');
+    if (!el) return;
+    const workouts = DB.get('workouts', []);
+    // Hide entirely if user has no real data yet
+    if (workouts.length === 0) { el.classList.add('hidden'); return; }
+
+    const enabled = (typeof isCloudSyncEnabled === 'function') ? isCloudSyncEnabled() : false;
+    const signedIn = (typeof currentUser !== 'undefined' && !!currentUser);
+    const last = (typeof getLastSync === 'function') ? getLastSync() : 0;
+
+    let state, icon, line1, line2, action;
+    if (!signedIn) {
+        state = 'warn';
+        icon = '&#x26A0;&#xFE0F;';
+        line1 = 'Backup off';
+        line2 = `${workouts.length} workout${workouts.length !== 1 ? 's' : ''} only on this device`;
+        action = `<button class="backup-health-cta" onclick="switchTab('social')">Turn on</button>`;
+    } else if (!enabled) {
+        state = 'warn';
+        icon = '&#x26A0;&#xFE0F;';
+        line1 = 'Cloud backup paused';
+        line2 = 'Tap to re-enable sync';
+        action = `<button class="backup-health-cta" onclick="switchTab('social')">Enable</button>`;
+    } else if (last === 0) {
+        state = 'warn';
+        icon = '&#x1F504;';
+        line1 = 'Waiting for first backup';
+        line2 = 'Will sync shortly';
+        action = '';
+    } else {
+        const ageMs = Date.now() - last;
+        const mins = Math.floor(ageMs / 60000);
+        const hrs = Math.floor(mins / 60);
+        const days = Math.floor(hrs / 24);
+        let ago;
+        if (mins < 1) ago = 'just now';
+        else if (mins < 60) ago = `${mins}m ago`;
+        else if (hrs < 24) ago = `${hrs}h ago`;
+        else ago = `${days}d ago`;
+        state = days >= 2 ? 'warn' : 'ok';
+        icon = days >= 2 ? '&#x26A0;&#xFE0F;' : '&#x2705;';
+        line1 = days >= 2 ? `Last backup ${ago}` : `Backed up ${ago}`;
+        line2 = `${workouts.length.toLocaleString()} workout${workouts.length !== 1 ? 's' : ''} safe`;
+        action = '';
+    }
+
+    el.innerHTML = `
+        <div class="backup-health-inner ${state}">
+            <div class="backup-health-icon">${icon}</div>
+            <div class="backup-health-text">
+                <strong>${line1}</strong>
+                <span>${line2}</span>
+            </div>
+            ${action}
+        </div>
+    `;
+    el.classList.remove('hidden');
+}
+
+// ========== SHARE APP ==========
+function shareApp() {
+    const url = 'https://ironfa.it';
+    const text = 'Check out Iron Faith \u2014 fitness + faith in one app. Track lifts, prayers, and progress in one place.';
+    if (navigator.share) {
+        navigator.share({ title: 'Iron Faith', text, url }).catch(() => {});
+        return;
+    }
+    // Fallback: copy to clipboard
+    const payload = `${text} ${url}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(payload).then(
+            () => showToast('Link copied! Paste anywhere to share', 'success'),
+            () => showToast('Copy failed \u2014 ' + url)
+        );
+    } else {
+        showToast(url);
+    }
+}
+
 // --- Dashboard ---
 function updateDashboard() {
     const workouts = DB.get('workouts', []).filter(w => w.date === today());
@@ -2305,6 +2393,7 @@ function updateDashboard() {
 
     updateStreak();
     renderStreakProtector();
+    renderBackupHealth();
     updateRecentWorkouts();
     renderProgressCharts();
     renderCalendarHeatmap();
