@@ -488,6 +488,30 @@ async function directHeaders(extra) {
     }, extra || {});
 }
 
+// Map raw HTTP statuses to user-friendly toasts.
+function friendlyHttpError(op, status, body) {
+    const b = (body || '').toLowerCase();
+    if (!navigator.onLine) return "You're offline — try again when reconnected";
+    if (status === 401 || status === 403) {
+        if (b.includes('jwt') || b.includes('expired')) return 'Session expired — please sign in again';
+        if (b.includes('row-level security') || b.includes('policy')) return "You don't have permission for that";
+        return 'Not authorized — please sign in again';
+    }
+    if (status === 404) return 'Not found';
+    if (status === 409) {
+        if (b.includes('duplicate') || b.includes('unique')) return 'That already exists';
+        return 'Conflict — try refreshing';
+    }
+    if (status === 413) return 'File too large';
+    if (status === 429) return 'Too many requests — slow down a sec';
+    if (status >= 500) return 'Server hiccup — try again in a moment';
+    if (status === 400) {
+        if (b.includes('username')) return 'That username is taken or invalid';
+        return 'Something was off with that request';
+    }
+    return 'Couldn’t ' + op + ' — please try again';
+}
+
 // Direct REST INSERT. Returns inserted row(s) or null on error.
 async function directInsert(table, body) {
     try {
@@ -508,7 +532,7 @@ async function directInsert(table, body) {
         if (!resp.ok) {
             const err = await resp.text().catch(() => '');
             console.error('directInsert HTTP', resp.status, table, err);
-            if (typeof showToast === 'function') showToast('Insert ' + resp.status + ': ' + err.slice(0, 60));
+            if (typeof showToast === 'function') showToast(friendlyHttpError('save', resp.status, err));
             return null;
         }
         return await resp.json();
@@ -535,7 +559,7 @@ async function directUpdate(table, filter, body) {
         if (!resp.ok) {
             const err = await resp.text().catch(() => '');
             console.error('directUpdate HTTP', resp.status, table, err);
-            if (typeof showToast === 'function') showToast('Update ' + resp.status);
+            if (typeof showToast === 'function') showToast(friendlyHttpError('update', resp.status, err));
             return null;
         }
         return await resp.json();
@@ -557,7 +581,7 @@ async function directDelete(table, filter) {
         });
         if (!resp.ok) {
             console.error('directDelete HTTP', resp.status, table);
-            if (typeof showToast === 'function') showToast('Delete ' + resp.status);
+            if (typeof showToast === 'function') showToast(friendlyHttpError('delete', resp.status, ''));
             return false;
         }
         return true;
@@ -583,7 +607,7 @@ async function directRpc(fnName, args) {
         if (!resp.ok) {
             const err = await resp.text().catch(() => '');
             console.error('directRpc HTTP', resp.status, fnName, err);
-            if (typeof showToast === 'function') showToast('RPC ' + resp.status);
+            if (typeof showToast === 'function') showToast(friendlyHttpError('do that', resp.status, err));
             return null;
         }
         const text = await resp.text();
@@ -611,7 +635,7 @@ async function directStorageUpload(bucket, path, file, contentType) {
         if (!resp.ok) {
             const err = await resp.text().catch(() => '');
             console.error('directStorageUpload HTTP', resp.status, err);
-            if (typeof showToast === 'function') showToast('Upload ' + resp.status);
+            if (typeof showToast === 'function') showToast(friendlyHttpError('upload', resp.status, err));
             return null;
         }
         // Public URL convention for public buckets
@@ -626,7 +650,7 @@ async function directSelect(path) {
     try {
         const sessInfo = await getAccessTokenSafely();
         if (!sessInfo?.token) {
-            if (typeof showToast === 'function') showToast('No auth token for ' + path.split('?')[0]);
+            if (typeof showToast === 'function') showToast('Please sign in to continue');
             return null;
         }
         const resp = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
@@ -639,13 +663,18 @@ async function directSelect(path) {
         if (!resp.ok) {
             const body = await resp.text().catch(() => '');
             console.error('directSelect HTTP', resp.status, path, body);
-            if (typeof showToast === 'function') showToast('REST ' + resp.status + ' on ' + path.split('?')[0]);
+            // Skip noisy "no rows" 406 toasts
+            if (resp.status !== 406 && typeof showToast === 'function') {
+                showToast(friendlyHttpError('load', resp.status, body));
+            }
             return null;
         }
         return await resp.json();
     } catch (e) {
         console.error('directSelect crashed:', path, e);
-        if (typeof showToast === 'function') showToast('REST crashed: ' + (e.message || 'unknown'));
+        if (typeof showToast === 'function') {
+            showToast(navigator.onLine ? "Couldn't load — please try again" : "You're offline");
+        }
         return null;
     }
 }

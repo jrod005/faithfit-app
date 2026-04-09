@@ -2471,6 +2471,68 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+// --- iOS install prompt (one-time, dismissible) ---
+function maybeShowIosInstallPrompt() {
+    try {
+        if (localStorage.getItem('ironfaith-ios-install-dismissed')) return;
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        if (isStandalone) return;
+        const ua = window.navigator.userAgent;
+        const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+        const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+        if (!isIOS || !isSafari) return;
+        // Wait until the app is loaded — don't blast users on first paint
+        setTimeout(showIosInstallSheet, 4000);
+    } catch (e) {}
+}
+
+function showIosInstallSheet() {
+    if (document.getElementById('ios-install-sheet')) return;
+    const sheet = document.createElement('div');
+    sheet.id = 'ios-install-sheet';
+    sheet.innerHTML = `
+        <div class="ios-install-card">
+            <button class="ios-install-close" aria-label="Dismiss">&times;</button>
+            <div class="ios-install-icon">&#x2694;</div>
+            <h3>Install Iron Faith</h3>
+            <p>Get the full app experience — add it to your home screen for offline use, push reminders, and a real fullscreen workout view.</p>
+            <ol>
+                <li>Tap the <strong>Share</strong> button <span class="ios-share-icon">&#x2B06;</span> at the bottom of Safari</li>
+                <li>Scroll and tap <strong>"Add to Home Screen"</strong></li>
+                <li>Tap <strong>Add</strong> in the top-right</li>
+            </ol>
+            <button class="btn btn-primary btn-full ios-install-ok">Got it</button>
+        </div>
+    `;
+    document.body.appendChild(sheet);
+    const dismiss = () => {
+        try { localStorage.setItem('ironfaith-ios-install-dismissed', '1'); } catch (e) {}
+        sheet.remove();
+    };
+    sheet.querySelector('.ios-install-close').addEventListener('click', dismiss);
+    sheet.querySelector('.ios-install-ok').addEventListener('click', dismiss);
+    sheet.addEventListener('click', e => { if (e.target === sheet) dismiss(); });
+}
+
+document.addEventListener('DOMContentLoaded', maybeShowIosInstallPrompt);
+
+// --- Offline detection banner ---
+function updateOfflineBanner() {
+    const el = document.getElementById('offline-banner');
+    if (!el) return;
+    if (navigator.onLine) {
+        el.classList.add('hidden');
+    } else {
+        el.classList.remove('hidden');
+    }
+}
+window.addEventListener('online', () => {
+    updateOfflineBanner();
+    if (typeof showToast === 'function') showToast('Back online', 'success');
+});
+window.addEventListener('offline', updateOfflineBanner);
+document.addEventListener('DOMContentLoaded', updateOfflineBanner);
+
 // --- Sharing ---
 function shareProgress() {
     openShareModal();
