@@ -532,6 +532,7 @@ async function directInsert(table, body) {
         if (!resp.ok) {
             const err = await resp.text().catch(() => '');
             console.error('directInsert HTTP', resp.status, table, err);
+            if (typeof logClientError === 'function') logClientError('insert:' + table, resp.status + ' ' + err.slice(0, 200));
             if (typeof showToast === 'function') showToast(friendlyHttpError('save', resp.status, err));
             return null;
         }
@@ -559,6 +560,7 @@ async function directUpdate(table, filter, body) {
         if (!resp.ok) {
             const err = await resp.text().catch(() => '');
             console.error('directUpdate HTTP', resp.status, table, err);
+            if (typeof logClientError === 'function') logClientError('update:' + table, resp.status + ' ' + err.slice(0, 200));
             if (typeof showToast === 'function') showToast(friendlyHttpError('update', resp.status, err));
             return null;
         }
@@ -607,6 +609,7 @@ async function directRpc(fnName, args) {
         if (!resp.ok) {
             const err = await resp.text().catch(() => '');
             console.error('directRpc HTTP', resp.status, fnName, err);
+            if (typeof logClientError === 'function') logClientError('rpc:' + fnName, resp.status + ' ' + err.slice(0, 200));
             if (typeof showToast === 'function') showToast(friendlyHttpError('do that', resp.status, err));
             return null;
         }
@@ -1323,11 +1326,20 @@ async function sendFriendRequest(toUid, toUsername) {
         return;
     }
 
+    // Defensive: schema requires from_username + from_display_name NOT NULL.
+    // Older accounts may have an empty display_name — fall back so we don't 400.
+    const fromUsername = (userProfile && userProfile.username) ? userProfile.username : '';
+    const fromDisplay = (userProfile && userProfile.display_name && userProfile.display_name.trim())
+        ? userProfile.display_name
+        : (fromUsername || 'User');
+    if (!fromUsername) {
+        return showToast('Finish setting up your profile first');
+    }
     const result = await directInsert('friend_requests', {
         from_uid: currentUser.id,
         to_uid: toUid,
-        from_username: userProfile.username,
-        from_display_name: userProfile.display_name,
+        from_username: fromUsername,
+        from_display_name: fromDisplay,
     });
     if (!result) return;
     showToast('Request sent to @' + toUsername);
