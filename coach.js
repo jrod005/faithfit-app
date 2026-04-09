@@ -2358,8 +2358,57 @@ function initCoach() {
     welcome += `<p>I analyze your workouts, nutrition, and weight data to give you personalized advice. Ask me anything or tap a quick action above!</p>`;
     welcome += verseHtml();
 
-    const starterChips = ['Generate a workout plan for me', 'How is my nutrition looking?', 'Analyze my progress'];
-    addBotMessage(welcome, { suggestions: starterChips });
+    addBotMessage(welcome, { suggestions: getSmartStarterChips(ctx) });
+}
+
+// Pick starter suggestions based on the user's actual state — what's most
+// useful right now beats a static list.
+function getSmartStarterChips(ctx) {
+    const chips = [];
+    const totalWorkouts = ctx.workouts.length;
+    const todayHasWorkout = ctx.todayWorkouts.length > 0;
+    const todayHasMeal = ctx.todayMeals.length > 0;
+    const hour = new Date().getHours();
+
+    if (totalWorkouts === 0) {
+        // Brand-new user
+        chips.push('Generate a workout plan for me');
+        chips.push('How do I get started lifting?');
+        chips.push('Set my calorie target');
+        return chips;
+    }
+    if (totalWorkouts < 5) {
+        chips.push('Generate a workout plan for me');
+        chips.push('How can I get stronger?');
+        chips.push('Warm-up routine');
+        return chips;
+    }
+    // Established user — recommend based on time and gaps
+    if (!todayHasWorkout && hour < 20) {
+        chips.push('What should I work on next?');
+    } else if (todayHasWorkout) {
+        chips.push('Analyze my progress');
+    }
+    if (!todayHasMeal) {
+        chips.push('What should I eat today?');
+    } else {
+        chips.push('How is my nutrition looking?');
+    }
+    if (ctx.weekDays >= 4) {
+        chips.push('How is my recovery?');
+    } else if (ctx.weekDays <= 2) {
+        chips.push('How can I stay consistent?');
+    } else {
+        chips.push('Weak point analysis');
+    }
+    // Ensure 3 chips
+    const fallback = ['How can I get stronger?', 'Generate a workout plan for me', 'Weekly recap'];
+    while (chips.length < 3) {
+        const next = fallback.find(c => !chips.includes(c));
+        if (!next) break;
+        chips.push(next);
+    }
+    return chips.slice(0, 3);
 }
 
 function renderBotMessage(html, time, animate, suggestions, planId) {
@@ -2659,23 +2708,104 @@ function processCoachInput(text, photoData) {
         // Reset plan capture before handler runs
         window._lastCoachPlanId = null;
 
-        // Score every topic against the question and pick the best match.
-        // This is much more forgiving than the old "first regex hit wins" loop.
-        const best = scoreCoachIntent(text);
+        // Score every topic — get top match plus runner-ups for "did you mean"
+        const ranked = rankCoachIntents(text);
         let response = null;
-        if (best && best.topic) {
-            response = best.topic.handler(ctx, text);
-        }
+        let suggestions = null;
 
-        if (!response) {
+        if (ranked.length > 0 && ranked[0].score >= 5) {
+            // Confident match — answer directly
+            response = ranked[0].topic.handler(ctx, text);
+        } else if (ranked.length > 0 && ranked[0].score >= 3) {
+            // Borderline — answer with the top match but offer the runner-ups as chips
+            response = ranked[0].topic.handler(ctx, text);
+            suggestions = buildDidYouMeanChips(ranked, 1);
+        } else if (ranked.length > 0) {
+            // Low confidence — show "did you mean" instead of dead-end fallback
+            response = buildDidYouMeanResponse(text, ranked, ctx);
+            suggestions = buildDidYouMeanChips(ranked, 0);
+        } else {
             response = TOPIC_RESPONSES.fallback(ctx, text);
         }
 
-        const suggestions = suggestFollowUps(text, ctx);
+        if (!suggestions) suggestions = suggestFollowUps(text, ctx);
         const planId = window._lastCoachPlanId || null;
         addBotMessage(response, { suggestions, planId });
         window._lastCoachPlanId = null;
+
+        // Remember last topic for conversational follow-ups
+        if (ranked.length > 0 && ranked[0].topic) {
+            window._coachLastTopicId = ranked[0].topic.id;
+        }
     }, 400 + Math.random() * 600);
+}
+
+// Convert a topic id to a human-friendly suggestion phrase
+const COACH_TOPIC_PHRASES = {
+    get_stronger: 'How can I get stronger?',
+    build_muscle: 'How do I build muscle?',
+    lose_weight: 'Help me lose weight',
+    workout_plan: 'Generate a workout plan for me',
+    meal_plan: 'Create a meal plan',
+    progress: 'Analyze my progress',
+    next_focus: 'What should I work on next?',
+    plateau: 'I\u2019ve hit a plateau',
+    nutrition: 'How is my nutrition looking?',
+    form: 'Form tips',
+    motivation: 'I need motivation',
+    recovery: 'How is my recovery?',
+    beginner: 'I\u2019m new to lifting',
+    one_rep_max: 'What\u2019s my estimated max?',
+    warmup: 'Warm-up routine',
+    supplements: 'Supplement advice',
+    weekly_recap: 'Weekly recap',
+    rest_periods: 'Rest between sets',
+    swap: 'Suggest an alternative exercise',
+    timeline: 'When will I hit my goal?',
+    streak: 'How is my consistency?',
+    cardio: 'Cardio guide',
+    meal_timing: 'Pre/post workout meal',
+    weak_point: 'Weak point analysis',
+    mobility: 'How can I improve mobility?',
+    sleep: 'How can I sleep better?',
+    hydration: 'How much water should I drink?',
+    core_abs: 'Best ab exercises?',
+    home_workout: 'Workout with no equipment',
+    fasting: 'Should I try intermittent fasting?',
+    injury_prevention: 'How do I lift without getting hurt?',
+    fill_macros: 'What should I eat to hit my macros?',
+    weekly_split_plan: 'Plan my training week',
+};
+
+function topicPhrase(topic) {
+    if (!topic) return null;
+    return COACH_TOPIC_PHRASES[topic.id] || null;
+}
+
+function buildDidYouMeanChips(ranked, startIdx) {
+    const out = [];
+    for (let i = startIdx; i < ranked.length && out.length < 3; i++) {
+        const phrase = topicPhrase(ranked[i].topic);
+        if (phrase && !out.includes(phrase)) out.push(phrase);
+    }
+    while (out.length < 3) {
+        const filler = ['Analyze my progress', 'Generate a workout plan for me', 'How is my nutrition looking?'].find(p => !out.includes(p));
+        if (!filler) break;
+        out.push(filler);
+    }
+    return out.slice(0, 3);
+}
+
+function buildDidYouMeanResponse(text, ranked, ctx) {
+    let html = `<p>I'm not 100% sure what you're asking, but I can help with one of these. Tap a chip below or rephrase your question.</p>`;
+    html += `<ul>`;
+    for (let i = 0; i < Math.min(ranked.length, 3); i++) {
+        const phrase = topicPhrase(ranked[i].topic);
+        if (phrase) html += `<li>${escapeHtml(phrase)}</li>`;
+    }
+    html += `</ul>`;
+    html += `<p style="color:var(--text-muted);font-size:13px">Or try: <em>"how can I get stronger"</em>, <em>"plan my week"</em>, <em>"what should I eat?"</em></p>`;
+    return html;
 }
 
 // ========== INTENT SCORING ==========
@@ -2791,6 +2921,34 @@ function scoreCoachIntent(text) {
     // Threshold: at least one solid signal (literal match worth 5, or 3+ token overlaps)
     if (bestScore >= 3) return { topic: bestTopic, score: bestScore };
     return null;
+}
+
+function rankCoachIntents(text) {
+    if (!text || !TOPIC_RESPONSES || !TOPIC_RESPONSES.topics) return [];
+    const lower = text.toLowerCase();
+    const tokens = tokenizeForCoach(text);
+    if (tokens.length === 0) return [];
+    const { wordHits, groupHits } = expandTokensWithSynonyms(tokens);
+
+    const scored = [];
+    TOPIC_RESPONSES.topics.forEach(topic => {
+        let score = 0;
+        for (const kw of topic.keywords) {
+            try {
+                if (new RegExp(kw, 'i').test(lower)) score += 5;
+            } catch (e) { /* invalid regex — skip */ }
+            const kwTokens = tokenizeForCoach(kw.replace(/[\\.*+?^${}()|[\]]/g, ' '));
+            kwTokens.forEach(kt => {
+                if (wordHits.has(kt)) score += 2;
+                const groups = COACH_SYNONYM_INDEX[kt];
+                if (groups) groups.forEach(g => { if (groupHits.has(g)) score += 1; });
+            });
+        }
+        if (topic.id === 'greeting' && tokens.length > 2) score -= 4;
+        if (score > 0) scored.push({ topic, score });
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return scored;
 }
 
 function addUserMessageWithPhoto(text, photoData) {
