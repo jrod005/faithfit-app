@@ -5183,6 +5183,153 @@ function refreshCustomExerciseIntegration() {
         opt.className = 'custom-option';
         datalist.appendChild(opt);
     });
+    // Make sure base options snapshot includes customs
+    captureBaseExerciseOptions(true);
+}
+
+// ========== MUSCLE-AWARE EXERCISE SEARCH ==========
+const MUSCLE_GROUP_EXERCISES = {
+    chest: ['Bench Press','Incline Bench Press','Decline Bench Press','Dumbbell Bench Press','Incline Dumbbell Press','Low Incline Dumbbell Press','Dumbbell Fly','Cable Fly','Chest Dips','Push-ups','Diamond Push-ups','Machine Chest Press','Pec Deck','Close Grip Bench Press'],
+    back: ['Deadlift','Romanian Deadlift','Sumo Deadlift','Barbell Row','Dumbbell Row','Pendlay Row','T-Bar Row','Seated Cable Row','Lat Pulldown','Pull-ups','Chin-ups','Face Pulls','Straight Arm Pulldown','Hyperextensions','Good Mornings','Shrugs','Barbell Shrugs'],
+    lats: ['Lat Pulldown','Pull-ups','Chin-ups','Straight Arm Pulldown','Seated Cable Row','Barbell Row','Dumbbell Row'],
+    shoulders: ['Overhead Press','Seated Dumbbell Press','Arnold Press','Machine Shoulder Press','Lateral Raises','Cable Lateral Raise','Front Raises','Rear Delt Fly','Reverse Pec Deck','Upright Row','Face Pulls','Shrugs','Barbell Shrugs'],
+    delts: ['Overhead Press','Seated Dumbbell Press','Arnold Press','Machine Shoulder Press','Lateral Raises','Cable Lateral Raise','Front Raises','Rear Delt Fly','Reverse Pec Deck'],
+    traps: ['Shrugs','Barbell Shrugs','Upright Row','Face Pulls','Deadlift'],
+    legs: ['Squat','Front Squat','Goblet Squat','Bulgarian Split Squat','Hack Squat','Leg Press','Lunges','Walking Lunges','Reverse Lunges','Leg Extension','Leg Curl','Seated Leg Curl','Hip Thrust','Glute Bridge','Romanian Deadlift','Sumo Deadlift','Good Mornings','Calf Raises','Seated Calf Raise','Standing Calf Raise','Step-ups','Box Jumps','Nordic Curl'],
+    quads: ['Squat','Front Squat','Goblet Squat','Bulgarian Split Squat','Hack Squat','Leg Press','Lunges','Walking Lunges','Reverse Lunges','Leg Extension','Step-ups','Box Jumps'],
+    hamstrings: ['Romanian Deadlift','Leg Curl','Seated Leg Curl','Sumo Deadlift','Good Mornings','Nordic Curl','Deadlift'],
+    glutes: ['Hip Thrust','Glute Bridge','Bulgarian Split Squat','Squat','Lunges','Walking Lunges','Reverse Lunges','Step-ups','Romanian Deadlift'],
+    calves: ['Calf Raises','Seated Calf Raise','Standing Calf Raise','Single-Leg Calf Raise','Leg Press Calf Raise'],
+    arms: ['Bicep Curls','Hammer Curls','Preacher Curls','Concentration Curls','Incline Dumbbell Curl','EZ Bar Curl','Cable Curl','Spider Curls','Tricep Pushdown','Overhead Tricep Extension','Skull Crushers','Close Grip Bench Press','Tricep Dips','Tricep Kickbacks','Cable Overhead Extension','Diamond Push-ups','Chin-ups'],
+    biceps: ['Bicep Curls','Hammer Curls','Preacher Curls','Concentration Curls','Incline Dumbbell Curl','EZ Bar Curl','Cable Curl','Spider Curls','Chin-ups'],
+    triceps: ['Tricep Pushdown','Overhead Tricep Extension','Skull Crushers','Close Grip Bench Press','Tricep Dips','Tricep Kickbacks','Cable Overhead Extension','Diamond Push-ups'],
+    forearms: ['Hammer Curls','Wrist Curls','Reverse Curls','Farmers Walk'],
+    core: ['Plank','Crunches','Hanging Leg Raise','Cable Crunch','Ab Wheel Rollout','Russian Twist','Bicycle Crunches','Leg Raises','Woodchoppers','Pallof Press','Dead Bug','Mountain Climbers','Side Plank'],
+    abs: ['Plank','Crunches','Hanging Leg Raise','Cable Crunch','Ab Wheel Rollout','Bicycle Crunches','Leg Raises','Dead Bug','Mountain Climbers'],
+    obliques: ['Russian Twist','Woodchoppers','Pallof Press','Side Plank','Bicycle Crunches'],
+    cardio: ['Battle Ropes','Sled Push','Sled Pull','Burpees','Jump Rope','Rowing Machine','Mountain Climbers','Box Jumps','Kettlebell Swing'],
+};
+
+const MUSCLE_ALIAS_MAP = {
+    'shoulder':'shoulders','shoulders':'shoulders','delt':'delts','delts':'delts',
+    'chest':'chest','pec':'chest','pecs':'chest','pectoral':'chest','pectorals':'chest',
+    'back':'back','lat':'lats','lats':'lats','trap':'traps','traps':'traps',
+    'leg':'legs','legs':'legs','quad':'quads','quads':'quads','quadricep':'quads','quadriceps':'quads',
+    'hamstring':'hamstrings','hamstrings':'hamstrings','ham':'hamstrings','hams':'hamstrings',
+    'glute':'glutes','glutes':'glutes','butt':'glutes',
+    'calf':'calves','calves':'calves',
+    'arm':'arms','arms':'arms',
+    'bicep':'biceps','biceps':'biceps',
+    'tricep':'triceps','triceps':'triceps',
+    'forearm':'forearms','forearms':'forearms',
+    'core':'core','ab':'abs','abs':'abs',
+    'oblique':'obliques','obliques':'obliques',
+    'cardio':'cardio','conditioning':'cardio',
+};
+
+const MUSCLE_LABELS = {
+    chest:'chest', back:'back', lats:'lats', shoulders:'shoulders', delts:'delts',
+    traps:'traps', legs:'legs', quads:'quads', hamstrings:'hamstrings',
+    glutes:'glutes', calves:'calves', arms:'arms', biceps:'biceps',
+    triceps:'triceps', forearms:'forearms', core:'core', abs:'abs',
+    obliques:'obliques', cardio:'cardio',
+};
+
+let _baseExerciseOptions = null;
+
+function captureBaseExerciseOptions(force) {
+    const datalist = document.getElementById('exercise-suggestions');
+    if (!datalist) return;
+    if (_baseExerciseOptions && !force) return;
+    // Snapshot all option values currently in the datalist (includes customs)
+    _baseExerciseOptions = Array.from(datalist.querySelectorAll('option'))
+        .map(o => o.value)
+        .filter(v => !/ — (chest|back|lats|shoulders|delts|traps|legs|quads|hamstrings|glutes|calves|arms|biceps|triceps|forearms|core|abs|obliques|cardio)$/i.test(v));
+}
+
+function detectMuscleKey(text) {
+    if (!text) return null;
+    const t = text.trim().toLowerCase();
+    if (t.length < 2) return null;
+    if (MUSCLE_ALIAS_MAP[t]) return MUSCLE_ALIAS_MAP[t];
+    // Allow partial — e.g. "shoul" → shoulders
+    for (const alias of Object.keys(MUSCLE_ALIAS_MAP)) {
+        if (alias.length >= 4 && alias.startsWith(t)) return MUSCLE_ALIAS_MAP[alias];
+    }
+    return null;
+}
+
+function rebuildDatalistForMuscle(muscleKey) {
+    const datalist = document.getElementById('exercise-suggestions');
+    if (!datalist) return;
+    captureBaseExerciseOptions();
+    const list = MUSCLE_GROUP_EXERCISES[muscleKey] || [];
+    const label = MUSCLE_LABELS[muscleKey] || muscleKey;
+    // Build: muscle-tagged options first, then base options so other typed queries still work
+    const seen = new Set();
+    const html = [];
+    list.forEach(name => {
+        const key = name.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        // Em dash + muscle so the typed muscle word still substring-matches the option value
+        html.push(`<option value="${name} \u2014 ${label}">`);
+    });
+    _baseExerciseOptions.forEach(name => {
+        html.push(`<option value="${name}">`);
+    });
+    datalist.innerHTML = html.join('');
+}
+
+function restoreBaseDatalist() {
+    const datalist = document.getElementById('exercise-suggestions');
+    if (!datalist || !_baseExerciseOptions) return;
+    datalist.innerHTML = _baseExerciseOptions.map(n => `<option value="${n}">`).join('');
+}
+
+function stripMuscleSuffix(value) {
+    if (!value) return value;
+    return value.replace(/\s+\u2014\s+(chest|back|lats|shoulders|delts|traps|legs|quads|hamstrings|glutes|calves|arms|biceps|triceps|forearms|core|abs|obliques|cardio)\s*$/i, '');
+}
+
+function installMuscleAwareSearch() {
+    captureBaseExerciseOptions();
+    let lastMuscleKey = null;
+
+    document.addEventListener('input', (e) => {
+        const el = e.target;
+        if (!el || el.getAttribute('list') !== 'exercise-suggestions') return;
+        const raw = el.value || '';
+        // If the user just selected a muscle-tagged option, strip the suffix
+        const stripped = stripMuscleSuffix(raw);
+        if (stripped !== raw) {
+            el.value = stripped;
+            // Also bubble change to any onchange/oninput handlers expecting the clean name
+            if (typeof el.oninput === 'function') {
+                try { el.oninput({ target: el }); } catch (_) {}
+            }
+            restoreBaseDatalist();
+            lastMuscleKey = null;
+            return;
+        }
+        const key = detectMuscleKey(raw);
+        if (key && key !== lastMuscleKey) {
+            rebuildDatalistForMuscle(key);
+            lastMuscleKey = key;
+        } else if (!key && lastMuscleKey) {
+            restoreBaseDatalist();
+            lastMuscleKey = null;
+        }
+    }, true);
+
+    // On focus loss, ensure datalist is restored to base
+    document.addEventListener('blur', (e) => {
+        const el = e.target;
+        if (!el || el.getAttribute('list') !== 'exercise-suggestions') return;
+        if (el.value) el.value = stripMuscleSuffix(el.value);
+        restoreBaseDatalist();
+        lastMuscleKey = null;
+    }, true);
 }
 
 function getFullMuscleMap() {
@@ -5962,6 +6109,7 @@ function init() {
     safeCall('renderWeeklyReport', renderWeeklyReport);
     safeCall('renderCustomExercises', renderCustomExercises);
     safeCall('refreshCustomExerciseIntegration', refreshCustomExerciseIntegration);
+    safeCall('installMuscleAwareSearch', installMuscleAwareSearch);
     safeCall('showOnboarding', showOnboarding);
 
     // Auto-fill exercise inputs from history when name changes
