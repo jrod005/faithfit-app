@@ -113,11 +113,16 @@ function getCoachContext() {
         }
     }
 
+    const progressPhotos = (typeof getProgressPhotoStats === 'function')
+        ? getProgressPhotoStats()
+        : { count: 0, lastDate: null, daysSinceLast: null };
+
     return {
         profile, workouts, meals, weights, todayWorkouts, todayMeals,
         weekWorkouts, weekDays, monthWorkouts, exerciseFreq, weekMuscleVolume,
         muscleMap, weightTrend, weekNutrition, exercisePRs, stagnant,
-        exercisesByName, hasProfile: !!profile.name, currentWeight: weights.length > 0 ? weights[weights.length - 1].weight : 0
+        exercisesByName, progressPhotos,
+        hasProfile: !!profile.name, currentWeight: weights.length > 0 ? weights[weights.length - 1].weight : 0
     };
 }
 
@@ -1214,30 +1219,35 @@ const TOPIC_RESPONSES = {
             id: 'recovery',
             keywords: ['recover', 'rest', 'sore', 'soreness', 'sleep', 'tired', 'overtraining', 'injury', 'hurt', 'pain', 'deload'],
             handler: (ctx) => {
-                let html = `<h3>Recovery & Rest Guide</h3>`;
+                let html = `<h3>Recovery: The Real Performance Driver</h3>`;
+                html += `<p>You don't grow in the gym \u2014 you grow between sessions. Recovery is where adaptation actually happens.</p>`;
 
+                // Adaptive read on the user's training load
                 if (ctx.weekDays >= 6) {
-                    html += insightHtml(`You've trained ${ctx.weekDays} days this week — that's a lot. Your body likely needs more rest to grow and adapt. Consider taking tomorrow off.`);
+                    html += insightHtml(`You've trained <strong>${ctx.weekDays} days</strong> this week. That's a high-frequency week. Watch for: bar speed dropping, sleep quality dipping, motivation crashing. Any 2 of those = take a day off, no guilt.`);
+                } else if (ctx.weekDays === 0 && ctx.workouts.length > 0) {
+                    html += insightHtml(`No sessions this week yet. If that's an unscheduled break (vs. a planned deload), get back in tomorrow \u2014 the longer the gap, the harder the return.`);
                 }
 
-                html += `<h3>Recovery Essentials</h3><ul>`;
-                html += `<li><strong>Sleep 7-9 hours:</strong> This is #1. Growth hormone spikes during deep sleep. No supplement replaces good sleep.</li>`;
-                html += `<li><strong>Eat enough protein:</strong> Your muscles repair with protein. Aim for ${ctx.profile.proteinGoal || 150}g daily, spread across meals.</li>`;
-                html += `<li><strong>Hydrate:</strong> Aim for half your bodyweight in ounces of water. Dehydration impairs recovery.</li>`;
-                html += `<li><strong>Active recovery:</strong> Light walking, stretching, or yoga on rest days helps blood flow without taxing your muscles.</li>`;
-                html += `<li><strong>Manage stress:</strong> Cortisol (stress hormone) breaks down muscle. Prayer, meditation, and time outdoors help.</li>`;
+                html += `<h3>The recovery hierarchy (in priority order)</h3><ol>`;
+                html += `<li><strong>Sleep \u2014 7\u20139 hours, every night.</strong> Dattilo et al. 2011: sleep loss reduces muscle protein synthesis by 18%, increases cortisol, drops testosterone. Less than 6 hrs and your training is actively counterproductive. There is no supplement that fixes this.</li>`;
+                html += `<li><strong>Protein \u2014 ${ctx.profile.proteinGoal || 150}g across 4 meals.</strong> Schoenfeld & Aragon 2018: 0.4 g/kg per meal optimizes muscle protein synthesis. Distribution beats one giant shake.</li>`;
+                html += `<li><strong>Calories \u2014 at or above maintenance.</strong> You can't recover from heavy training in a deficit beyond ~500 kcal. Fueled lifters recover faster, period.</li>`;
+                html += `<li><strong>Hydration \u2014 ~0.6 oz per lb of bodyweight.</strong> 2% dehydration measurably reduces strength output and cognitive function (Judelson et al. 2007).</li>`;
+                html += `<li><strong>Stress management.</strong> Chronic cortisol blocks recovery. Walks, prayer, breathwork, time outdoors, less doomscrolling.</li>`;
+                html += `</ol>`;
+
+                html += `<h3>Deloads \u2014 the science</h3><ul>`;
+                html += `<li><strong>Frequency:</strong> every 4\u20138 weeks for intermediates, every 6\u201312 weeks for beginners. Cue: when your top sets feel grindy at weights that should be easy, deload now.</li>`;
+                html += `<li><strong>Format:</strong> drop volume by ~50% (e.g. 4 sets \u2192 2 sets) OR drop intensity by ~20% (e.g. 80% \u2192 60% 1RM). Same exercises, just lighter or shorter.</li>`;
+                html += `<li><strong>Why it works:</strong> fitness builds slowly, fatigue builds fast. A deload sheds fatigue while preserving fitness, leaving you supercompensated when you return (Issurin 2010).</li>`;
+                html += `<li><strong>Don't skip the deload.</strong> Lifters who push through fatigue plateau or get hurt. The deload is the tax that lets the next 4 weeks of growth happen.</li>`;
                 html += `</ul>`;
 
-                html += `<h3>When to Deload</h3><ul>`;
-                html += `<li>Every 4-6 weeks, or when weights start feeling heavier than usual</li>`;
-                html += `<li>Drop to 50-60% of working weights for 1 week</li>`;
-                html += `<li>Keep the same exercises and sets, just reduce the weight</li>`;
-                html += `<li>You'll come back feeling stronger — this is backed by science</li>`;
-                html += `</ul>`;
-
-                html += `<h3>Soreness vs. Injury</h3><ul>`;
-                html += `<li><strong>Normal soreness:</strong> Dull, achy feeling in the muscle belly. Goes away in 24-72 hours. Safe to train through (lightly).</li>`;
-                html += `<li><strong>Warning signs:</strong> Sharp or stabbing pain, pain in joints (not muscles), pain that gets worse during exercise, numbness or tingling. <strong>Stop and see a doctor.</strong></li>`;
+                html += `<h3>Soreness vs. injury \u2014 know the difference</h3><ul>`;
+                html += `<li><strong>DOMS (delayed onset muscle soreness):</strong> dull, diffuse, in the muscle belly, 24\u201372 hrs after a session. Normal. Light training is fine.</li>`;
+                html += `<li><strong>Injury signals:</strong> sharp, localized, in a joint, gets worse during the lift, accompanied by swelling/numbness/tingling. <strong>Stop, swap the exercise, and if it's not gone in 3\u20135 days, see a physio.</strong></li>`;
+                html += `<li><strong>Don't "tough it out."</strong> Cheap soreness becomes chronic tendinopathy fast. The lifters still training in their 50s are the ones who pulled back when it counted.</li>`;
                 html += `</ul>`;
                 html += verseHtml({ text: "Come to me, all you who are weary and burdened, and I will give you rest.", ref: "Matthew 11:28" });
                 return html;
@@ -1247,30 +1257,37 @@ const TOPIC_RESPONSES = {
             id: 'beginner',
             keywords: ['beginner', 'start', 'new to', 'never lifted', 'first time', 'getting started', 'just starting', 'newbie', 'no experience'],
             handler: (ctx) => {
-                let html = `<h3>Welcome to Your Fitness Journey!</h3>`;
-                html += `<p>Starting is the hardest and most important step. Here's your roadmap to build a strong foundation.</p>`;
+                let html = `<h3>Your First 12 Weeks: A Real Beginner's Roadmap</h3>`;
+                html += `<p>You're in the most rewarding phase of lifting. Beginners gain strength and muscle <strong>2\u20133x faster</strong> than intermediates (the "newbie gains" curve is real \u2014 see Helms 2014). Don't waste it on a bad program.</p>`;
 
-                html += `<h3>The First 4 Weeks</h3><ol>`;
-                html += `<li><strong>Week 1-2:</strong> Learn the movements with just the bar or light dumbbells. Form is everything.</li>`;
-                html += `<li><strong>Week 3-4:</strong> Start adding weight in small increments (5 lbs per session for compounds).</li>`;
+                html += `<h3>The 6 fundamental movement patterns</h3>`;
+                html += `<p>Forget split routines for now. Master these six, and you can build anything later.</p>`;
+                html += `<table class="plan-table"><tr><th>Pattern</th><th>Exercise</th><th>Why</th></tr>`;
+                html += `<tr><td>Squat</td><td>Goblet \u2192 Back Squat</td><td>Knee-dominant, builds quads/glutes/core</td></tr>`;
+                html += `<tr><td>Hinge</td><td>RDL \u2192 Deadlift</td><td>Hip-dominant, builds hamstrings/glutes/back</td></tr>`;
+                html += `<tr><td>Lunge</td><td>Reverse Lunge \u2192 Bulgarian Split</td><td>Single-leg strength, fixes asymmetries</td></tr>`;
+                html += `<tr><td>Horizontal Push</td><td>Push-up \u2192 Bench Press</td><td>Chest, front delts, triceps</td></tr>`;
+                html += `<tr><td>Horizontal Pull</td><td>Inverted Row \u2192 Barbell Row</td><td>Mid-back, posture, shoulder health</td></tr>`;
+                html += `<tr><td>Vertical Push</td><td>Overhead Press</td><td>Shoulders, triceps, overhead strength</td></tr>`;
+                html += `</table>`;
+                html += `<p style="font-size:13px;color:var(--text-muted);">Add a vertical pull (pull-ups / lat pulldown) and you have a complete kinetic chain.</p>`;
+
+                html += `<h3>The 12-week plan</h3><ol>`;
+                html += `<li><strong>Weeks 1\u20132: Pattern week.</strong> Learn each lift with just the bar or bodyweight. Sets of 8\u201310, focus 100% on form. Film yourself.</li>`;
+                html += `<li><strong>Weeks 3\u20136: Linear progression.</strong> Add 5 lbs to upper body lifts and 10 lbs to lower body lifts <em>every session</em>. This works because you're so far below your true ceiling.</li>`;
+                html += `<li><strong>Weeks 7\u201310: Slow it down.</strong> Now add weight only when you complete all reps with 1\u20132 reps in reserve. Switch to 5 lbs/10 lbs <em>per week</em>.</li>`;
+                html += `<li><strong>Weeks 11\u201312: First deload + reassess.</strong> Drop weights 30% for 1 week. Then test your top sets and start a slightly more advanced program.</li>`;
                 html += `</ol>`;
 
-                html += `<h3>Your Starter Exercises (learn these first)</h3>`;
-                html += `<table class="plan-table"><tr><th>Exercise</th><th>Why</th><th>Start With</th></tr>`;
-                html += `<tr><td>Squat</td><td>Best overall lower body builder</td><td>Bodyweight, then empty bar</td></tr>`;
-                html += `<tr><td>Bench Press</td><td>Primary chest & push strength</td><td>Empty bar (45 lbs)</td></tr>`;
-                html += `<tr><td>Deadlift</td><td>Full body strength, posterior chain</td><td>95 lbs (empty bar + 25s)</td></tr>`;
-                html += `<tr><td>Overhead Press</td><td>Shoulder strength & stability</td><td>Empty bar</td></tr>`;
-                html += `<tr><td>Barbell Row</td><td>Back strength, posture</td><td>Empty bar or 65 lbs</td></tr>`;
-                html += `</table>`;
+                html += `<h3>Frequency: 3 full-body sessions per week</h3>`;
+                html += `<p>Beginners benefit from <strong>high frequency, low volume</strong>. The Schoenfeld 2016 frequency meta showed 2\u20133x per muscle per week beats 1x at every level \u2014 and full-body 3x is the most efficient way to hit that for beginners. Save splits for when your work capacity catches up.</p>`;
 
-                html += `<h3>Key Rules</h3><ul>`;
-                html += `<li><strong>3 days per week</strong> is plenty. Mon/Wed/Fri with rest days between.</li>`;
-                html += `<li><strong>Track everything</strong> in this app — you can't improve what you don't measure</li>`;
-                html += `<li><strong>Eat protein:</strong> 0.7-1g per pound of body weight</li>`;
-                html += `<li><strong>Sleep 7-9 hours:</strong> This is when muscles actually grow</li>`;
-                html += `<li><strong>Don't compare yourself</strong> to others. Compare to who you were yesterday.</li>`;
-                html += `<li><strong>Be patient:</strong> Real results take 3-6 months. You WILL see them if you stay consistent.</li>`;
+                html += `<h3>The non-negotiables</h3><ul>`;
+                html += `<li><strong>Protein: 0.7\u20131.0 g per lb of bodyweight</strong>. The single biggest nutrition lever.</li>`;
+                html += `<li><strong>Sleep: 7\u20139 hours</strong>. Beginners under-slept gain ~30% less muscle than well-rested controls.</li>`;
+                html += `<li><strong>Track every set.</strong> Log it here. Memory is unreliable; the spreadsheet doesn't lie.</li>`;
+                html += `<li><strong>Two warm-up sets</strong> at 50% and 75% before your working weight on every compound. Always.</li>`;
+                html += `<li><strong>Patience.</strong> First visible changes: 6\u20138 weeks. Real strength: 12\u201316 weeks. Don't compare your week 4 to someone's year 4.</li>`;
                 html += `</ul>`;
                 html += verseHtml({ text: "For I know the plans I have for you, declares the LORD, plans to prosper you and not to harm you.", ref: "Jeremiah 29:11" });
                 return html;
@@ -1280,29 +1297,50 @@ const TOPIC_RESPONSES = {
             id: 'weight_loss',
             keywords: ['lose weight', 'weight loss', 'fat loss', 'cutting', 'cut', 'slim', 'lean', 'shred', 'burn fat', 'belly fat', 'lose fat'],
             handler: (ctx) => {
-                let html = `<h3>Smart Fat Loss Strategy</h3>`;
-                const calGoal = ctx.profile.calorieGoal || 2000;
+                const unit = wu();
+                let html = `<h3>Fat Loss, Done Right</h3>`;
 
+                // Adaptive personalized math (Mifflin-St Jeor + activity)
                 if (ctx.currentWeight > 0) {
-                    const maintenanceCal = Math.round(ctx.currentWeight * 15);
-                    const cutCal = maintenanceCal - 400;
-                    html += insightHtml(`At ${lbsToDisplay(ctx.currentWeight)} ${wu()}, your estimated maintenance is ~${maintenanceCal} cal. A safe cut would be ~<strong>${cutCal} cal/day</strong> (400 cal deficit).`);
+                    const lbs = ctx.currentWeight;
+                    const kg = lbs / 2.20462;
+                    const age = ctx.profile.age || 30;
+                    const heightIn = (ctx.profile.heightFeet || 5) * 12 + (ctx.profile.heightInches || 9);
+                    const cm = heightIn * 2.54;
+                    const isFemale = (ctx.profile.gender || '').toLowerCase().startsWith('f');
+                    // Mifflin-St Jeor BMR
+                    const bmr = isFemale
+                        ? Math.round(10 * kg + 6.25 * cm - 5 * age - 161)
+                        : Math.round(10 * kg + 6.25 * cm - 5 * age + 5);
+                    // Activity multiplier — default lightly active for lifters
+                    const activityFactor = ctx.weekDays >= 5 ? 1.55 : ctx.weekDays >= 3 ? 1.45 : 1.35;
+                    const tdee = Math.round(bmr * activityFactor);
+                    const cutCal = tdee - 500;        // ~1 lb/wk loss
+                    const aggressive = tdee - 750;     // ~1.5 lb/wk
+                    const proteinG = Math.round(lbs * 1.0); // 1.0 g/lb during a deficit (Helms/Aragon, Phillips)
+                    html += insightHtml(`At ${lbsToDisplay(lbs)}${unit}, your estimated maintenance is ~<strong>${tdee} kcal/day</strong> (Mifflin-St Jeor BMR \u00d7 activity). For sustainable fat loss, eat <strong>${cutCal} kcal</strong> with <strong>${proteinG}g protein</strong>. If you want to push harder, ${aggressive} kcal is the floor I'd recommend.`);
                 }
 
-                html += `<h3>The Rules of Sustainable Fat Loss</h3><ol>`;
-                html += `<li><strong>Moderate deficit (300-500 cal):</strong> Bigger deficits = more muscle loss, worse workouts, and eventual binge eating.</li>`;
-                html += `<li><strong>High protein (1g/lb bodyweight):</strong> This is THE most important rule for preserving muscle while losing fat.</li>`;
-                html += `<li><strong>Keep lifting heavy:</strong> Don't switch to "toning" (high rep, low weight). Your muscles need a reason to stick around.</li>`;
-                html += `<li><strong>Be patient:</strong> 0.5-1 lb per week is healthy and sustainable. That's 25-50 lbs in a year.</li>`;
-                html += `<li><strong>Track your food:</strong> Use the Nutrition tab. People underestimate calories by 30-50% when not tracking.</li>`;
-                html += `<li><strong>Weigh daily, track weekly:</strong> Your weight fluctuates 2-5 lbs day-to-day. Look at the weekly average.</li>`;
-                html += `<li><strong>Drink water:</strong> Often what feels like hunger is thirst. Half your bodyweight in ounces daily.</li>`;
+                html += `<h3>What the research actually says</h3><ol>`;
+                html += `<li><strong>Deficit size: 0.5\u20131% of bodyweight per week.</strong> Helms et al. (2014) showed faster cuts (>1%/wk) cause significantly more lean mass loss in trained lifters. Slow is the cheat code.</li>`;
+                html += `<li><strong>Protein: 1.6\u20132.4 g/kg (0.7\u20131.1 g/lb).</strong> Morton et al. 2018 meta-analysis (n=1,863) confirms anything beyond ~1.6 g/kg has minimal added benefit for hypertrophy \u2014 but in a deficit, the upper end (2.0\u20132.4 g/kg) is muscle insurance. Spread across 4 meals.</li>`;
+                html += `<li><strong>Keep lifting heavy.</strong> Longland et al. 2016: cutting subjects on a high-protein diet who lifted heavy actually <em>gained</em> 1.2 kg of muscle while losing 4.8 kg of fat. "Toning" (light weights, high reps) is not how you preserve mass.</li>`;
+                html += `<li><strong>Carbs are not the enemy.</strong> Carb intake correlates with training performance and adherence. Drop fat first (to ~0.3 g/lb minimum), keep carbs to fuel lifts.</li>`;
+                html += `<li><strong>Diet breaks every 8\u201312 weeks.</strong> The MATADOR study (Byrne 2018) showed intermittent dieters lost more fat and regained less than continuous dieters. Plan a 1-week return to maintenance.</li>`;
+                html += `<li><strong>Track for at least 2 weeks before adjusting.</strong> Self-reported intake underestimates by 20\u201350% on average (Lichtman et al.). The Nutrition tab is your friend.</li>`;
                 html += `</ol>`;
 
-                html += `<h3>Foods That Help</h3><ul>`;
-                html += `<li>High protein + high volume = full and satisfied (chicken breast, Greek yogurt, egg whites, fish)</li>`;
-                html += `<li>Vegetables with every meal (fiber, micronutrients, very low calorie)</li>`;
-                html += `<li>Avoid liquid calories (sodas, juice, fancy coffees)</li>`;
+                html += `<h3>How to read the scale</h3><ul>`;
+                html += `<li><strong>Weigh daily, average weekly.</strong> Day-to-day fluctuations of 2\u20135 lbs are water, glycogen, and gut content \u2014 not fat.</li>`;
+                html += `<li><strong>Use a 7-day rolling average.</strong> If this week's average < last week's by 0.5\u20131% bodyweight, your deficit is dialed in.</li>`;
+                html += `<li><strong>Photos > scale.</strong> Take a progress photo every 2 weeks. Body recomposition often hides on the scale but shows in the mirror.</li>`;
+                html += `</ul>`;
+
+                html += `<h3>The eating playbook</h3><ul>`;
+                html += `<li><strong>Volume eating:</strong> chicken breast, white fish, egg whites, Greek yogurt 0%, lean beef 93/7. High protein per calorie keeps you full.</li>`;
+                html += `<li><strong>Fibrous veg with every meal:</strong> 1\u20132 cups. Bulk + micronutrients + satiety.</li>`;
+                html += `<li><strong>Drop liquid calories.</strong> Soda, juice, sweetened coffees \u2014 they don't trigger satiety. Switch to zero-cal.</li>`;
+                html += `<li><strong>Fiber: 25\u201340 g/day.</strong> Massive impact on hunger. Berries, oats, vegetables, lentils.</li>`;
                 html += `</ul>`;
                 html += verseHtml({ text: "No discipline seems pleasant at the time, but painful. Later on it produces a harvest of righteousness.", ref: "Hebrews 12:11" });
                 return html;
@@ -1312,27 +1350,56 @@ const TOPIC_RESPONSES = {
             id: 'muscle_gain',
             keywords: ['build muscle', 'gain muscle', 'bulk', 'bulking', 'get big', 'hypertrophy', 'mass', 'size', 'grow', 'muscle gain'],
             handler: (ctx) => {
-                let html = `<h3>Building Muscle Effectively</h3>`;
+                const unit = wu();
+                let html = `<h3>Hypertrophy: What the Research Actually Shows</h3>`;
 
+                // Adaptive personalized calorie + protein target
                 if (ctx.currentWeight > 0) {
-                    const surplusCal = Math.round(ctx.currentWeight * 16) + 300;
-                    const proteinTarget = Math.round(ctx.currentWeight * 0.9);
-                    html += insightHtml(`At ${lbsToDisplay(ctx.currentWeight)} ${wu()}, aim for ~<strong>${surplusCal} cal/day</strong> (slight surplus) and <strong>${proteinTarget}g protein</strong>.`);
+                    const lbs = ctx.currentWeight;
+                    const kg = lbs / 2.20462;
+                    const age = ctx.profile.age || 30;
+                    const heightIn = (ctx.profile.heightFeet || 5) * 12 + (ctx.profile.heightInches || 9);
+                    const cm = heightIn * 2.54;
+                    const isFemale = (ctx.profile.gender || '').toLowerCase().startsWith('f');
+                    const bmr = isFemale
+                        ? Math.round(10 * kg + 6.25 * cm - 5 * age - 161)
+                        : Math.round(10 * kg + 6.25 * cm - 5 * age + 5);
+                    const activityFactor = ctx.weekDays >= 5 ? 1.55 : ctx.weekDays >= 3 ? 1.45 : 1.35;
+                    const tdee = Math.round(bmr * activityFactor);
+                    const surplus = tdee + 250;          // ~0.25\u20130.5% bw/wk lean gain
+                    const aggressiveSurplus = tdee + 400;
+                    const proteinG = Math.round(lbs * 0.8); // 0.8 g/lb is the sweet spot
+                    html += insightHtml(`At ${lbsToDisplay(lbs)}${unit}, your maintenance is ~<strong>${tdee} kcal</strong>. Lean bulk: <strong>${surplus} kcal</strong>. Faster bulk (more fat gain): <strong>${aggressiveSurplus} kcal</strong>. Protein target: <strong>${proteinG}g</strong>.`);
                 }
 
-                html += `<h3>The 5 Pillars of Muscle Growth</h3><ol>`;
-                html += `<li><strong>Progressive Overload:</strong> Add weight or reps every session. Use the Overload Tracker to monitor this!</li>`;
-                html += `<li><strong>Caloric Surplus:</strong> You MUST eat more than you burn. A 200-400 cal surplus is the sweet spot — enough to grow, not enough to get fat.</li>`;
-                html += `<li><strong>High Protein:</strong> 0.8-1g per lb of bodyweight, spread across 4-5 meals.</li>`;
-                html += `<li><strong>Volume:</strong> 10-20 sets per muscle group per week. More isn't always better — quality matters.</li>`;
-                html += `<li><strong>Recovery:</strong> Sleep 7-9 hours. Growth hormone peaks during deep sleep. Training breaks muscle down; sleep builds it back stronger.</li>`;
+                html += `<h3>The Schoenfeld hypertrophy framework</h3>`;
+                html += `<p>Brad Schoenfeld is the most-cited researcher in muscle growth. The current evidence rests on three pillars:</p>`;
+                html += `<ol>`;
+                html += `<li><strong>Mechanical tension</strong> \u2014 lift heavy enough to recruit high-threshold motor units. Anywhere from 30\u201385% 1RM works for hypertrophy as long as sets are taken close to failure (Schoenfeld 2017 meta).</li>`;
+                html += `<li><strong>Progressive overload</strong> \u2014 add reps or weight session over session. Without it, no growth signal.</li>`;
+                html += `<li><strong>Volume</strong> \u2014 dose-response up to ~20 hard sets per muscle per week (Schoenfeld 2017, Baz-Valle 2022). More than that and returns flatten.</li>`;
                 html += `</ol>`;
 
-                html += `<h3>Common Bulking Mistakes</h3><ul>`;
-                html += `<li>"Dirty bulking" (eating everything) — you'll gain more fat than muscle. Keep it clean.</li>`;
-                html += `<li>Skipping legs — your body releases more growth hormone from big compound leg exercises</li>`;
-                html += `<li>Not tracking — "I eat a lot" isn't specific enough. Track for at least 2 weeks to calibrate.</li>`;
-                html += `<li>Changing programs every 2 weeks — stick with a program for 8-12 weeks minimum.</li>`;
+                html += `<h3>The numbers that matter</h3><ul>`;
+                html += `<li><strong>Volume: 10\u201320 hard sets per muscle per week.</strong> Beginners thrive on 10\u201312, intermediates on 14\u201318, advanced on 18\u201322. A "hard set" = within 0\u20133 reps of failure (RIR 0\u20133).</li>`;
+                html += `<li><strong>Frequency: 2x per muscle per week beats 1x.</strong> Schoenfeld 2016 meta: matched volume, higher frequency = significantly more growth. Push/pull/legs 2x or upper/lower 4x is gold standard.</li>`;
+                html += `<li><strong>Rep range: 5\u201330 reps all build muscle</strong> (Schoenfeld 2017) when taken near failure. The sweet spot for joint health + volume tolerance is <strong>6\u201312</strong> on compounds, <strong>8\u201315</strong> on isolation.</li>`;
+                html += `<li><strong>Rest: 2\u20133 minutes on compounds, 1\u20132 on isolation.</strong> Schoenfeld 2016 directly compared 1-min vs 3-min rest: long rest produced 67% more muscle thickness gain. Cutting rest short to "save time" actively costs you growth.</li>`;
+                html += `<li><strong>Proximity to failure: RIR 0\u20133.</strong> You don't have to grind every set, but the last 5 reps need to feel like work. Helms et al. 2022 showed RIR 1\u20133 builds muscle equivalently to going to failure with less fatigue cost.</li>`;
+                html += `</ul>`;
+
+                html += `<h3>Nutrition for growth</h3><ul>`;
+                html += `<li><strong>Surplus: +200\u2013400 kcal/day.</strong> Targets a lean 0.25\u20130.5% bw/wk gain (Aragon & Schoenfeld 2020). More than that = mostly fat.</li>`;
+                html += `<li><strong>Protein: 1.6\u20132.2 g/kg (0.7\u20131.0 g/lb).</strong> Morton et al. 2018 meta: returns plateau hard above 1.6 g/kg. Don't chase 1.5 g/lb \u2014 it's expensive and unnecessary.</li>`;
+                html += `<li><strong>Distribution matters.</strong> 0.4 g/kg per meal across 4 meals maximizes muscle protein synthesis (Schoenfeld & Aragon 2018).</li>`;
+                html += `<li><strong>Carbs fuel volume.</strong> 3\u20135 g/kg/day on training days. Low-carb cuts your work capacity and recovery.</li>`;
+                html += `</ul>`;
+
+                html += `<h3>The 4 mistakes that kill bulks</h3><ul>`;
+                html += `<li><strong>Dirty bulking.</strong> A 1000 kcal surplus doesn't grow muscle 4x faster \u2014 your body has a hard ceiling on how much muscle it can synthesize per week. Excess goes to fat.</li>`;
+                html += `<li><strong>Program hopping.</strong> Stay on one program for 8\u201312 weeks minimum. Progressive overload only works if you have a baseline to overload from.</li>`;
+                html += `<li><strong>Skipping legs.</strong> Lower body has the largest muscle mass and highest growth potential per session. Skipping it caps your results.</li>`;
+                html += `<li><strong>Junk volume.</strong> 5 sets of curls 1 day apart \u2260 5 hard sets. If you're not within 3 reps of failure, the set barely counts toward your weekly total.</li>`;
                 html += `</ul>`;
                 html += verseHtml({ text: "She sets about her work vigorously; her arms are strong for her tasks.", ref: "Proverbs 31:17" });
                 return html;
@@ -1382,7 +1449,18 @@ const TOPIC_RESPONSES = {
             id: 'warmup',
             keywords: ['warm up', 'warmup', 'warm-up', 'stretching', 'stretch', 'before workout', 'pre workout routine', 'dynamic stretch'],
             handler: (ctx) => {
-                let html = `<h3>Dynamic Warm-Up</h3>`;
+                let html = `<h3>The RAMP Warm-Up Protocol</h3>`;
+                html += `<p>RAMP = <strong>Raise, Activate, Mobilize, Potentiate</strong>. It's the framework UK Strength &amp; Conditioning uses with elite athletes \u2014 8\u201312 minutes, science-backed, no foam roller theatrics.</p>`;
+                html += insightHtml(`<strong>Skip static stretching before lifting.</strong> Behm et al. 2016 (meta of 125 studies): static stretching held >60 sec reduces strength output by <strong>~5%</strong>. Save it for after the session.`);
+
+                html += `<h3>The 4 stages</h3><ol>`;
+                html += `<li><strong>Raise (2\u20133 min):</strong> Light cardio to raise core temp + heart rate. Bike, jog, jump rope.</li>`;
+                html += `<li><strong>Activate (2\u20133 min):</strong> Wake up the muscles you'll train. Glute bridges, scap push-ups, band pull-aparts.</li>`;
+                html += `<li><strong>Mobilize (2\u20133 min):</strong> Dynamic ROM through the joints you'll use. World's greatest stretch, leg swings, T-spine rotations.</li>`;
+                html += `<li><strong>Potentiate (2\u20133 min):</strong> 2\u20133 ramping warm-up sets at 50%, 70%, 85% of your top set. Primes the nervous system for the heavy work.</li>`;
+                html += `</ol>`;
+
+                html += `<h3>Lift-specific warm-ups (before working sets)</h3>`;
                 // Check what they've trained today or suggest general
                 const todayMuscles = new Set();
                 ctx.todayWorkouts.forEach(w => {
@@ -1426,20 +1504,42 @@ const TOPIC_RESPONSES = {
         },
         {
             id: 'supplements',
-            keywords: ['supplement', 'creatine', 'protein powder', 'pre.?workout', 'bcaa', 'vitamins', 'whey', 'casein'],
+            keywords: ['supplement', 'creatine', 'protein powder', 'pre.?workout', 'bcaa', 'vitamins', 'whey', 'casein', 'beta alanine', 'citrulline'],
             handler: (ctx) => {
-                let html = `<h3>Evidence-Based Supplements</h3>`;
-                html += `<p><strong>Tier 1 — Actually works:</strong></p><ul>`;
-                html += `<li><strong>Creatine monohydrate</strong> (5g/day) — Most studied supplement in history. Increases strength, muscle size, and recovery. Take daily, no need to cycle.</li>`;
-                html += `<li><strong>Protein powder</strong> — Not magic, just convenient protein. Use it if you struggle to hit ${ctx.profile.proteinGoal || 150}g/day from food alone.</li>`;
-                html += `<li><strong>Caffeine</strong> (200mg pre-workout) — Improves performance 3-5%. Coffee works fine.</li>`;
+                let html = `<h3>Supplements: What's Worth Your Money</h3>`;
+                html += `<p>The supplement industry is a 50-billion-dollar machine selling 5-billion dollars of actual benefit. Here's what survives a real evidence review (Kreider et al. 2018; ISSN position stands).</p>`;
+
+                html += `<h3>Tier 1 \u2014 Strong evidence, take these</h3>`;
+                html += `<table class="plan-table"><tr><th>Supplement</th><th>Dose</th><th>What it does</th></tr>`;
+                html += `<tr><td>Creatine monohydrate</td><td>3\u20135 g/day, any time</td><td>~5\u201315% strength gain, ~1\u20132 kg lean mass over 8\u201312 weeks. Most-studied legal performance aid in history. No loading needed (Antonio et al. 2021).</td></tr>`;
+                html += `<tr><td>Whey or casein protein</td><td>20\u201340 g per serving</td><td>Convenience tool for hitting your daily protein target (${ctx.profile.proteinGoal || 150}g). Not magic \u2014 food protein works the same.</td></tr>`;
+                html += `<tr><td>Caffeine</td><td>3\u20136 mg/kg, 30\u201360 min pre-workout</td><td>2\u20137% strength and endurance boost (Grgic 2018 meta). Coffee works. Don't take after 2 PM.</td></tr>`;
+                html += `<tr><td>Vitamin D3</td><td>2,000\u20134,000 IU/day</td><td>Most lifters in northern climates are deficient. Linked to strength, immunity, and testosterone. Get a blood test if you can.</td></tr>`;
+                html += `</table>`;
+
+                html += `<h3>Tier 2 \u2014 Modest evidence, situational</h3>`;
+                html += `<table class="plan-table"><tr><th>Supplement</th><th>Dose</th><th>When</th></tr>`;
+                html += `<tr><td>Beta-alanine</td><td>3\u20135 g/day</td><td>Helps in 60\u2013240 second efforts (high-rep sets, conditioning). Modest 2\u20133% benefit (Saunders 2017 meta). Causes harmless tingles.</td></tr>`;
+                html += `<tr><td>Citrulline malate</td><td>6\u20138 g, 30 min pre</td><td>Improves endurance and pump. Mixed evidence on strength.</td></tr>`;
+                html += `<tr><td>Fish oil (EPA/DHA)</td><td>1\u20133 g/day combined</td><td>Joint health, recovery, cardiovascular. Skip if you eat fatty fish 2x/week.</td></tr>`;
+                html += `<tr><td>Magnesium glycinate</td><td>300\u2013400 mg before bed</td><td>Sleep quality, muscle relaxation. Most people are mildly deficient.</td></tr>`;
+                html += `<tr><td>Ashwagandha</td><td>300\u2013600 mg/day</td><td>Modest stress/cortisol reduction. Some evidence for strength gains in trained subjects (Wankhede 2015).</td></tr>`;
+                html += `</table>`;
+
+                html += `<h3>Tier 3 \u2014 Skip these</h3><ul>`;
+                html += `<li><strong>BCAAs</strong> \u2014 The ISSN's 2017 review concluded they're useless if you eat enough whole protein. Wolfe (2017): "BCAA supplements... do not promote muscle protein synthesis." You're paying for amino acids you already get from chicken.</li>`;
+                html += `<li><strong>Glutamine</strong> \u2014 No effect on muscle gain or recovery in healthy lifters.</li>`;
+                html += `<li><strong>"Test boosters"</strong> \u2014 Tribulus, fenugreek, etc. Don't raise testosterone in normal men. Marketing only.</li>`;
+                html += `<li><strong>Fat burners</strong> \u2014 Mostly caffeine + filler. Buy coffee for $0.50/cup instead.</li>`;
+                html += `<li><strong>Most pre-workout blends</strong> \u2014 You're paying $40 for ~150 mg caffeine + a "proprietary blend" of underdosed garbage. Buy caffeine pills + citrulline powder separately for 1/5 the cost.</li>`;
                 html += `</ul>`;
-                html += `<p><strong>Tier 2 — Helpful for some:</strong></p><ul>`;
-                html += `<li><strong>Vitamin D</strong> — If you're low on sun exposure. Get bloodwork to check.</li>`;
-                html += `<li><strong>Fish oil</strong> — If you don't eat fatty fish 2x/week.</li>`;
-                html += `<li><strong>Magnesium</strong> — Helps sleep quality. Take before bed.</li>`;
+
+                html += `<h3>Stack for ~$25/month that actually works</h3><ul>`;
+                html += `<li>5 g creatine monohydrate \u2014 daily, any time</li>`;
+                html += `<li>200 mg caffeine + 6 g citrulline 30 min pre-workout</li>`;
+                html += `<li>2,000 IU vitamin D3 with breakfast</li>`;
+                html += `<li>Whey protein <em>only if</em> food protein isn't getting you to target</li>`;
                 html += `</ul>`;
-                html += `<p><strong>Skip these:</strong> BCAAs (waste of money if you eat protein), fat burners, testosterone boosters, most pre-workout blends (just drink coffee).</p>`;
                 html += verseHtml();
                 return html;
             },
@@ -1495,15 +1595,28 @@ const TOPIC_RESPONSES = {
             id: 'rest_timer',
             keywords: ['rest time', 'rest period', 'how long.*rest', 'rest between', 'rest timer', 'break between'],
             handler: (ctx) => {
-                let html = `<h3>Rest Period Guide</h3>`;
-                html += `<table class="plan-table"><tr><th>Goal</th><th>Rest Time</th><th>Why</th></tr>`;
-                html += `<tr><td><strong>Strength</strong> (1-5 reps)</td><td>3-5 min</td><td>Full ATP recovery for max effort</td></tr>`;
-                html += `<tr><td><strong>Hypertrophy</strong> (6-12 reps)</td><td>60-90 sec</td><td>Metabolic stress drives muscle growth</td></tr>`;
-                html += `<tr><td><strong>Endurance</strong> (12+ reps)</td><td>30-60 sec</td><td>Keeps heart rate up, builds stamina</td></tr>`;
-                html += `<tr><td><strong>Compounds</strong> (squat, dead, bench)</td><td>2-4 min</td><td>Heavier loads need more recovery</td></tr>`;
-                html += `<tr><td><strong>Isolation</strong> (curls, raises)</td><td>60-90 sec</td><td>Smaller muscles recover faster</td></tr>`;
+                let html = `<h3>Rest Periods: Longer Than You Think</h3>`;
+                html += insightHtml(`Schoenfeld 2016 directly compared <strong>1-min vs 3-min rest</strong> for hypertrophy: 3-min produced <strong>67% more muscle thickness gain</strong>. The "short rest = pump = growth" idea is one of bro-science's worst leftovers.`);
+
+                html += `<h3>The current evidence</h3>`;
+                html += `<table class="plan-table"><tr><th>Goal</th><th>Rep Range</th><th>Rest</th><th>Why</th></tr>`;
+                html += `<tr><td><strong>Pure strength</strong></td><td>1\u20135 reps</td><td>3\u20135 min</td><td>Full ATP-PCr recovery for max neural output. Anything less and your top set drops weight.</td></tr>`;
+                html += `<tr><td><strong>Hypertrophy (compounds)</strong></td><td>6\u201312 reps</td><td>2\u20133 min</td><td>Long enough to maintain reps + load (the real growth driver), short enough to fit volume.</td></tr>`;
+                html += `<tr><td><strong>Hypertrophy (isolation)</strong></td><td>8\u201315 reps</td><td>60\u2013120 sec</td><td>Smaller muscles recover faster. Cable curls don't need 3 min.</td></tr>`;
+                html += `<tr><td><strong>Endurance / metcon</strong></td><td>15+ reps</td><td>30\u201360 sec</td><td>Keeps heart rate up. Different goal entirely.</td></tr>`;
                 html += `</table>`;
-                html += `<p>When in doubt: rest until your breathing normalizes and you feel ready to give the next set full effort.</p>`;
+
+                html += `<h3>How to know if you rested enough</h3><ul>`;
+                html += `<li><strong>The "talk test"</strong> \u2014 you should be able to speak in full sentences before the next set. If you're still panting, wait.</li>`;
+                html += `<li><strong>The "rep drop" check</strong> \u2014 if your second set drops more than 1\u20132 reps from the first at the same weight, you didn't rest long enough.</li>`;
+                html += `<li><strong>Watch the clock, not the feeling.</strong> Most lifters wildly underestimate rest time \u2014 90 seconds feels like 3 minutes when you're tired.</li>`;
+                html += `</ul>`;
+
+                html += `<h3>Time-saving moves (without sabotaging gains)</h3><ul>`;
+                html += `<li><strong>Antagonist supersets:</strong> Bench + row, squat + leg curl. Rest the muscle you just trained while working its opposite. Saves time without cutting recovery.</li>`;
+                html += `<li><strong>Stretch the bored muscle:</strong> Foam roll a different body part during rest \u2014 active recovery without raising overall fatigue.</li>`;
+                html += `<li><strong>Cluster sets:</strong> Break a heavy set of 6 into 2+2+2 with 20 sec rest. Maintains load with less total fatigue (Tufano et al. 2017).</li>`;
+                html += `</ul>`;
                 html += verseHtml();
                 return html;
             },
@@ -1647,22 +1760,34 @@ const TOPIC_RESPONSES = {
         },
         {
             id: 'cardio',
-            keywords: ['cardio', 'running', 'hiit', 'liss', 'treadmill', 'cycling', 'heart rate', 'conditioning', 'endurance', 'stamina'],
+            keywords: ['cardio', 'running', 'hiit', 'liss', 'zone 2', 'zone two', 'treadmill', 'cycling', 'heart rate', 'conditioning', 'endurance', 'stamina'],
             handler: (ctx) => {
                 const goal = ctx.profile.goal || 'maintain';
-                let html = `<h3>Cardio Guide</h3>`;
-                html += `<table class="plan-table"><tr><th>Type</th><th>What</th><th>When</th></tr>`;
-                html += `<tr><td><strong>LISS</strong></td><td>Walking, light cycling (can hold a conversation)</td><td>Rest days, post-workout</td></tr>`;
-                html += `<tr><td><strong>HIIT</strong></td><td>Sprints, intervals (20-30 sec hard, 60-90 sec rest)</td><td>1-2x/week max, not on leg day</td></tr>`;
-                html += `<tr><td><strong>Moderate</strong></td><td>Jogging, swimming, rowing (moderate effort)</td><td>2-3x/week, separate from lifting</td></tr>`;
+                let html = `<h3>Cardio for Lifters: Without Killing Your Gains</h3>`;
+                html += `<p>The "cardio kills muscle" myth is half right. Wilson et al. 2012 (the concurrent training meta) showed cardio can blunt strength gains \u2014 but only when it's high-impact, long-duration, on the same muscles you're trying to grow. Done right, cardio improves recovery, work capacity, and longevity without costing you a single rep.</p>`;
+
+                html += `<h3>The 3 cardio modalities</h3>`;
+                html += `<table class="plan-table"><tr><th>Type</th><th>Intensity</th><th>What it does</th></tr>`;
+                html += `<tr><td><strong>Zone 2 / LISS</strong></td><td>60\u201370% max HR (can hold a conversation)</td><td>Builds mitochondrial density, improves between-set recovery, burns fat without crushing CNS. The cardio elite endurance athletes spend 80% of their time on.</td></tr>`;
+                html += `<tr><td><strong>Moderate</strong></td><td>70\u201385% max HR (can speak in short sentences)</td><td>Cardiovascular fitness ceiling. Useful but the most fatiguing per minute.</td></tr>`;
+                html += `<tr><td><strong>HIIT</strong></td><td>90%+ max HR, 20\u201360 sec efforts</td><td>VO\u2082 max boost, time-efficient. But high systemic fatigue \u2014 don't pair with leg day.</td></tr>`;
                 html += `</table>`;
-                html += `<h3>Recommendation for Your Goal</h3>`;
+
+                html += `<h3>The lifter's cardio rules</h3><ol>`;
+                html += `<li><strong>Walking is undefeated.</strong> Low impact, near-zero recovery cost, burns ~300\u2013400 kcal/hour for most people. 3\u20134 brisk walks per week is a quietly elite move.</li>`;
+                html += `<li><strong>Separate cardio from lifting by 6+ hours when possible.</strong> If you can't, lift first, cardio after.</li>`;
+                html += `<li><strong>Avoid running on lifting days, especially leg day.</strong> Cycling, rowing, and swimming have less concurrent training interference (Wilson 2012).</li>`;
+                html += `<li><strong>HIIT max 1\u20132x/week.</strong> It's a tax on your nervous system. More than that and your lifting suffers.</li>`;
+                html += `<li><strong>Track your steps.</strong> Aim for <strong>8,000\u201312,000 steps/day</strong>. NEAT (non-exercise activity thermogenesis) explains huge differences in fat loss between people on the same diet.</li>`;
+                html += `</ol>`;
+
+                html += `<h3>Recommendation for your goal</h3>`;
                 if (goal === 'lose') {
-                    html += `<p>Focus on <strong>LISS (walking)</strong> — 3-4 times per week, 30 min. Add 1 HIIT session if progress stalls. Walking burns fat without killing recovery.</p>`;
+                    html += `<p><strong>Cutting:</strong> 3\u20134 walks per week (30\u201345 min) + 8,000+ daily steps. Add 1 HIIT session if fat loss stalls. Walking is the cheat code for adherence \u2014 it burns calories without raising hunger the way a hard run does.</p>`;
                 } else if (goal === 'gain') {
-                    html += `<p>Keep cardio <strong>minimal</strong> — 2 walks per week. Every calorie burned is a calorie not building muscle. Save your energy for the weights.</p>`;
+                    html += `<p><strong>Bulking:</strong> 2\u20133 walks per week + 8,000+ steps. Don't go zero-cardio \u2014 cardiovascular fitness improves recovery and lets you do more total training volume. Skip HIIT entirely; it eats into your surplus.</p>`;
                 } else {
-                    html += `<p>Mix it up — 2-3 sessions of whatever you enjoy. Consistency matters more than the type. Heart health is part of the mission.</p>`;
+                    html += `<p><strong>Maintenance/general health:</strong> 150 min of moderate cardio per week (WHO + ACSM guideline). Mix walks, cycling, and one HIIT session. Heart health is the longest-game of all.</p>`;
                 }
                 html += verseHtml();
                 return html;
@@ -1670,19 +1795,32 @@ const TOPIC_RESPONSES = {
         },
         {
             id: 'meal_timing',
-            keywords: ['meal timing', 'pre.?workout.*meal', 'post.?workout.*meal', 'when.*eat', 'eat before', 'eat after', 'nutrient timing', 'anabolic window'],
+            keywords: ['meal timing', 'pre.?workout.*meal', 'post.?workout.*meal', 'when.*eat', 'eat before', 'eat after', 'nutrient timing', 'anabolic window', 'protein distribution'],
             handler: (ctx) => {
-                let html = `<h3>Workout Nutrition Timing</h3>`;
-                html += `<p><strong>Pre-Workout</strong> (1-2 hours before):</p><ul>`;
-                html += `<li>Moderate carbs + moderate protein, low fat</li>`;
-                html += `<li>Examples: rice + chicken, oatmeal + protein shake, banana + PB toast</li>`;
-                html += `<li>Avoid heavy fat — slows digestion and can cause nausea</li>`;
+                let html = `<h3>Nutrient Timing: Signal vs. Noise</h3>`;
+                html += `<p>Most "nutrient timing" advice is leftover from the 1990s. The current research is way more relaxed \u2014 with two specific exceptions that actually do matter.</p>`;
+
+                html += `<h3>What actually matters (the signal)</h3><ol>`;
+                html += `<li><strong>Total daily protein.</strong> 1.6\u20132.2 g/kg. This is 80% of the timing conversation. Hit the daily total and you're fine.</li>`;
+                html += `<li><strong>Protein distribution: 4 doses across the day, ~0.4 g/kg each.</strong> Mamerow et al. 2014: 30g protein at each of 3 meals stimulated 25% more muscle protein synthesis than the same total skewed to dinner. Schoenfeld & Aragon 2018 confirmed this for lifters.</li>`;
+                html += `</ol>`;
+
+                html += `<h3>What barely matters (the noise)</h3><ul>`;
+                html += `<li><strong>The "anabolic window" myth.</strong> The classic "30-minute window" is dead. Aragon & Schoenfeld 2013 reviewed it directly: as long as you eat a protein-containing meal within ~3\u20134 hours of training, you're capturing the full anabolic response.</li>`;
+                html += `<li><strong>Pre-workout shake "to spike insulin"?</strong> Not necessary. If you ate a normal protein meal in the 4 hours before training, you're already covered.</li>`;
+                html += `<li><strong>Fast vs slow protein at night?</strong> Casein vs whey before bed: minor differences, not worth optimizing for unless you're competing.</li>`;
                 html += `</ul>`;
-                html += `<p><strong>Post-Workout</strong> (within 2 hours after):</p><ul>`;
-                html += `<li>Protein (30-40g) + fast carbs to replenish glycogen</li>`;
-                html += `<li>Examples: protein shake + fruit, chicken + rice, eggs + toast</li>`;
-                html += `</ul>`;
-                html += `<p><strong>The truth about the "anabolic window":</strong> It's not as tight as people think. Just eat a solid meal within 2 hours of training and you're fine. Total daily protein matters way more than timing.</p>`;
+
+                html += `<h3>The practical playbook</h3>`;
+                html += `<table class="plan-table"><tr><th>Meal</th><th>Timing</th><th>What</th></tr>`;
+                html += `<tr><td>Pre-workout</td><td>1\u20133 hrs before</td><td>Moderate carbs + 30\u201340g protein, low fat. Oatmeal + Greek yogurt, rice + chicken, banana + protein shake.</td></tr>`;
+                html += `<tr><td>Intra-workout</td><td>During</td><td>Water, electrolytes if you sweat heavily. Carbs only matter for sessions over 90 min.</td></tr>`;
+                html += `<tr><td>Post-workout</td><td>Within 2\u20133 hrs</td><td>30\u201340g protein + carbs to replenish glycogen. Don't rush home in 20 min \u2014 a normal meal is fine.</td></tr>`;
+                html += `<tr><td>Pre-bed</td><td>30\u201360 min before sleep</td><td>20\u201340g slow-digesting protein (Greek yogurt, cottage cheese, casein shake). Res et al. 2012 showed nighttime protein elevates overnight muscle protein synthesis ~22%.</td></tr>`;
+                html += `</table>`;
+
+                html += `<h3>Training fasted?</h3>`;
+                html += `<p>Fine for cardio/light sessions, sub-optimal for heavy lifting. If you train fasted, eat your first big protein meal within 1\u20132 hours after \u2014 don't push the eating window so late that you only fit 2 protein doses into the day.</p>`;
                 html += verseHtml();
                 return html;
             },
@@ -2251,6 +2389,45 @@ const TOPIC_RESPONSES = {
                 return html;
             },
         },
+        {
+            id: 'progress_photos',
+            keywords: ['progress photo', 'progress pic', 'transformation', 'before after', 'before and after', 'compare photo', 'how do i look', 'physique check', 'mirror check', 'body change'],
+            handler: (ctx) => {
+                const stats = ctx.progressPhotos || { count: 0, daysSinceLast: null };
+                let html = `<h3>Progress Photos: The Honest Mirror</h3>`;
+                html += `<p>The scale lies (water, glycogen, food in your gut can swing you 4\u20136 lbs day-to-day). The mirror lies too \u2014 you see yourself daily so change is invisible. Photos taken on the same schedule, same light, same angles are the only honest measurement of body composition you can do at home.</p>`;
+                html += insightHtml(`<strong>Why it works.</strong> Helms et al. 2014 and the Lichtman tracking research both rank visual self-monitoring as a top-3 predictor of long-term physique adherence \u2014 above scale weight, above measurements.`);
+
+                if (stats.count === 0) {
+                    html += `<h3>You haven't taken one yet</h3>`;
+                    html += `<p>Open your <strong>Profile tab</strong> and tap <strong>Add First Photo</strong>. Tag the angle (front, side, or back) and you're done.</p>`;
+                } else if (stats.daysSinceLast !== null && stats.daysSinceLast >= 14) {
+                    html += `<h3>Your timeline</h3>`;
+                    html += `<p>You have <strong>${stats.count}</strong> photo${stats.count !== 1 ? 's' : ''}. Your last one was <strong>${stats.daysSinceLast} days ago</strong> \u2014 time for the next one. Same lighting, same angle, same time of day.</p>`;
+                } else {
+                    html += `<h3>Your timeline</h3>`;
+                    html += `<p>You have <strong>${stats.count}</strong> photo${stats.count !== 1 ? 's' : ''} on file${stats.daysSinceLast !== null ? ` (last one ${stats.daysSinceLast} day${stats.daysSinceLast !== 1 ? 's' : ''} ago)` : ''}. ${stats.count >= 2 ? 'Open Profile and tap <strong>Compare</strong> to put any two side-by-side.' : 'Take your next one in 2\u20134 weeks to start a real comparison.'}</p>`;
+                }
+
+                html += `<h3>How to take a photo that's actually useful</h3><ol>`;
+                html += `<li><strong>Same time of day.</strong> Morning, fasted, post-bathroom. Glycogen and gut content swing your look hourly.</li>`;
+                html += `<li><strong>Same lighting.</strong> Overhead light flatters \u2014 it's also a liar. Use natural window light or a fixed lamp position.</li>`;
+                html += `<li><strong>Same camera distance and height.</strong> Phone at chest height, ~6 feet back. Mark the spot with tape if you have to.</li>`;
+                html += `<li><strong>Three angles every time.</strong> Front relaxed, side relaxed, back relaxed. Optional flexed set after.</li>`;
+                html += `<li><strong>Minimal clothing.</strong> Same outfit each session so you're comparing tissue, not fabric.</li>`;
+                html += `</ol>`;
+
+                html += `<h3>How often</h3>`;
+                html += `<p>Every <strong>2\u20134 weeks</strong>. Weekly is too noisy \u2014 you'll see water weight and lighting differences and convince yourself nothing's working. Monthly is the sweet spot for a fat-loss or recomp phase. Every 3\u20134 weeks for a lean bulk.</p>`;
+
+                html += `<h3>What I will not do</h3>`;
+                html += `<p>I used to try to grade your form from a single still photo using a 17-keypoint pose model. I'm being honest with you: it didn't work. One frame can't see your bar path, can't tell if your brace held, and gets the joint angles wrong because of camera tilt. Progress photos are honest. AI form-grading from a still wasn't.</p>`;
+                html += `<p>For real form feedback, ask me about a specific lift \u2014 "<em>bench press form</em>" or "<em>how do I deadlift</em>" \u2014 and I'll give you the cues, common mistakes, and how to film yourself for self-review.</p>`;
+
+                html += verseHtml();
+                return html;
+            },
+        },
     ],
 
     // Fallback for unrecognized input
@@ -2400,6 +2577,11 @@ function getSmartStarterChips(ctx) {
         chips.push('How can I stay consistent?');
     } else {
         chips.push('Weak point analysis');
+    }
+    // Nudge a progress photo if it's been a while (or never)
+    const pp = ctx.progressPhotos;
+    if (pp && (pp.count === 0 || (pp.daysSinceLast !== null && pp.daysSinceLast >= 14))) {
+        chips.push('How do progress photos work?');
     }
     // Ensure 3 chips
     const fallback = ['How can I get stronger?', 'Generate a workout plan for me', 'Weekly recap'];
@@ -2775,6 +2957,7 @@ const COACH_TOPIC_PHRASES = {
     injury_prevention: 'How do I lift without getting hurt?',
     fill_macros: 'What should I eat to hit my macros?',
     weekly_split_plan: 'Plan my training week',
+    progress_photos: 'How do progress photos work?',
 };
 
 function topicPhrase(topic) {

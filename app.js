@@ -689,15 +689,19 @@ function displayDailyVerse() {
 }
 
 // --- Tab Navigation ---
+function switchTab(tabId) {
+    const btn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    const target = document.getElementById(tabId);
+    if (target) target.classList.add('active');
+    if (typeof updateRestTimerVisibility === 'function') updateRestTimerVisibility();
+    if (tabId === 'coach' && typeof initCoach === 'function') initCoach();
+    if (tabId === 'profile' && typeof renderProgressPhotoCard === 'function') renderProgressPhotoCard();
+}
 document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById(btn.dataset.tab).classList.add('active');
-        updateRestTimerVisibility();
-        if (btn.dataset.tab === 'coach' && typeof initCoach === 'function') initCoach();
-    });
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
 // --- Weight Tracking ---
@@ -2186,6 +2190,9 @@ function loadProfile() {
         document.getElementById('profile-height-feet').value = Math.floor(profile.height / 12);
         document.getElementById('profile-height-inches').value = profile.height % 12;
     }
+
+    // Render the progress photo gallery card
+    if (typeof renderProgressPhotoCard === 'function') renderProgressPhotoCard();
 }
 
 function calculateCalories() {
