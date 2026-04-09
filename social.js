@@ -614,7 +614,9 @@ async function directRpc(fnName, args) {
             return null;
         }
         const text = await resp.text();
-        try { return text ? JSON.parse(text) : null; } catch (e) { return text; }
+        // Many of our RPCs RETURN void → empty body. Treat success-with-empty-body as truthy.
+        if (!text) return true;
+        try { return JSON.parse(text); } catch (e) { return text; }
     } catch (e) {
         console.error('directRpc crashed:', fnName, e);
         return null;
@@ -1392,11 +1394,25 @@ function getTodayWorkoutStats() {
             if (s.weight > topLift.weight) topLift = { name: w.name, weight: s.weight, reps: s.reps };
         });
     });
+    // Per-exercise breakdown so feed can show real insight
+    const byName = {};
+    workouts.forEach(w => {
+        if (!byName[w.name]) byName[w.name] = { name: w.name, sets: 0, reps: 0, volume: 0, best: { weight: 0, reps: 0 } };
+        const ex = byName[w.name];
+        w.sets.forEach(s => {
+            ex.sets += 1;
+            ex.reps += (s.reps || 0);
+            ex.volume += (s.weight || 0) * (s.reps || 0);
+            if ((s.weight || 0) > ex.best.weight) ex.best = { weight: s.weight, reps: s.reps };
+        });
+    });
+    const breakdown = Object.values(byName);
     return {
         exercises: workouts.map(w => w.name),
         totalVolume: totalVol,
         topLift,
-        setCount: workouts.reduce((s, w) => s + w.sets.length, 0)
+        setCount: workouts.reduce((s, w) => s + w.sets.length, 0),
+        breakdown,
     };
 }
 
@@ -1561,6 +1577,14 @@ async function loadFeed() {
     const avatarMap = {};
     if (authorProfiles) authorProfiles.forEach(a => { avatarMap[a.id] = a.profile_pic; });
 
+    // Batch-fetch comment counts so we can show "Comments (3)" without opening
+    const postIds = posts.map(p => p.id);
+    const commentRows = await directSelect(
+        'comments?post_id=in.(' + postIds.join(',') + ')&select=post_id'
+    );
+    const commentCounts = {};
+    if (commentRows) commentRows.forEach(r => { commentCounts[r.post_id] = (commentCounts[r.post_id] || 0) + 1; });
+
     container.innerHTML = posts.map(p => {
         const time = timeAgo(new Date(p.created_at).getTime());
         const liked = p.likes && p.likes.includes(currentUser.id);
@@ -1569,14 +1593,37 @@ async function loadFeed() {
 
         let statsHtml = '';
         if (p.workout) {
-            statsHtml = `<div class="post-workout-stats">
-                <span>${p.workout.exercises.join(', ')}</span>
-                <span>${parseFloat(lbsToDisplay(p.workout.totalVolume)).toLocaleString()} ${wu()} total</span>
-                ${p.workout.topLift && p.workout.topLift.name
-                    ? `<span class="post-top-lift">${p.workout.topLift.name}: ${lbsToDisplay(p.workout.topLift.weight)}${wu()} x ${p.workout.topLift.reps}</span>`
-                    : ''}
-            </div>`;
+            const w = p.workout;
+            const exCount = w.breakdown ? w.breakdown.length : (w.exercises ? w.exercises.length : 0);
+            const setCount = w.setCount || 0;
+            const totalVolStr = parseFloat(lbsToDisplay(w.totalVolume || 0)).toLocaleString() + ' ' + wu();
+            // Header row of pill stats
+            const pills = `
+                <div class="post-stats-pills">
+                    <div class="post-stat-pill"><span class="psp-num">${exCount}</span><span class="psp-lbl">exercise${exCount !== 1 ? 's' : ''}</span></div>
+                    <div class="post-stat-pill"><span class="psp-num">${setCount}</span><span class="psp-lbl">set${setCount !== 1 ? 's' : ''}</span></div>
+                    <div class="post-stat-pill"><span class="psp-num">${totalVolStr}</span><span class="psp-lbl">volume</span></div>
+                </div>`;
+            // Per-exercise breakdown if we have it (new posts)
+            let breakdownHtml = '';
+            if (w.breakdown && w.breakdown.length) {
+                const rows = w.breakdown.map(ex => `
+                    <div class="post-ex-row">
+                        <span class="post-ex-name">${escapeHtml(ex.name)}</span>
+                        <span class="post-ex-meta">${ex.sets}\u00d7 &middot; best ${lbsToDisplay(ex.best.weight)}${wu()} \u00d7 ${ex.best.reps}</span>
+                    </div>
+                `).join('');
+                breakdownHtml = `<div class="post-ex-list">${rows}</div>`;
+            } else if (w.exercises && w.exercises.length) {
+                // Legacy posts: just list exercise names
+                breakdownHtml = `<div class="post-ex-list-legacy">${escapeHtml(w.exercises.join(', '))}</div>`;
+            }
+            const topLift = w.topLift && w.topLift.name
+                ? `<div class="post-top-lift-banner">&#x1F3C6; Top lift: <strong>${escapeHtml(w.topLift.name)}</strong> &middot; ${lbsToDisplay(w.topLift.weight)}${wu()} \u00d7 ${w.topLift.reps}</div>`
+                : '';
+            statsHtml = `<div class="post-workout-card">${pills}${topLift}${breakdownHtml}</div>`;
         }
+        const cmtCount = commentCounts[p.id] || 0;
 
         const authorPic = avatarMap[p.uid];
         const avatarHtml = authorPic
@@ -1611,11 +1658,12 @@ async function loadFeed() {
             ${p.caption ? `<p class="post-caption">${escapeHtml(p.caption)}</p>` : ''}
             ${verseHtml}
             <div class="post-actions">
-                <button class="post-like-btn ${liked ? 'liked' : ''}" onclick="sbToggleLike('${p.id}')">
-                    ${liked ? '&#x2764;' : '&#x2661;'} ${likeCount > 0 ? likeCount : ''}
+                <button class="post-like-btn ${liked ? 'liked' : ''}" id="like-btn-${p.id}" data-liked="${liked ? '1' : '0'}" data-count="${likeCount}" onclick="sbToggleLike('${p.id}')">
+                    <span class="like-icon">${liked ? '&#x2764;' : '&#x2661;'}</span>
+                    <span class="like-count">${likeCount > 0 ? likeCount : ''}</span>
                 </button>
                 <button class="post-comment-btn" onclick="toggleComments('${p.id}')">
-                    &#x1F4AC; Comments
+                    &#x1F4AC; Comments${cmtCount > 0 ? ' (' + cmtCount + ')' : ''}
                 </button>
             </div>
             <div id="comments-wrap-${p.id}" class="comments-wrap hidden">
@@ -1630,9 +1678,37 @@ async function loadFeed() {
 }
 
 async function sbToggleLike(postId) {
+    const btn = document.getElementById('like-btn-' + postId);
+    if (!btn) return;
+    // Optimistic toggle
+    const wasLiked = btn.dataset.liked === '1';
+    let count = parseInt(btn.dataset.count || '0', 10) || 0;
+    const nowLiked = !wasLiked;
+    count += nowLiked ? 1 : -1;
+    if (count < 0) count = 0;
+    btn.dataset.liked = nowLiked ? '1' : '0';
+    btn.dataset.count = String(count);
+    btn.classList.toggle('liked', nowLiked);
+    const iconEl = btn.querySelector('.like-icon');
+    const countEl = btn.querySelector('.like-count');
+    if (iconEl) iconEl.innerHTML = nowLiked ? '&#x2764;' : '&#x2661;';
+    if (countEl) countEl.textContent = count > 0 ? String(count) : '';
+    // Tiny pop animation
+    btn.classList.remove('like-pop');
+    void btn.offsetWidth;
+    btn.classList.add('like-pop');
+    if (typeof haptic === 'function') haptic(10);
+
     const result = await directRpc('toggle_like', { post_id: postId });
-    if (result === null) return;
-    loadFeed();
+    if (result === null) {
+        // Rollback
+        btn.dataset.liked = wasLiked ? '1' : '0';
+        const rollbackCount = wasLiked ? count + 1 : count - 1;
+        btn.dataset.count = String(rollbackCount < 0 ? 0 : rollbackCount);
+        btn.classList.toggle('liked', wasLiked);
+        if (iconEl) iconEl.innerHTML = wasLiked ? '&#x2764;' : '&#x2661;';
+        if (countEl) countEl.textContent = rollbackCount > 0 ? String(rollbackCount) : '';
+    }
 }
 
 async function deletePost(postId) {
