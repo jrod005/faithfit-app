@@ -1845,27 +1845,62 @@ let barcodeScanner = null;
 
 function openBarcodeScanner() {
     const modal = document.getElementById('barcode-modal');
+    if (!modal) return;
     modal.style.display = 'flex';
-    document.getElementById('barcode-status').textContent = 'Starting camera...';
-    document.getElementById('barcode-result').style.display = 'none';
+    const statusEl = document.getElementById('barcode-status');
+    const resultEl = document.getElementById('barcode-result');
+    if (resultEl) resultEl.style.display = 'none';
 
-    barcodeScanner = new Html5Qrcode('barcode-reader');
-    barcodeScanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 280, height: 120 }, formatsToSupport: [
+    // Defensive: the scanner library is loaded from a CDN. If it failed to load
+    // (offline, blocked, slow network), don't crash — show a friendly fallback.
+    if (typeof Html5Qrcode === 'undefined') {
+        if (statusEl) statusEl.innerHTML = 'Scanner unavailable offline.<br><small>Connect to the internet and reopen, or enter the food manually.</small>';
+        return;
+    }
+
+    if (statusEl) statusEl.textContent = 'Starting camera...';
+
+    try {
+        barcodeScanner = new Html5Qrcode('barcode-reader');
+    } catch (e) {
+        console.error('Html5Qrcode init failed:', e);
+        if (statusEl) statusEl.textContent = 'Could not start scanner. Try entering the food manually.';
+        return;
+    }
+
+    // Build format list defensively — Html5QrcodeSupportedFormats may be undefined
+    // in some bundles. If so, omit formatsToSupport (lib will accept all).
+    const config = { fps: 10, qrbox: { width: 280, height: 120 } };
+    if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+        config.formatsToSupport = [
             Html5QrcodeSupportedFormats.EAN_13,
             Html5QrcodeSupportedFormats.EAN_8,
             Html5QrcodeSupportedFormats.UPC_A,
             Html5QrcodeSupportedFormats.UPC_E,
             Html5QrcodeSupportedFormats.CODE_128,
             Html5QrcodeSupportedFormats.CODE_39,
-        ]},
+        ];
+    }
+
+    barcodeScanner.start(
+        { facingMode: 'environment' },
+        config,
         (decodedText) => { onBarcodeScanned(decodedText); },
         () => {}
     ).then(() => {
-        document.getElementById('barcode-status').textContent = 'Point your camera at a barcode';
+        if (statusEl) statusEl.textContent = 'Point your camera at a barcode';
     }).catch(err => {
-        document.getElementById('barcode-status').textContent = 'Camera access denied. Please allow camera permissions.';
+        console.error('Barcode start failed:', err);
+        const msg = (err && err.message ? err.message : String(err || '')).toLowerCase();
+        if (statusEl) {
+            if (msg.includes('permission') || msg.includes('denied') || msg.includes('notallowed')) {
+                statusEl.textContent = 'Camera access denied. Allow camera in your browser/device settings and try again.';
+            } else if (msg.includes('notfound') || msg.includes('no camera')) {
+                statusEl.textContent = 'No camera found on this device.';
+            } else {
+                statusEl.textContent = 'Could not start camera. Try closing and reopening the scanner.';
+            }
+        }
     });
 }
 

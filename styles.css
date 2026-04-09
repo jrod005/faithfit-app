@@ -198,6 +198,21 @@ button:disabled {
     flex-shrink: 0;
 }
 
+/* Username inline edit */
+.username-edit-btn {
+    background: rgba(220,38,38,0.12);
+    border: 1px solid rgba(220,38,38,0.35);
+    color: #f87171;
+    border-radius: 6px;
+    padding: 4px 6px;
+    cursor: pointer;
+    line-height: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.username-edit-btn:hover { background: rgba(220,38,38,0.2); }
+
 /* Share app card */
 .share-app-card { text-align: left; }
 .share-app-btn {

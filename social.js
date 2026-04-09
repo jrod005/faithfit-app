@@ -1955,7 +1955,7 @@ function renderProfileView() {
                     <input type="file" id="avatar-upload" accept="image/*" onchange="uploadProfilePic(event)" style="display:none">
                 </div>
                 <div>
-                    <h2 style="margin:0">@${escapeHtml(userProfile.username)}</h2>
+                    <h2 style="margin:0;display:flex;align-items:center;gap:6px">@${escapeHtml(userProfile.username)}<button class="username-edit-btn" aria-label="Change username" onclick="changeUsernamePrompt()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button></h2>
                     <p style="color:var(--text-muted);font-size:13px;margin-top:2px">${escapeHtml(userProfile.display_name)}</p>
                 </div>
             </div>
