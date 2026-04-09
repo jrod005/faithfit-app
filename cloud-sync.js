@@ -156,31 +156,75 @@ async function pullFromCloud(silent) {
     }
 }
 
-// On login, decide whether to push or pull based on timestamps
+// Estimate the "size" of a snapshot so we can avoid silently replacing a
+// rich local dataset with a smaller cloud one. Counts the things that would
+// hurt to lose: workouts, weights, meals, prayers, and whether profile exists.
+function snapshotSize(snap) {
+    if (!snap || typeof snap !== 'object') return 0;
+    const len = (k) => (Array.isArray(snap[k]) ? snap[k].length : 0);
+    let s = 0;
+    s += len('workouts') * 4;     // workouts are most precious
+    s += len('weights') * 2;
+    s += len('meals');
+    s += len('prayerEntries') * 2;
+    s += len('progressPhotos') * 3;
+    s += len('myRoutines') * 2;
+    s += (snap.profile && snap.profile.name ? 5 : 0);
+    return s;
+}
+
+function getLocalSnapshotSize() {
+    return snapshotSize(getLocalSnapshot());
+}
+
+// On login, decide whether to push or pull based on timestamps AND content size
 async function reconcileOnLogin() {
     if (typeof currentUser === 'undefined' || !currentUser) return;
     if (!isCloudSyncEnabled()) return;
     try {
+        // Pull the FULL row so we can compare snapshot sizes, not just timestamps
         const rows = await directSelect(
             'user_data?user_id=eq.' + encodeURIComponent(currentUser.id) +
-            '&select=local_modified,updated_at'
+            '&select=data,local_modified,updated_at'
         );
         const data = (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
         const localMod = getLocalModified();
         const remoteMod = data?.local_modified || 0;
-        const hasLocal = localStorage.getItem('faithfit_workouts') || localStorage.getItem('faithfit_profile');
+        const localSize = getLocalSnapshotSize();
+        const remoteSize = snapshotSize(data?.data);
+        const hasLocal = localSize > 0;
 
+        // No cloud backup yet — push whatever we have
         if (!data) {
-            // No cloud backup yet — push current state
             if (hasLocal) await pushToCloud(true);
             return;
         }
+
+        // Cloud is empty (no real data in snapshot) — never let it overwrite local
+        if (remoteSize === 0) {
+            if (hasLocal) await pushToCloud(true);
+            return;
+        }
+
+        // SAFETY: if local has more data than cloud, push local instead of pulling.
+        // This prevents the classic 'I logged in and lost my workouts' bug where
+        // the cloud has a stale/smaller snapshot from another device or earlier session.
+        if (hasLocal && localSize > remoteSize) {
+            console.log('Cloud sync: local data is richer than cloud, pushing instead of pulling',
+                { localSize, remoteSize });
+            await pushToCloud(true);
+            return;
+        }
+
+        // Cloud is meaningfully newer AND not smaller
         if (remoteMod > localMod) {
-            // Cloud is newer — confirm before overwriting if local also has data
-            if (hasLocal && localMod > 0) {
+            // ALWAYS ask if local has anything — never silently overwrite
+            if (hasLocal) {
+                const localTime = localMod ? new Date(localMod).toLocaleString() : 'unknown';
+                const remoteTime = remoteMod ? new Date(remoteMod).toLocaleString() : 'unknown';
                 const ok = await confirmDialog(
-                    'Cloud backup is newer than your local data. Restore from cloud? Your local changes will be replaced.',
-                    { okText: 'Restore', danger: false }
+                    `Your cloud backup looks newer than this device.\n\nCloud: ${remoteTime}\nThis device: ${localTime}\n\nRestore from cloud? Your local changes will be replaced.`,
+                    { okText: 'Restore from cloud', danger: false }
                 );
                 if (!ok) { await pushToCloud(true); return; }
             }
@@ -188,6 +232,7 @@ async function reconcileOnLogin() {
         } else if (localMod > remoteMod) {
             await pushToCloud(true);
         }
+        // else: equal — do nothing
     } catch (e) {
         console.error('Reconcile failed', e);
     }
@@ -407,6 +452,22 @@ async function checkPendingRestore() {
         const data = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
 
         if (data && data.data && Object.keys(data.data).length > 0) {
+            // SAFETY: never let an explicit "restore" wipe out richer local data
+            // without a confirmation. This is the only time we ever take cloud
+            // and overwrite local on purpose, so we still need to be careful.
+            const localSize = getLocalSnapshotSize();
+            const remoteSize = snapshotSize(data.data);
+            if (localSize > remoteSize && localSize > 0) {
+                const ok = await confirmDialog(
+                    `Your cloud backup looks smaller than your local data.\n\nLocal: ${localSize} pts of activity\nCloud: ${remoteSize} pts\n\nRestore anyway? Your local data will be replaced.`,
+                    { okText: 'Restore anyway', danger: true }
+                );
+                if (!ok) {
+                    DB.set('pendingCloudRestore', false);
+                    if (typeof showToast === 'function') showToast('Restore cancelled — local data kept');
+                    return;
+                }
+            }
             applySnapshot(data.data);
             setLastSync(Date.now());
             setCloudSyncEnabled(true);
