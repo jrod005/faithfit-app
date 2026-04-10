@@ -1767,7 +1767,7 @@ async function loadFeed() {
 
         return `<div class="feed-post">
             <div class="post-header">
-                <div class="post-user">
+                <div class="post-user" onclick="viewUserProfile('${p.uid}')" style="cursor:pointer">
                     ${avatarHtml}
                     <div>
                         <strong>@${escapeHtml(p.username)}</strong>
@@ -2043,7 +2043,7 @@ async function renderFriendsView() {
                     ? `<img class="post-avatar" src="${f.profile_pic}" alt="">`
                     : `<div class="post-avatar-letter">${(f.display_name || '?')[0].toUpperCase()}</div>`;
                 html += `<div class="friend-item">
-                    <div class="friend-info" style="flex-direction:row;align-items:center;gap:10px">
+                    <div class="friend-info" style="flex-direction:row;align-items:center;gap:10px;cursor:pointer" onclick="viewUserProfile('${f.id}')">
                         ${fAvatar}
                         <div>
                             <strong>@${escapeHtml(f.username)}</strong>
@@ -2145,6 +2145,128 @@ function renderProfileView() {
             </button>
         </div>
     `;
+}
+
+// ========== VIEW USER PROFILE ==========
+async function viewUserProfile(uid) {
+    if (!uid || !currentUser) return;
+    // If it's the current user, just switch to their profile tab
+    if (uid === currentUser.id) { showSocialView('profile'); return; }
+
+    // Remove existing modal if open
+    const old = document.getElementById('user-profile-modal');
+    if (old) old.remove();
+
+    // Show loading modal immediately
+    const modal = document.createElement('div');
+    modal.id = 'user-profile-modal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `<div class="modal-card modal-card-wide"><p class="muted" style="text-align:center;padding:24px">Loading profile...</p></div>`;
+    document.body.appendChild(modal);
+
+    try {
+        // Fetch profile + recent posts in parallel
+        const [profiles, posts] = await Promise.all([
+            directSelect('profiles?id=eq.' + encodeURIComponent(uid) + '&select=id,username,display_name,bio,stats,profile_pic'),
+            directSelect('posts?uid=eq.' + encodeURIComponent(uid) + '&order=created_at.desc&limit=10&select=*')
+        ]);
+
+        const prof = profiles && profiles[0];
+        if (!prof) {
+            modal.innerHTML = `<div class="modal-card"><p>Could not load this profile.</p><div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('user-profile-modal').remove()">Close</button></div></div>`;
+            return;
+        }
+
+        const s = prof.stats || {};
+        const avatarHtml = prof.profile_pic
+            ? `<img class="profile-avatar-img" src="${prof.profile_pic}" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover">`
+            : `<div class="profile-avatar" style="width:64px;height:64px;font-size:28px">${(prof.display_name || '?')[0].toUpperCase()}</div>`;
+
+        const isFriend = userProfile && (userProfile.friends || []).includes(uid);
+
+        let html = `<div class="modal-card modal-card-wide" style="max-height:85vh;overflow-y:auto">`;
+        html += `<button class="share-modal-close" onclick="document.getElementById('user-profile-modal').remove()">&times;</button>`;
+
+        // Header
+        html += `<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">`;
+        html += avatarHtml;
+        html += `<div>
+            <h2 style="margin:0">@${escapeHtml(prof.username)}</h2>
+            <p style="color:var(--text-muted);font-size:13px;margin:2px 0 0">${escapeHtml(prof.display_name || '')}</p>
+        </div></div>`;
+
+        if (prof.bio) {
+            html += `<p class="profile-bio">${escapeHtml(prof.bio)}</p>`;
+        }
+
+        // Stats grid
+        html += `<div class="profile-stats-grid" style="margin:14px 0">`;
+        html += `<div class="profile-stat"><span class="profile-stat-val">${s.totalWorkouts || 0}</span><span class="profile-stat-label">Workouts</span></div>`;
+        html += `<div class="profile-stat"><span class="profile-stat-val">${s.streak || 0}</span><span class="profile-stat-label">Day Streak</span></div>`;
+        html += `<div class="profile-stat"><span class="profile-stat-val">${s.prsHit || 0}</span><span class="profile-stat-label">PRs Hit</span></div>`;
+        html += `<div class="profile-stat"><span class="profile-stat-val">${s.uniqueExercises || 0}</span><span class="profile-stat-label">Exercises</span></div>`;
+        if (s.totalVolume) {
+            html += `<div class="profile-stat" style="grid-column:1/-1"><span class="profile-stat-val">${parseFloat(lbsToDisplay(s.totalVolume)).toLocaleString()} ${wu()}</span><span class="profile-stat-label">Total Volume</span></div>`;
+        }
+        if (s.favoriteExercise) {
+            html += `<div class="profile-stat" style="grid-column:1/-1"><span class="profile-stat-val">${escapeHtml(s.favoriteExercise)}</span><span class="profile-stat-label">Favorite Exercise</span></div>`;
+        }
+        html += `</div>`;
+
+        // Friend action
+        if (isFriend) {
+            html += `<p style="color:var(--accent);font-size:13px;margin:8px 0">You're friends</p>`;
+        } else {
+            html += `<button class="btn btn-primary btn-full" id="profile-add-friend-btn" onclick="sendFriendRequestFromProfile('${uid}')">Send Friend Request</button>`;
+        }
+
+        // Recent posts
+        if (posts && posts.length > 0) {
+            html += `<h3 style="margin-top:18px">Recent Posts</h3>`;
+            posts.forEach(p => {
+                const time = timeAgo(new Date(p.created_at).getTime());
+                let postHtml = `<div class="user-profile-post">`;
+                postHtml += `<span class="post-time">${time}</span>`;
+                if (p.photo_url) {
+                    postHtml += `<img src="${p.photo_url}" style="width:100%;border-radius:var(--radius-sm);margin:8px 0" loading="lazy">`;
+                }
+                if (p.workout) {
+                    const w = p.workout;
+                    const exCount = w.breakdown ? w.breakdown.length : (w.exercises ? w.exercises.length : 0);
+                    postHtml += `<p class="muted" style="font-size:12px">${exCount} exercise${exCount !== 1 ? 's' : ''} · ${w.setCount || 0} sets</p>`;
+                }
+                if (p.caption) postHtml += `<p style="font-size:13px;margin:4px 0">${escapeHtml(p.caption)}</p>`;
+                postHtml += `</div>`;
+                html += postHtml;
+            });
+        }
+
+        html += `<div class="modal-actions" style="margin-top:16px"><button class="btn btn-secondary" onclick="document.getElementById('user-profile-modal').remove()">Close</button></div>`;
+        html += `</div>`;
+        modal.innerHTML = html;
+    } catch (e) {
+        console.error('viewUserProfile error:', e);
+        modal.innerHTML = `<div class="modal-card"><p>Error loading profile.</p><div class="modal-actions"><button class="btn btn-secondary" onclick="document.getElementById('user-profile-modal').remove()">Close</button></div></div>`;
+    }
+}
+
+async function sendFriendRequestFromProfile(uid) {
+    const btn = document.getElementById('profile-add-friend-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+    try {
+        await directInsert('friend_requests', {
+            from_uid: currentUser.id,
+            from_username: userProfile.username,
+            from_display_name: userProfile.display_name,
+            to_uid: uid,
+            status: 'pending'
+        });
+        if (btn) { btn.textContent = 'Request Sent'; btn.classList.remove('btn-primary'); btn.classList.add('btn-secondary'); }
+        showToast('Friend request sent!');
+    } catch (e) {
+        showToast('Could not send request');
+        if (btn) { btn.disabled = false; btn.textContent = 'Send Friend Request'; }
+    }
 }
 
 // ========== CHANGE USERNAME ==========

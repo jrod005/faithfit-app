@@ -3596,6 +3596,13 @@ canvas {
     white-space: nowrap;
 }
 
+/* User profile modal — recent posts */
+.user-profile-post {
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+}
+.user-profile-post:first-of-type { border-top: none; }
+
 /* Post photo preview with remove */
 .post-photo-preview-wrap {
     position: relative;
