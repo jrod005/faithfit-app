@@ -1778,7 +1778,7 @@ async function loadFeed() {
             </div>
             ${p.photo_url ? `<img class="post-photo" src="${p.photo_url}" loading="lazy" decoding="async" onload="this.classList.add('loaded')">` : ''}
             ${statsHtml}
-            ${p.caption ? `<p class="post-caption">${escapeHtml(p.caption)}</p>` : ''}
+            ${p.caption ? `<p class="post-caption">${linkifyMentions(escapeHtml(p.caption))}</p>` : ''}
             ${verseHtml}
             <div class="post-actions">
                 <button class="post-like-btn ${liked ? 'liked' : ''}" id="like-btn-${p.id}" data-liked="${liked ? '1' : '0'}" data-count="${likeCount}" onclick="sbToggleLike('${p.id}')">
@@ -1863,8 +1863,8 @@ async function loadComments(postId) {
         const isOwn = c.uid === currentUser.id;
         return `<div class="comment-item">
             <div class="comment-body">
-                <strong>@${escapeHtml(c.username)}</strong>
-                <span>${escapeHtml(c.text)}</span>
+                <strong class="mention-link" onclick="viewUserProfileByUsername('${escapeHtml(c.username)}')">@${escapeHtml(c.username)}</strong>
+                <span>${linkifyMentions(escapeHtml(c.text))}</span>
             </div>
             ${isOwn ? `<button class="comment-delete" onclick="deleteComment('${c.id}','${postId}')">&times;</button>` : ''}
         </div>`;
@@ -2147,6 +2147,29 @@ function renderProfileView() {
     `;
 }
 
+// ========== @MENTION LINKING ==========
+// Takes already-escaped text, returns HTML with clickable @mentions.
+function linkifyMentions(text) {
+    return text.replace(/@([A-Za-z0-9_]{3,20})/g, '<span class="mention-link" onclick="viewUserProfileByUsername(\'$1\')">@$1</span>');
+}
+
+async function viewUserProfileByUsername(username) {
+    if (!username || !currentUser) return;
+    // Check if it's the current user
+    if (userProfile && userProfile.username === username) {
+        showSocialView('profile');
+        return;
+    }
+    const rows = await directSelect(
+        'profiles?username=eq.' + encodeURIComponent(username) + '&select=id'
+    );
+    if (rows && rows.length > 0) {
+        viewUserProfile(rows[0].id);
+    } else {
+        showToast('User @' + username + ' not found');
+    }
+}
+
 // ========== VIEW USER PROFILE ==========
 async function viewUserProfile(uid) {
     if (!uid || !currentUser) return;
@@ -2235,7 +2258,7 @@ async function viewUserProfile(uid) {
                     const exCount = w.breakdown ? w.breakdown.length : (w.exercises ? w.exercises.length : 0);
                     postHtml += `<p class="muted" style="font-size:12px">${exCount} exercise${exCount !== 1 ? 's' : ''} · ${w.setCount || 0} sets</p>`;
                 }
-                if (p.caption) postHtml += `<p style="font-size:13px;margin:4px 0">${escapeHtml(p.caption)}</p>`;
+                if (p.caption) postHtml += `<p style="font-size:13px;margin:4px 0">${linkifyMentions(escapeHtml(p.caption))}</p>`;
                 postHtml += `</div>`;
                 html += postHtml;
             });

@@ -3596,6 +3596,16 @@ canvas {
     white-space: nowrap;
 }
 
+/* @mention links */
+.mention-link {
+    color: var(--accent);
+    cursor: pointer;
+    font-weight: 600;
+}
+.mention-link:active {
+    opacity: 0.7;
+}
+
 /* User profile modal — recent posts */
 .user-profile-post {
     padding: 10px 0;
