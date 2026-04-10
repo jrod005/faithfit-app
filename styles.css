@@ -3547,6 +3547,69 @@ canvas {
 }
 .post-auto-stats p { margin: 2px 0; }
 
+/* Post lift picker */
+.post-lift-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.post-lift-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    cursor: pointer;
+}
+.post-lift-option input[type="checkbox"] {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+}
+.post-lift-name {
+    flex: 1;
+    font-weight: 600;
+    color: var(--text);
+}
+.post-lift-meta {
+    color: var(--text-secondary);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* Post photo preview with remove */
+.post-photo-preview-wrap {
+    position: relative;
+    margin-top: 10px;
+}
+.post-photo-preview-wrap img {
+    width: 100%;
+    border-radius: var(--radius-sm);
+    display: block;
+}
+.post-photo-remove {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .friend-item {
     display: flex;
     justify-content: space-between;

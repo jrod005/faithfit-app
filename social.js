@@ -1383,18 +1383,30 @@ async function sbRemoveFriend(friendUid) {
 
 // ========== POSTS / FEED ==========
 
-function getTodayWorkoutStats() {
+// A "real" set has at least one of weight/reps actually entered.
+function _setIsReal(s) {
+    return (s && ((s.weight || 0) > 0 || (s.reps || 0) > 0));
+}
+
+// Get today's logged exercises that actually have non-empty sets.
+function getTodayLoggedExercises() {
     const workouts = DB.get('workouts', []).filter(w => w.date === today());
-    if (workouts.length === 0) return null;
+    return workouts
+        .map(w => ({ ...w, sets: (w.sets || []).filter(_setIsReal) }))
+        .filter(w => w.sets.length > 0);
+}
+
+// Build stats from a specific list of workout entries (used by the post composer).
+function buildStatsFromWorkouts(workouts) {
+    if (!workouts || workouts.length === 0) return null;
     const totalVol = workouts.reduce((sum, w) =>
-        sum + w.sets.reduce((s, set) => s + set.weight * set.reps, 0), 0);
+        sum + w.sets.reduce((s, set) => s + (set.weight || 0) * (set.reps || 0), 0), 0);
     let topLift = { name: '', weight: 0, reps: 0 };
     workouts.forEach(w => {
         w.sets.forEach(s => {
-            if (s.weight > topLift.weight) topLift = { name: w.name, weight: s.weight, reps: s.reps };
+            if ((s.weight || 0) > topLift.weight) topLift = { name: w.name, weight: s.weight, reps: s.reps };
         });
     });
-    // Per-exercise breakdown so feed can show real insight
     const byName = {};
     workouts.forEach(w => {
         if (!byName[w.name]) byName[w.name] = { name: w.name, sets: 0, reps: 0, volume: 0, best: { weight: 0, reps: 0 } };
@@ -1406,14 +1418,27 @@ function getTodayWorkoutStats() {
             if ((s.weight || 0) > ex.best.weight) ex.best = { weight: s.weight, reps: s.reps };
         });
     });
-    const breakdown = Object.values(byName);
     return {
         exercises: workouts.map(w => w.name),
         totalVolume: totalVol,
         topLift,
         setCount: workouts.reduce((s, w) => s + w.sets.length, 0),
-        breakdown,
+        breakdown: Object.values(byName),
     };
+}
+
+// Backwards-compatible: returns stats for today's *non-empty* workouts only.
+function getTodayWorkoutStats() {
+    return buildStatsFromWorkouts(getTodayLoggedExercises());
+}
+
+// Read which workouts the user checked in the post composer.
+function getSelectedPostWorkouts() {
+    const boxes = document.querySelectorAll('#post-lift-picker input[type="checkbox"]:checked');
+    if (boxes.length === 0) return [];
+    const tsSet = new Set();
+    boxes.forEach(b => tsSet.add(Number(b.value)));
+    return getTodayLoggedExercises().filter(w => tsSet.has(w.timestamp));
 }
 
 function compressImage(file) {
@@ -1435,17 +1460,46 @@ function compressImage(file) {
     });
 }
 
-function openPostModal() {
-    const modal = document.getElementById('post-modal');
-    const stats = getTodayWorkoutStats();
-    const statsHtml = stats
-        ? `<div class="post-auto-stats">
+function _renderPostStatsPreview() {
+    const selected = getSelectedPostWorkouts();
+    const stats = buildStatsFromWorkouts(selected);
+    const el = document.getElementById('post-stats-summary');
+    if (!el) return;
+    if (stats) {
+        el.innerHTML = `<div class="post-auto-stats">
             <p><strong>${stats.exercises.length} exercise${stats.exercises.length > 1 ? 's' : ''}</strong> &middot; ${stats.setCount} sets &middot; ${parseFloat(lbsToDisplay(stats.totalVolume)).toLocaleString()} ${wu()}</p>
             ${stats.topLift.name ? `<p>Top lift: ${stats.topLift.name} ${lbsToDisplay(stats.topLift.weight)}${wu()} x ${stats.topLift.reps}</p>` : ''}
-           </div>`
-        : '<p class="empty-state" style="padding:10px 0">No workout logged today — stats attach when you train</p>';
+           </div>`;
+    } else {
+        el.innerHTML = '<p class="muted" style="padding:4px 0;font-size:13px">No exercises selected</p>';
+    }
+}
 
-    document.getElementById('post-stats-preview').innerHTML = statsHtml;
+function openPostModal() {
+    const modal = document.getElementById('post-modal');
+    const exercises = getTodayLoggedExercises();
+
+    let pickerHtml = '';
+    if (exercises.length > 0) {
+        pickerHtml = '<div id="post-lift-picker" class="post-lift-picker">';
+        exercises.forEach(w => {
+            const best = w.sets.reduce((b, s) => (s.weight || 0) > (b.weight || 0) ? s : b, w.sets[0]);
+            const meta = `${w.sets.length} set${w.sets.length !== 1 ? 's' : ''} · best ${lbsToDisplay(best.weight)}${wu()} × ${best.reps}`;
+            pickerHtml += `
+                <label class="post-lift-option">
+                    <input type="checkbox" value="${w.timestamp}" checked onchange="_renderPostStatsPreview()">
+                    <span class="post-lift-name">${escapeHtml(w.name)}</span>
+                    <span class="post-lift-meta">${meta}</span>
+                </label>`;
+        });
+        pickerHtml += '</div><div id="post-stats-summary"></div>';
+    } else {
+        pickerHtml = '<p class="empty-state" style="padding:10px 0">No workout logged today — stats attach when you train</p><div id="post-stats-summary"></div>';
+    }
+
+    document.getElementById('post-stats-preview').innerHTML = pickerHtml;
+    // Render initial summary from all checked
+    _renderPostStatsPreview();
     document.getElementById('post-caption').value = '';
     document.getElementById('post-photo-preview').innerHTML = '';
     document.getElementById('post-photo-input').value = '';
@@ -1470,9 +1524,18 @@ function previewPostPhoto(event) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = e => {
-        document.getElementById('post-photo-preview').innerHTML = `<img src="${e.target.result}" style="width:100%;border-radius:var(--radius-sm);margin-top:10px;">`;
+        document.getElementById('post-photo-preview').innerHTML = `
+            <div class="post-photo-preview-wrap">
+                <img src="${e.target.result}">
+                <button type="button" class="post-photo-remove" onclick="removePostPhoto()" title="Remove photo">&times;</button>
+            </div>`;
     };
     reader.readAsDataURL(file);
+}
+
+function removePostPhoto() {
+    document.getElementById('post-photo-preview').innerHTML = '';
+    document.getElementById('post-photo-input').value = '';
 }
 
 async function submitPost() {
@@ -1496,7 +1559,7 @@ async function submitPost() {
             photo_url = url;
         }
 
-        const stats = getTodayWorkoutStats();
+        const stats = buildStatsFromWorkouts(getSelectedPostWorkouts());
         const verseOrMessage = getVerseOrMessage();
         const result = await directInsert('posts', {
             uid: currentUser.id,
