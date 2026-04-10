@@ -3547,6 +3547,20 @@ canvas {
 }
 .post-auto-stats p { margin: 2px 0; }
 
+/* Post session selector */
+.post-session-select {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
 /* Post lift picker */
 .post-lift-picker {
     display: flex;

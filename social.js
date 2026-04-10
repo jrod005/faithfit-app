@@ -1396,6 +1396,36 @@ function getTodayLoggedExercises() {
         .filter(w => w.sets.length > 0);
 }
 
+// Group exercises into sessions. Exercises within 3 hours of each other
+// are treated as one session — same logic the history share card uses.
+function groupIntoSessions(exercises) {
+    if (exercises.length === 0) return [];
+    const sorted = exercises.slice().sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    const windowMs = 3 * 60 * 60 * 1000;
+    const sessions = [];
+    let current = { exercises: [sorted[0]], anchor: sorted[0].timestamp || 0 };
+    for (let i = 1; i < sorted.length; i++) {
+        const ts = sorted[i].timestamp || 0;
+        if (ts - current.anchor <= windowMs) {
+            current.exercises.push(sorted[i]);
+        } else {
+            sessions.push(current);
+            current = { exercises: [sorted[i]], anchor: ts };
+        }
+    }
+    sessions.push(current);
+    // Label each session
+    return sessions.map((s, i) => {
+        const names = s.exercises.map(e => e.name);
+        const label = s.exercises.length === 1
+            ? names[0]
+            : `${s.exercises.length} exercises`;
+        const startTime = new Date(s.anchor);
+        const timeStr = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        return { ...s, label, timeStr, index: i };
+    });
+}
+
 // Build stats from a specific list of workout entries (used by the post composer).
 function buildStatsFromWorkouts(workouts) {
     if (!workouts || workouts.length === 0) return null;
@@ -1432,7 +1462,10 @@ function getTodayWorkoutStats() {
     return buildStatsFromWorkouts(getTodayLoggedExercises());
 }
 
-// Read which workouts the user checked in the post composer.
+// Stashed sessions list for the currently-open post modal
+let _postSessions = [];
+
+// Read which exercises the user selected in the post composer.
 function getSelectedPostWorkouts() {
     const boxes = document.querySelectorAll('#post-lift-picker input[type="checkbox"]:checked');
     if (boxes.length === 0) return [];
@@ -1475,31 +1508,58 @@ function _renderPostStatsPreview() {
     }
 }
 
+// Render the exercise checkboxes for a given session index
+function _renderSessionExercises(sessionIdx) {
+    const session = _postSessions[sessionIdx];
+    if (!session) return;
+    const container = document.getElementById('post-lift-picker');
+    if (!container) return;
+    let html = '';
+    session.exercises.forEach(w => {
+        const best = w.sets.reduce((b, s) => (s.weight || 0) > (b.weight || 0) ? s : b, w.sets[0]);
+        const meta = `${w.sets.length} set${w.sets.length !== 1 ? 's' : ''} · best ${lbsToDisplay(best.weight)}${wu()} × ${best.reps}`;
+        html += `
+            <label class="post-lift-option">
+                <input type="checkbox" value="${w.timestamp}" checked onchange="_renderPostStatsPreview()">
+                <span class="post-lift-name">${escapeHtml(w.name)}</span>
+                <span class="post-lift-meta">${meta}</span>
+            </label>`;
+    });
+    container.innerHTML = html;
+    _renderPostStatsPreview();
+}
+
 function openPostModal() {
     const modal = document.getElementById('post-modal');
     const exercises = getTodayLoggedExercises();
+    _postSessions = groupIntoSessions(exercises);
 
     let pickerHtml = '';
-    if (exercises.length > 0) {
-        pickerHtml = '<div id="post-lift-picker" class="post-lift-picker">';
-        exercises.forEach(w => {
-            const best = w.sets.reduce((b, s) => (s.weight || 0) > (b.weight || 0) ? s : b, w.sets[0]);
-            const meta = `${w.sets.length} set${w.sets.length !== 1 ? 's' : ''} · best ${lbsToDisplay(best.weight)}${wu()} × ${best.reps}`;
-            pickerHtml += `
-                <label class="post-lift-option">
-                    <input type="checkbox" value="${w.timestamp}" checked onchange="_renderPostStatsPreview()">
-                    <span class="post-lift-name">${escapeHtml(w.name)}</span>
-                    <span class="post-lift-meta">${meta}</span>
-                </label>`;
-        });
-        pickerHtml += '</div><div id="post-stats-summary"></div>';
+    if (_postSessions.length === 0) {
+        pickerHtml = '<p class="empty-state" style="padding:10px 0">No workout logged today — stats attach when you train</p>';
+        pickerHtml += '<div id="post-lift-picker"></div><div id="post-stats-summary"></div>';
     } else {
-        pickerHtml = '<p class="empty-state" style="padding:10px 0">No workout logged today — stats attach when you train</p><div id="post-stats-summary"></div>';
+        // Session selector (only shown when > 1 session)
+        if (_postSessions.length > 1) {
+            pickerHtml += '<label class="form-label">Which workout?</label>';
+            pickerHtml += '<select id="post-session-select" class="post-session-select" onchange="_renderSessionExercises(Number(this.value))">';
+            _postSessions.forEach((s, i) => {
+                const names = s.exercises.map(e => e.name).join(', ');
+                const truncated = names.length > 50 ? names.slice(0, 47) + '...' : names;
+                pickerHtml += `<option value="${i}"${i === _postSessions.length - 1 ? ' selected' : ''}>${s.timeStr} — ${truncated}</option>`;
+            });
+            pickerHtml += '</select>';
+        }
+        pickerHtml += '<div id="post-lift-picker" class="post-lift-picker"></div>';
+        pickerHtml += '<div id="post-stats-summary"></div>';
     }
 
     document.getElementById('post-stats-preview').innerHTML = pickerHtml;
-    // Render initial summary from all checked
-    _renderPostStatsPreview();
+
+    // Populate exercises for the default session (latest)
+    if (_postSessions.length > 0) {
+        _renderSessionExercises(_postSessions.length - 1);
+    }
     document.getElementById('post-caption').value = '';
     document.getElementById('post-photo-preview').innerHTML = '';
     document.getElementById('post-photo-input').value = '';
