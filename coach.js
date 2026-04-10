@@ -2430,34 +2430,311 @@ const TOPIC_RESPONSES = {
         },
     ],
 
-    // Fallback for unrecognized input
+    // General fitness knowledge base — catches freeform questions that don't match a specific topic.
+    // Keyword→answer pairs grounded in real exercise science so the coach can answer
+    // open-ended questions like "will 30 mins on the stairmaster help me lose weight?"
+    generalKnowledge: [
+        {
+            triggers: ['stairmaster', 'stair.?master', 'stair.?stepper', 'stair.?climb', 'step.?mill'],
+            answer: (ctx) => {
+                let html = `<h3>Stairmaster &amp; Stair Climbing</h3>`;
+                html += `<p>30 minutes on a stairmaster at moderate intensity burns roughly <strong>250–400 calories</strong> depending on your weight and pace (Ainsworth et al. 2011 Compendium of Physical Activities: ~9 METs for stair-climbing machine).</p>`;
+                html += insightHtml(`For a ${ctx.currentWeight || 180} lb person, 30 min ≈ <strong>${Math.round((ctx.currentWeight || 180) * 0.453592 * 9 * 0.5 * 1.05)}</strong> calories.`);
+                html += `<p><strong>Will it help you lose weight?</strong> Only if your total daily calories stay below your TDEE. Cardio creates a larger deficit — but you can't outrun a bad diet. A 300-calorie stairmaster session is erased by one large bagel with cream cheese.</p>`;
+                html += `<p><strong>Best use:</strong> 2–3 sessions per week as a Zone 2 cardio tool (you can hold a conversation). Great for glute and quad endurance, low joint impact vs running. Pair with resistance training and a calorie deficit for real fat loss.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['treadmill', 'running', 'jogging', 'run for', 'jog for'],
+            answer: (ctx) => {
+                let html = `<h3>Running &amp; Treadmill for Fat Loss</h3>`;
+                html += `<p>Running at 6 mph (10 min/mile) burns roughly <strong>~10 calories per minute</strong> for a 180 lb person (Ainsworth Compendium: ~9.8 METs). A 30-minute run ≈ 300–400 cal.</p>`;
+                html += `<p><strong>The catch:</strong> Running without resistance training in a calorie deficit burns muscle alongside fat. Longland et al. 2016 showed that combining lifting + deficit preserved lean mass far better than cardio alone.</p>`;
+                html += `<p><strong>Recommendation:</strong> Use running as a conditioning tool (2–3×/week), keep your lifting program primary, and manage your deficit through food. If your knees hurt, the stairmaster or bike gives similar calorie burn with less impact.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['elliptical', 'elliptic'],
+            answer: (ctx) => {
+                let html = `<h3>Elliptical Training</h3>`;
+                html += `<p>The elliptical burns roughly <strong>270–400 calories in 30 min</strong> depending on resistance and pace (~7–8 METs). It's lower impact than running — good for joint-friendly cardio.</p>`;
+                html += `<p>The calorie displays on machines overestimate by 15–30% on average (Stanford study). Don't eat back those numbers.</p>`;
+                html += `<p><strong>Best use:</strong> Zone 2 steady state 20–40 min, 2–3x/week alongside your lifting. Useful for active recovery days at low resistance.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['bike', 'cycling', 'spin', 'stationary bike', 'peloton', 'recumbent'],
+            answer: (ctx) => {
+                let html = `<h3>Cycling &amp; Stationary Bike</h3>`;
+                html += `<p>Moderate cycling (~12–14 mph or ~7 METs) burns <strong>250–350 cal in 30 min</strong>. Vigorous cycling or spin classes push to 400–600 cal/hr.</p>`;
+                html += `<p>Great choice for people who want low-impact cardio that doesn't hammer recovery for leg day. Cycling has minimal eccentric stress, so it won't make your quads as sore as running will.</p>`;
+                html += `<p><strong>For fat loss:</strong> Same rule — it's a tool to increase your deficit, not a replacement for nutrition control. 3× per week of 20–30 min Zone 2 is a sustainable starting point.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['rowing', 'row machine', 'concept2', 'erg ', 'ergo'],
+            answer: (ctx) => {
+                let html = `<h3>Rowing Machine</h3>`;
+                html += `<p>Rowing at moderate effort burns <strong>300–400 cal in 30 min</strong> (~8.5 METs). It's one of the few cardio machines that trains upper and lower body simultaneously — 86% of muscles used per stroke.</p>`;
+                html += `<p><strong>Form matters:</strong> Legs drive first (60% of power), then lean back, then arms pull. Common mistake: yanking with your arms first.</p>`;
+                html += `<p>Great for conditioning without beating up your joints. 2–3 sessions of 15–25 min at a conversational pace is a solid addition to any program.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['jump rope', 'jump.?rope', 'skipping rope'],
+            answer: (ctx) => {
+                let html = `<h3>Jump Rope</h3>`;
+                html += `<p>Jump rope at moderate pace burns <strong>300–450 cal in 30 min</strong> (~11 METs — one of the highest calorie burns per minute of any exercise). It also builds calf endurance, coordination, and cardiovascular fitness.</p>`;
+                html += `<p><strong>Start small:</strong> 30-second rounds with 30-second rest. Work up to 3-minute rounds. If you're new, expect it to gas you in under 2 minutes.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['walk', 'walking', 'steps', '10.?000 steps', 'step count'],
+            answer: (ctx) => {
+                let html = `<h3>Walking for Fat Loss</h3>`;
+                html += `<p>Walking at 3–3.5 mph burns roughly <strong>80–120 cal per 30 min</strong> depending on body weight (~3.5 METs). It's not flashy, but it's one of the most underrated fat loss tools.</p>`;
+                html += insightHtml(`<strong>NEAT (Non-Exercise Activity Thermogenesis)</strong> accounts for 15–30% of daily calorie burn. Adding 4,000 steps to your day can burn an extra 150–200 cal — without touching gym recovery.`);
+                html += `<p><strong>Target:</strong> 7,000–10,000 steps daily. Park farther away, take the stairs, walk after meals. Aoyama & Shibata 2020: post-meal walking improves glucose response by ~30%.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['how many cal', 'calorie burn', 'calories burn', 'does.*burn', 'burn.*fat', 'fat.?burn', 'burn.*calorie'],
+            answer: (ctx) => {
+                const wt = ctx.currentWeight || 180;
+                const wtKg = Math.round(wt * 0.453592);
+                let html = `<h3>Calorie Burn: The Real Numbers</h3>`;
+                html += `<p>For a <strong>${wt} lb (${wtKg} kg)</strong> person, approximate 30-minute burns:</p>`;
+                html += `<table class="plan-table"><tr><th>Activity</th><th>~Cal / 30 min</th></tr>`;
+                html += `<tr><td>Walking (3.5 mph)</td><td>${Math.round(wtKg * 3.5 * 0.5 * 1.05)}</td></tr>`;
+                html += `<tr><td>Stairmaster</td><td>${Math.round(wtKg * 9 * 0.5 * 1.05)}</td></tr>`;
+                html += `<tr><td>Running (6 mph)</td><td>${Math.round(wtKg * 9.8 * 0.5 * 1.05)}</td></tr>`;
+                html += `<tr><td>Cycling (moderate)</td><td>${Math.round(wtKg * 7 * 0.5 * 1.05)}</td></tr>`;
+                html += `<tr><td>Rowing (moderate)</td><td>${Math.round(wtKg * 8.5 * 0.5 * 1.05)}</td></tr>`;
+                html += `<tr><td>Jump rope</td><td>${Math.round(wtKg * 11 * 0.5 * 1.05)}</td></tr>`;
+                html += `<tr><td>Swimming (moderate)</td><td>${Math.round(wtKg * 7 * 0.5 * 1.05)}</td></tr>`;
+                html += `<tr><td>Weight training</td><td>${Math.round(wtKg * 5 * 0.5 * 1.05)}</td></tr>`;
+                html += `</table>`;
+                html += `<p>These are estimates from the Ainsworth Compendium of Physical Activities. Machine displays overestimate by 15–30%. <strong>Don't eat back exercise calories</strong> — use them as bonus deficit.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['how much protein', 'protein.*need', 'daily protein', 'enough protein', 'protein.*day', 'protein.*intake'],
+            answer: (ctx) => {
+                const wt = ctx.currentWeight || 180;
+                const wtKg = Math.round(wt * 0.453592);
+                const low = Math.round(wtKg * 1.6);
+                const high = Math.round(wtKg * 2.2);
+                let html = `<h3>Daily Protein Requirements</h3>`;
+                html += `<p>The research is clear: for anyone doing resistance training, you need <strong>1.6–2.2 g/kg</strong> of body weight per day (Morton et al. 2018 meta-analysis of 49 studies).</p>`;
+                html += insightHtml(`At ${wt} lbs (${wtKg} kg), your target is <strong>${low}–${high}g protein per day</strong>.`);
+                html += `<p><strong>Distribution matters.</strong> Mamerow et al. 2014: spreading protein across 4 meals (0.4 g/kg each) produces 25% more muscle protein synthesis than cramming it into 1–2 meals.</p>`;
+                html += `<p><strong>Best sources:</strong> chicken breast (31g/100g), Greek yogurt (10g/100g), eggs (6g each), whey protein (25g/scoop), lean beef (26g/100g), cottage cheese (11g/100g), lentils (9g/100g cooked).</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['how much water', 'water.*drink', 'hydrat', 'dehydrat'],
+            answer: (ctx) => {
+                const wt = ctx.currentWeight || 180;
+                const ozBase = Math.round(wt * 0.5);
+                let html = `<h3>Hydration Guide</h3>`;
+                html += `<p>A practical baseline: <strong>half your body weight in ounces</strong> per day. At ${wt} lbs, that's ~<strong>${ozBase} oz</strong> (~${Math.round(ozBase * 29.5735 / 1000 * 10) / 10} liters).</p>`;
+                html += `<p>Add 16–20 oz for every hour of hard training. Judelson et al. 2007: even 2% dehydration reduces strength output by 2–6% and impairs recovery.</p>`;
+                html += `<p><strong>Quick test:</strong> If your urine is pale yellow, you're fine. Dark yellow = drink more.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['how often.*train', 'how many.*days', 'training frequency', 'how often.*work.?out', 'days per week', 'times.*per.*week', 'how many times'],
+            answer: (ctx) => {
+                let html = `<h3>Training Frequency</h3>`;
+                html += `<p><strong>For muscle growth:</strong> Schoenfeld 2016 meta found training each muscle <strong>2× per week</strong> produces more hypertrophy than 1×. Beyond 3× shows diminishing returns for most people.</p>`;
+                html += `<p><strong>Optimal splits by days available:</strong></p>`;
+                html += `<table class="plan-table"><tr><th>Days/week</th><th>Best split</th></tr>`;
+                html += `<tr><td>3</td><td>Full Body (Mon/Wed/Fri)</td></tr>`;
+                html += `<tr><td>4</td><td>Upper/Lower (Mon/Tue/Thu/Fri)</td></tr>`;
+                html += `<tr><td>5</td><td>Upper/Lower/Push/Pull/Legs</td></tr>`;
+                html += `<tr><td>6</td><td>PPL × 2 (Push/Pull/Legs repeated)</td></tr>`;
+                html += `</table>`;
+                html += `<p><strong>Recovery minimum:</strong> 48 hours between hitting the same muscle group hard. Sleep 7–9 hours. If you're consistently sore for 72+ hours, you're doing too much volume.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['how long.*results', 'when.*see.*results', 'how long.*take', 'how fast.*grow', 'how quickly'],
+            answer: (ctx) => {
+                let html = `<h3>Realistic Timelines for Results</h3>`;
+                html += `<p>This depends on training age and goal:</p>`;
+                html += `<table class="plan-table"><tr><th>Goal</th><th>Realistic timeline</th></tr>`;
+                html += `<tr><td>Feel stronger</td><td>2–3 weeks (neural adaptations)</td></tr>`;
+                html += `<tr><td>Visible muscle gain (beginner)</td><td>6–8 weeks</td></tr>`;
+                html += `<tr><td>Noticeable fat loss</td><td>4–6 weeks at 500 cal/day deficit</td></tr>`;
+                html += `<tr><td>10 lbs muscle (beginner)</td><td>6–12 months</td></tr>`;
+                html += `<tr><td>20 lbs muscle (total)</td><td>2–3 years of consistent training</td></tr>`;
+                html += `</table>`;
+                html += insightHtml(`<strong>Muscle growth rates</strong> (Lyle McDonald model): beginners gain ~2 lbs/month, intermediates ~1 lb/month, advanced ~0.5 lb/month. These are actual tissue gains, not scale weight.`);
+                html += `<p>Take progress photos every 2–4 weeks. The mirror and scale are unreliable day-to-day.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['swimming', 'swim', 'pool', 'laps'],
+            answer: (ctx) => {
+                let html = `<h3>Swimming for Fitness</h3>`;
+                html += `<p>Moderate lap swimming burns <strong>250–350 cal in 30 min</strong> (~7 METs). It's full-body, zero impact, and excellent for active recovery days.</p>`;
+                html += `<p>Downside for body composition: swimming in cool water increases appetite more than land-based exercise (Halse et al. 2011). Don't overeat after pool sessions.</p>`;
+                html += `<p><strong>Best use:</strong> 2× per week as conditioning or active recovery. Won't build serious muscle — you need resistance training for that.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['alcohol', 'beer', 'wine', 'drinking', 'drink.*gains'],
+            answer: (ctx) => {
+                let html = `<h3>Alcohol &amp; Fitness</h3>`;
+                html += `<p>Alcohol has 7 cal/gram (almost as calorie-dense as fat) and <strong>zero nutritional value</strong>.</p>`;
+                html += `<p><strong>The research:</strong></p><ul>`;
+                html += `<li>Parr et al. 2014: Alcohol post-exercise reduces muscle protein synthesis by <strong>24–37%</strong>.</li>`;
+                html += `<li>Even moderate drinking (2+ drinks) disrupts sleep architecture — less deep sleep, less recovery.</li>`;
+                html += `<li>Alcohol increases estrogen and cortisol, and lowers testosterone for 24–72 hours.</li>`;
+                html += `</ul>`;
+                html += `<p><strong>Practical rule:</strong> If you drink, limit to 1–2 drinks max, never on training days, and add the calories to your daily log. A pint of beer is ~200 cal. Three beers = a missed meal's worth of protein replaced with empty calories.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['sore', 'soreness', 'doms', 'muscle.*hurt', 'muscle.*pain', 'delayed onset'],
+            answer: (ctx) => {
+                let html = `<h3>Muscle Soreness (DOMS)</h3>`;
+                html += `<p>Delayed Onset Muscle Soreness peaks 24–72 hours after training. It's caused by microtrauma to muscle fibers during eccentric (lowering) contractions.</p>`;
+                html += `<p><strong>Important:</strong> Soreness is NOT a reliable indicator of a good workout. Schoenfeld 2012: muscle damage is one of three hypertrophy mechanisms, but excessive damage impairs recovery without extra growth.</p>`;
+                html += `<p><strong>What helps:</strong></p><ul>`;
+                html += `<li>Light movement / active recovery (walking, easy cycling)</li>`;
+                html += `<li>Adequate protein (1.6–2.2 g/kg/day)</li>`;
+                html += `<li>Sleep (7–9 hours)</li>`;
+                html += `<li>Cold water immersion may help if very sore (Leeder 2012 meta)</li>`;
+                html += `</ul>`;
+                html += `<p><strong>Should you train while sore?</strong> Yes, unless pain is sharp or joint-related. Light training actually reduces DOMS (repeated bout effect). Start with lighter weights and you'll loosen up.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['body.?weight', 'calisthenic', 'no.?gym', 'without.*weight', 'prison workout', 'at home'],
+            answer: (ctx) => {
+                let html = `<h3>Bodyweight Training</h3>`;
+                html += `<p>You can build a solid physique with bodyweight alone — the limiting factor is progressive overload. Without adding weight, you progress through harder variations:</p>`;
+                html += `<table class="plan-table"><tr><th>Movement</th><th>Progression</th></tr>`;
+                html += `<tr><td>Push</td><td>Knee push-ups → Push-ups → Diamond → Archer → One-arm</td></tr>`;
+                html += `<tr><td>Pull</td><td>Inverted rows → Chin-ups → Pull-ups → Weighted → L-sit pull-ups</td></tr>`;
+                html += `<tr><td>Squat</td><td>Air squat → Bulgarian split squat → Pistol squat → Weighted pistol</td></tr>`;
+                html += `<tr><td>Hinge</td><td>Glute bridge → Single-leg hip thrust → Nordic curl</td></tr>`;
+                html += `<tr><td>Core</td><td>Plank → Ab wheel → Dragon flag → Front lever</td></tr>`;
+                html += `</table>`;
+                html += `<p>Aim for 3–4 sets of 8–15 reps per exercise, 3–5 days per week. When you can do 15 clean reps, move to the next progression.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['belly.*fat', 'stomach.*fat', 'ab.*fat', 'love.?handle', 'spot.?reduc', 'target.*fat', 'lose.*stomach'],
+            answer: (ctx) => {
+                let html = `<h3>Can You Target Belly Fat?</h3>`;
+                html += `<p><strong>No.</strong> Spot reduction is a myth. Vispute et al. 2011: six weeks of daily ab exercises produced zero reduction in abdominal fat compared to a control group.</p>`;
+                html += `<p>Where your body stores and loses fat is genetically determined. Belly fat is typically the <strong>last to go</strong> for men and lower body fat for women. The only way to reduce it:</p><ol>`;
+                html += `<li><strong>Calorie deficit</strong> — 300–500 cal/day below TDEE</li>`;
+                html += `<li><strong>Resistance training</strong> — preserves muscle so you lose fat, not muscle</li>`;
+                html += `<li><strong>Patience</strong> — you'll lose fat from your face, arms, and chest first. Belly comes last.</li>`;
+                html += `<li><strong>Sleep and stress management</strong> — cortisol (stress hormone) specifically promotes abdominal fat storage.</li>`;
+                html += `</ol>`;
+                html += `<p>Ab exercises build ab <em>muscle</em>, which looks great once the fat layer comes off. But they don't burn the fat on top.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['how many sets', 'how much volume', 'sets per', 'optimal.*volume', 'overtraining', 'too much'],
+            answer: (ctx) => {
+                let html = `<h3>Training Volume: How Many Sets?</h3>`;
+                html += `<p>Schoenfeld et al. 2017 dose-response meta: <strong>10–20 sets per muscle group per week</strong> is the hypertrophy sweet spot for most people.</p>`;
+                html += `<table class="plan-table"><tr><th>Level</th><th>Sets/muscle/week</th></tr>`;
+                html += `<tr><td>Beginner (< 1 year)</td><td>10–12</td></tr>`;
+                html += `<tr><td>Intermediate (1–3 years)</td><td>12–18</td></tr>`;
+                html += `<tr><td>Advanced (3+ years)</td><td>16–22+</td></tr>`;
+                html += `</table>`;
+                html += `<p><strong>Signs you're doing too much:</strong> strength going down, chronic joint pain, poor sleep, losing motivation, getting sick often. If that's you, drop volume by 30–40% for 1–2 weeks (deload).</p>`;
+                html += `<p><strong>Signs you can do more:</strong> you recover within 48 hours, weights feel easy, you're not sore at all. Add 2–3 sets per muscle per week.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['age', 'too old', 'over 40', 'over 50', 'older', 'senior', 'after 40'],
+            answer: (ctx) => {
+                let html = `<h3>Training at 40, 50, 60+</h3>`;
+                html += `<p>You are never too old to build muscle and get stronger. Resistance training is actually <strong>more important</strong> as you age — sarcopenia (muscle loss) starts at ~30 and accelerates after 50.</p>`;
+                html += insightHtml(`Peterson 2010 meta: adults over 50 gained significant strength (average <strong>+33%</strong>) with resistance training. You don't lose the ability to grow muscle — you just have to train.`);
+                html += `<p><strong>Adjustments for 40+:</strong></p><ul>`;
+                html += `<li>Warm up longer (10–15 min instead of 5)</li>`;
+                html += `<li>Slightly higher rep ranges (8–15 instead of 3–5) to reduce joint stress</li>`;
+                html += `<li>Extra recovery time (train same muscle every 3–4 days instead of 2)</li>`;
+                html += `<li>Prioritize mobility work and joint health</li>`;
+                html += `<li>Protein needs actually increase with age — aim for the high end (2.0–2.2 g/kg)</li>`;
+                html += `</ul>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+    ],
+
+    // Fallback for unrecognized input — tries general knowledge first, then shows help
     fallback: (ctx, input) => {
+        // Check general knowledge base
+        const lower = input.toLowerCase();
+        const gk = TOPIC_RESPONSES.generalKnowledge;
+        for (let i = 0; i < gk.length; i++) {
+            for (let j = 0; j < gk[i].triggers.length; j++) {
+                if (new RegExp(gk[i].triggers[j], 'i').test(lower)) {
+                    return gk[i].answer(ctx);
+                }
+            }
+        }
+
         const name = ctx.profile.name ? escapeHtml(ctx.profile.name) : 'there';
-        let html = `<p>Hey ${name}, I'm not sure I understood that, but I'm here to help! Here's what I can do:</p>`;
+        let html = `<p>Hey ${name}, I didn't catch that one. Try asking about:</p>`;
         html += `<ul>`;
-        html += `<li><strong>"Generate a workout plan"</strong> — personalized training split based on your goals</li>`;
-        html += `<li><strong>"Create a meal plan"</strong> — daily nutrition plan tailored to your targets</li>`;
-        html += `<li><strong>"Analyze my progress"</strong> — detailed report on your training and weight trends</li>`;
-        html += `<li><strong>"What should I work on next?"</strong> — finds your weak points this week</li>`;
-        html += `<li><strong>"How do I squat / bench / deadlift?"</strong> — detailed form guides</li>`;
-        html += `<li><strong>"Help me lose weight / build muscle"</strong> — goal-specific strategies</li>`;
-        html += `<li><strong>"I've hit a plateau"</strong> — specific strategies to break through</li>`;
-        html += `<li><strong>"I need motivation"</strong> — a kick in the pants with love</li>`;
-        html += `<li><strong>"How is my nutrition?"</strong> — analysis of your logged meals</li>`;
-        html += `<li><strong>"Recovery tips"</strong> — rest, sleep, deload guidance</li>`;
-        html += `<li><strong>"What's my max?"</strong> — estimated 1RM from your lifts</li>`;
-        html += `<li><strong>"Warm-up routine"</strong> — dynamic warm-up for your session</li>`;
-        html += `<li><strong>"Supplements"</strong> — what actually works, what to skip</li>`;
-        html += `<li><strong>"Weekly recap"</strong> — this week vs last week comparison</li>`;
-        html += `<li><strong>"Rest periods"</strong> — how long to rest between sets</li>`;
-        html += `<li><strong>"Alternative to bench"</strong> — exercise swap suggestions</li>`;
-        html += `<li><strong>"When will I hit 225?"</strong> — progress timeline projections</li>`;
-        html += `<li><strong>"My streak"</strong> — consistency and attendance tracking</li>`;
-        html += `<li><strong>"Cardio guide"</strong> — HIIT vs LISS, what's right for you</li>`;
-        html += `<li><strong>"Pre/post workout meal"</strong> — nutrient timing tips</li>`;
-        html += `<li><strong>"What should I eat?"</strong> — smart food recs based on your remaining macros today</li>`;
-        html += `<li><strong>"Weak point analysis"</strong> — identify and fix lagging muscles & lift sticking points</li>`;
+        html += `<li><strong>"Will 30 min on the stairmaster help me lose weight?"</strong></li>`;
+        html += `<li><strong>"How much protein do I need?"</strong></li>`;
+        html += `<li><strong>"Generate a workout plan"</strong></li>`;
+        html += `<li><strong>"Help me lose weight"</strong> or <strong>"build muscle"</strong></li>`;
+        html += `<li><strong>"How do I squat / bench / deadlift?"</strong></li>`;
+        html += `<li><strong>"Analyze my progress"</strong></li>`;
+        html += `<li><strong>"I've hit a plateau"</strong></li>`;
+        html += `<li><strong>"Supplements"</strong> — what works, what to skip</li>`;
+        html += `<li><strong>"Recovery tips"</strong></li>`;
         html += `</ul>`;
+        html += `<p style="color:var(--text-muted);font-size:13px">I can also answer questions about specific exercises, cardio machines, calorie burn, training frequency, soreness, alcohol and gains, belly fat, and more.</p>`;
         html += verseHtml();
         return html;
     },
@@ -2841,48 +3118,19 @@ function toggleCoachVoice() {
 function sendCoachMessage() {
     const input = document.getElementById('coach-input');
     const text = input.value.trim();
-    const hasPhoto = !!pendingPhoto;
-
-    if (!text && !hasPhoto) return;
+    if (!text) return;
     input.value = '';
-
-    const photoData = pendingPhoto;
-    if (hasPhoto) removeCoachPhoto();
-
-    processCoachInput(text || 'Check out my photo', photoData);
+    processCoachInput(text);
 }
 
-function processCoachInput(text, photoData) {
+function processCoachInput(text) {
     initCoach();
     DB.set('coachUsed', true);
 
-    // Show user message with optional photo
-    if (photoData) {
-        addUserMessageWithPhoto(text, photoData);
-    } else {
-        addUserMessage(text);
-    }
-
+    addUserMessage(text);
     showTyping();
 
-    // If photo is attached, run pose detection (async)
-    if (photoData) {
-        // Update typing indicator to show we're analyzing
-        const typingEl = document.getElementById('typing-indicator');
-        if (typingEl) typingEl.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div> <span style="font-size:12px;color:var(--text-light);margin-left:4px">Analyzing your pose...</span>';
-
-        const ctx = getCoachContext();
-        analyzePoseFromPhoto(photoData, ctx, text).then(response => {
-            removeTyping();
-            addBotMessage(response, { suggestions: ['Weak point analysis', 'Generate a workout plan for me', 'Warm-up routine'] });
-        }).catch(() => {
-            removeTyping();
-            addBotMessage(analyzePhoto(getCoachContext(), text));
-        });
-        return;
-    }
-
-    // Non-photo messages — brief delay for natural feel
+    // Brief delay for natural feel
     setTimeout(() => {
         removeTyping();
         const ctx = getCoachContext();

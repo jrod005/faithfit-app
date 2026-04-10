@@ -2353,13 +2353,13 @@ function renderBackupHealth() {
         icon = '&#x26A0;&#xFE0F;';
         line1 = 'Backup off';
         line2 = `${workouts.length} workout${workouts.length !== 1 ? 's' : ''} only on this device`;
-        action = `<button class="backup-health-cta" onclick="switchTab('social')">Turn on</button>`;
+        action = `<button class="backup-health-cta" onclick="switchTab('social');setTimeout(()=>{if(typeof showSocialView==='function')showSocialView('profile')},300)">Sign in to back up</button>`;
     } else if (!enabled) {
         state = 'warn';
         icon = '&#x26A0;&#xFE0F;';
         line1 = 'Cloud backup paused';
-        line2 = 'Tap to re-enable sync';
-        action = `<button class="backup-health-cta" onclick="switchTab('social')">Enable</button>`;
+        line2 = `${workouts.length} workout${workouts.length !== 1 ? 's' : ''} not synced`;
+        action = `<button class="backup-health-cta" onclick="if(typeof enableCloudSync==='function'){enableCloudSync();renderBackupHealth();}">Enable backup</button>`;
     } else if (last === 0) {
         state = 'warn';
         icon = '&#x1F504;';
@@ -2521,12 +2521,18 @@ function getDailyInsight() {
             body: 'Sleep is the missing piece for most lifters.',
             prompt: 'How can I sleep better?'
         });
-        candidates.push({
-            icon: '\uD83D\uDCD0',
-            title: 'Form check',
-            body: 'Want a quick form refresher on your big lifts?',
-            prompt: 'Form tips'
-        });
+        // Progress photo nudge
+        if (typeof getProgressPhotoStats === 'function') {
+            const pp = getProgressPhotoStats();
+            if (pp.count === 0 || (pp.daysSinceLast !== null && pp.daysSinceLast >= 14)) {
+                candidates.push({
+                    icon: '\uD83D\uDCF8',
+                    title: 'Progress photo time',
+                    body: pp.count === 0 ? 'Take your first progress photo — future-you will thank you.' : `It\u2019s been ${pp.daysSinceLast} days since your last photo.`,
+                    prompt: 'How do progress photos work?'
+                });
+            }
+        }
 
         if (candidates.length === 0) return null;
         return candidates[seed % candidates.length];
@@ -3415,6 +3421,7 @@ function renderAchievements() {
         return `<div class="badge ${earned ? 'earned' : 'locked'}" title="${a.desc}">
             <span class="badge-icon">${a.icon}</span>
             <span class="badge-name">${a.name}</span>
+            <span class="badge-desc">${a.desc}</span>
             ${progressHtml}
         </div>`;
     }).join('');
