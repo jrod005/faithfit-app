@@ -1014,6 +1014,86 @@ input::placeholder {
     flex: 1;
 }
 
+/* ========== BODY MEASUREMENTS ========== */
+.measure-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    margin: 12px 0;
+}
+.measure-field label {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 2px;
+}
+.measure-field input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+    font-size: 14px;
+}
+.measure-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+.measure-stat {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: center;
+}
+.measure-stat-label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+.measure-stat-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+}
+.measure-up { color: #f97316; font-size: 12px; font-weight: 500; }
+.measure-down { color: #22c55e; font-size: 12px; font-weight: 500; }
+.measure-chart-controls {
+    margin-top: 6px;
+}
+.measure-chart-controls select {
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 13px;
+}
+.measure-history-scroll {
+    overflow-x: auto;
+    margin: 12px 0;
+}
+.measure-history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.measure-history-table th,
+.measure-history-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    white-space: nowrap;
+}
+.measure-history-table th {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
 /* ========== PROGRESS BARS (Macros) ========== */
 .macro-bars {
     display: flex;
@@ -2579,6 +2659,16 @@ canvas {
 .food-result:last-child { border-bottom: none; }
 .food-result-name { font-size: 14px; font-weight: 500; }
 .food-result-info { font-size: 12px; color: var(--text-muted); white-space: nowrap; margin-left: 12px; }
+.food-result-divider {
+    padding: 6px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+}
 .servings-row {
     display: flex;
     align-items: center;
@@ -2991,6 +3081,40 @@ canvas {
     border-radius: 10px;
     margin-left: 4px;
 }
+
+/* Notifications */
+.notif-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+}
+.notif-item:last-child { border-bottom: none; }
+.notif-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+.notif-body { flex: 1; min-width: 0; }
+.notif-text { font-size: 14px; line-height: 1.4; display: block; }
+.notif-time { font-size: 12px; color: var(--text-muted); display: block; margin-top: 2px; }
+.notif-actions { margin-top: 6px; display: flex; gap: 6px; }
+
+/* Social Achievements */
+.social-achievements-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+.social-achievement {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 12px;
+}
+.social-achievement-icon { font-size: 16px; }
+.social-achievement-name { font-weight: 500; color: var(--text); }
 
 .feed-post {
     background: var(--card-bg);

@@ -41,7 +41,8 @@ const SYNCED_KEYS = new Set([
     'profile', 'workouts', 'meals', 'weights', 'myRoutines', 'customExercises',
     'prayerEntries', 'goals', 'achievements', 'streakHistory', 'units',
     'experience', 'equipment', 'onboarded', 'hapticsEnabled', 'notifSettings',
-    'bibleVersion', 'savedTemplates', 'progressPhotos', 'challenges', 'coachHistory'
+    'bibleVersion', 'savedTemplates', 'challenges', 'coachHistory',
+    'measurements'
 ]);
 const DB = {
     get(key, fallback = null) {
@@ -811,6 +812,257 @@ function drawWeightChart() {
     }
 }
 
+// --- Body Measurements ---
+const MEASUREMENT_SITES = [
+    { key: 'waist', label: 'Waist', icon: '\u{1F4CF}' },
+    { key: 'chest', label: 'Chest', icon: '\u{1F4CF}' },
+    { key: 'hips', label: 'Hips', icon: '\u{1F4CF}' },
+    { key: 'leftArm', label: 'L Arm', icon: '\u{1F4AA}' },
+    { key: 'rightArm', label: 'R Arm', icon: '\u{1F4AA}' },
+    { key: 'leftThigh', label: 'L Thigh', icon: '\u{1F9B5}' },
+    { key: 'rightThigh', label: 'R Thigh', icon: '\u{1F9B5}' },
+    { key: 'shoulders', label: 'Shoulders', icon: '\u{1F4CF}' },
+    { key: 'neck', label: 'Neck', icon: '\u{1F4CF}' },
+    { key: 'leftCalf', label: 'L Calf', icon: '\u{1F9B5}' },
+    { key: 'rightCalf', label: 'R Calf', icon: '\u{1F9B5}' },
+    { key: 'leftForearm', label: 'L Forearm', icon: '\u{1F4AA}' },
+    { key: 'rightForearm', label: 'R Forearm', icon: '\u{1F4AA}' },
+];
+
+function getMeasurements() { return DB.get('measurements', []); }
+function saveMeasurements(arr) { DB.set('measurements', arr); }
+
+function openMeasurementsModal() {
+    const existing = document.getElementById('measurements-modal');
+    if (existing) existing.remove();
+
+    const last = getMeasurements().slice().sort((a, b) => b.timestamp - a.timestamp)[0] || {};
+    const metric = isMetric();
+    const unit = metric ? 'cm' : 'in';
+
+    const modal = document.createElement('div');
+    modal.id = 'measurements-modal';
+    modal.className = 'modal-overlay';
+
+    let fieldsHtml = '';
+    MEASUREMENT_SITES.forEach(s => {
+        const prev = last[s.key] ? (metric ? (last[s.key] * 2.54).toFixed(1) : last[s.key].toFixed(1)) : '';
+        fieldsHtml += `
+            <div class="measure-field">
+                <label>${s.label} (${unit})</label>
+                <input type="number" id="meas-${s.key}" step="0.1" placeholder="${prev ? prev : '--'}">
+            </div>`;
+    });
+
+    modal.innerHTML = `
+        <div class="modal-card">
+            <h3>Log Measurements</h3>
+            <p class="modal-sub">Grab a tape measure. Only fill in what you measure — skip the rest.</p>
+            <div class="measure-grid">${fieldsHtml}</div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="meas-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="meas-save">Save</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.querySelector('#meas-cancel').onclick = () => modal.remove();
+    modal.querySelector('#meas-save').onclick = () => {
+        const entry = { date: today(), timestamp: Date.now() };
+        let hasAny = false;
+        MEASUREMENT_SITES.forEach(s => {
+            const raw = parseFloat(document.getElementById('meas-' + s.key).value);
+            if (raw && raw > 0) {
+                entry[s.key] = metric ? raw / 2.54 : raw; // store as inches
+                hasAny = true;
+            }
+        });
+        if (!hasAny) { showToast('Enter at least one measurement', 'warn'); return; }
+        const arr = getMeasurements();
+        arr.push(entry);
+        saveMeasurements(arr);
+        modal.remove();
+        showToast('Measurements saved', 'success');
+        renderMeasurementsCard();
+        haptic(20);
+    };
+}
+
+function renderMeasurementsCard() {
+    const card = document.getElementById('measurements-card');
+    if (!card) return;
+    const all = getMeasurements();
+    const metric = isMetric();
+    const unit = metric ? 'cm' : 'in';
+
+    if (all.length === 0) {
+        card.innerHTML = `
+            <h2>Body Measurements</h2>
+            <p class="muted">Track your waist, chest, arms, and more over time. Grab a tape measure and log your first entry.</p>
+            <button class="btn btn-primary" onclick="openMeasurementsModal()">Log Measurements</button>
+        `;
+        return;
+    }
+
+    const sorted = all.slice().sort((a, b) => b.timestamp - a.timestamp);
+    const latest = sorted[0];
+    const previous = sorted.length >= 2 ? sorted[1] : null;
+
+    // Find which sites have data
+    const activeSites = MEASUREMENT_SITES.filter(s => latest[s.key]);
+
+    let html = `<h2>Body Measurements</h2>`;
+    html += `<div class="measure-stats-grid">`;
+    activeSites.forEach(s => {
+        const val = metric ? (latest[s.key] * 2.54).toFixed(1) : latest[s.key].toFixed(1);
+        let delta = '';
+        if (previous && previous[s.key] && latest[s.key]) {
+            const diff = latest[s.key] - previous[s.key];
+            const displayDiff = metric ? (diff * 2.54).toFixed(1) : diff.toFixed(1);
+            if (Math.abs(diff) >= 0.05) {
+                const sign = diff > 0 ? '+' : '';
+                const cls = diff > 0 ? 'measure-up' : 'measure-down';
+                delta = ` <span class="${cls}">${sign}${displayDiff}</span>`;
+            }
+        }
+        html += `<div class="measure-stat"><span class="measure-stat-label">${s.label}</span><span class="measure-stat-value">${val}${unit}${delta}</span></div>`;
+    });
+    html += `</div>`;
+    html += `<p class="muted" style="margin-top:6px;font-size:12px">Last logged: ${formatMeasDate(latest.date)}</p>`;
+
+    // Mini chart for the most-tracked site
+    if (all.length >= 2) {
+        html += `<canvas id="measurements-chart" height="140" style="margin-top:12px"></canvas>`;
+        html += `<div class="measure-chart-controls">`;
+        html += `<select id="measure-chart-site" onchange="drawMeasurementsChart()">`;
+        activeSites.forEach(s => { html += `<option value="${s.key}">${s.label}</option>`; });
+        html += `</select></div>`;
+    }
+
+    html += `<button class="btn btn-secondary" style="margin-top:12px" onclick="openMeasurementsModal()">+ Log New</button>`;
+    if (all.length >= 2) {
+        html += ` <button class="btn btn-secondary" style="margin-top:12px" onclick="openMeasurementsHistory()">History</button>`;
+    }
+    card.innerHTML = html;
+
+    if (all.length >= 2) {
+        setTimeout(() => drawMeasurementsChart(), 50);
+    }
+}
+
+function drawMeasurementsChart() {
+    const canvas = document.getElementById('measurements-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const siteKey = (document.getElementById('measure-chart-site') || {}).value || 'waist';
+    const all = getMeasurements().filter(m => m[siteKey]).sort((a, b) => a.timestamp - b.timestamp).slice(-20);
+    const metric = isMetric();
+
+    canvas.width = canvas.offsetWidth * 2;
+    canvas.height = 280;
+    ctx.scale(2, 2);
+    const w = canvas.offsetWidth, h = 140;
+    ctx.clearRect(0, 0, w, h);
+
+    if (all.length < 2) {
+        ctx.fillStyle = '#64748B'; ctx.font = '13px Inter, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('Need 2+ entries to chart', w / 2, h / 2);
+        return;
+    }
+
+    const values = all.map(m => metric ? m[siteKey] * 2.54 : m[siteKey]);
+    const min = Math.min(...values) - 0.5;
+    const max = Math.max(...values) + 0.5;
+    const range = max - min || 1;
+    const padTop = 16, padBot = 30, padLeft = 40, padRight = 10;
+    const chartW = w - padLeft - padRight, chartH = h - padTop - padBot;
+
+    // Grid
+    ctx.strokeStyle = '#E2E8F0'; ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 3; i++) {
+        const y = padTop + (chartH / 3) * i;
+        ctx.beginPath(); ctx.moveTo(padLeft, y); ctx.lineTo(w - padRight, y); ctx.stroke();
+        ctx.fillStyle = '#94A3B8'; ctx.font = '10px Inter, sans-serif'; ctx.textAlign = 'right';
+        ctx.fillText((max - (range / 3) * i).toFixed(1), padLeft - 6, y + 3);
+    }
+
+    // Line
+    ctx.beginPath(); ctx.strokeStyle = '#60A5FA'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    values.forEach((v, i) => {
+        const x = padLeft + (chartW / (values.length - 1)) * i;
+        const y = padTop + chartH - ((v - min) / range) * chartH;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Dots
+    values.forEach((v, i) => {
+        const x = padLeft + (chartW / (values.length - 1)) * i;
+        const y = padTop + chartH - ((v - min) / range) * chartH;
+        ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fillStyle = '#60A5FA'; ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill();
+    });
+
+    // Date labels
+    ctx.fillStyle = '#94A3B8'; ctx.font = '9px Inter, sans-serif'; ctx.textAlign = 'center';
+    const labelCount = Math.min(all.length, 5);
+    for (let i = 0; i < labelCount; i++) {
+        const idx = Math.round(i * (all.length - 1) / (labelCount - 1));
+        const x = padLeft + (chartW / (all.length - 1)) * idx;
+        ctx.fillText(all[idx].date.slice(5), x, h - 5);
+    }
+}
+
+function openMeasurementsHistory() {
+    const existing = document.getElementById('measurements-modal');
+    if (existing) existing.remove();
+    const all = getMeasurements().slice().sort((a, b) => b.timestamp - a.timestamp);
+    const metric = isMetric();
+    const unit = metric ? 'cm' : 'in';
+
+    const modal = document.createElement('div');
+    modal.id = 'measurements-modal';
+    modal.className = 'modal-overlay';
+
+    let tableHtml = '<div class="measure-history-scroll"><table class="measure-history-table"><thead><tr><th>Date</th>';
+    const sites = MEASUREMENT_SITES.filter(s => all.some(m => m[s.key]));
+    sites.forEach(s => { tableHtml += `<th>${s.label}</th>`; });
+    tableHtml += '<th></th></tr></thead><tbody>';
+    all.forEach(m => {
+        tableHtml += `<tr><td>${formatMeasDate(m.date)}</td>`;
+        sites.forEach(s => {
+            const v = m[s.key] ? (metric ? (m[s.key] * 2.54).toFixed(1) : m[s.key].toFixed(1)) : '-';
+            tableHtml += `<td>${v}</td>`;
+        });
+        tableHtml += `<td><button class="btn btn-danger btn-sm" onclick="deleteMeasurement(${m.timestamp});this.closest('.modal-overlay').remove();openMeasurementsHistory()">X</button></td>`;
+        tableHtml += `</tr>`;
+    });
+    tableHtml += '</tbody></table></div>';
+
+    modal.innerHTML = `
+        <div class="modal-card modal-card-wide">
+            <h3>Measurement History</h3>
+            ${tableHtml}
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Close</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function deleteMeasurement(timestamp) {
+    const arr = getMeasurements().filter(m => m.timestamp !== timestamp);
+    saveMeasurements(arr);
+    renderMeasurementsCard();
+}
+
+function formatMeasDate(iso) {
+    try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+    catch (e) { return iso; }
+}
+
 // --- Haptics ---
 function isHapticsEnabled() {
     return DB.get('hapticsEnabled', true) !== false;
@@ -966,8 +1218,21 @@ function scheduleNotifications() {
         notifTimers.push(t);
     };
 
-    schedule('workout', s.workoutTime, '\u26A1 Time to train', 'Your workout is calling. Get after it.');
-    schedule('prayer', s.prayerTime, '\u2728 Prayer time', 'Take a moment to pray and read scripture.');
+    const workoutMessages = [
+        'Your workout is calling. Get after it.',
+        'Iron sharpens iron. Time to put in the work.',
+        'Show up today. Future you will be grateful.',
+        'Consistency beats intensity. Let\'s go.',
+        'The gym doesn\'t care about excuses. Neither does progress.',
+    ];
+    const prayerMessages = [
+        'Take a moment to pray and reflect on scripture.',
+        '"Be still, and know that I am God." — Psalm 46:10',
+        'Start your day grounded in faith.',
+        '"Commit your work to the Lord." — Proverbs 16:3',
+    ];
+    schedule('workout', s.workoutTime, '\u26A1 Time to train', workoutMessages[Math.floor(Date.now() / 86400000) % workoutMessages.length]);
+    schedule('prayer', s.prayerTime, '\u2728 Prayer time', prayerMessages[Math.floor(Date.now() / 86400000) % prayerMessages.length]);
 
     if (s.verseDaily) {
         schedule('verse', '07:00', '\u2727 Verse of the day', getDailyVerse().text.slice(0, 100) + '\u2026');
@@ -2599,6 +2864,7 @@ function updateDashboard() {
     renderProgressCharts();
     renderCalendarHeatmap();
     renderMuscleHeatmap();
+    renderMeasurementsCard();
     renderAchievements();
     renderWeeklyReport();
     renderDiscoveryHint();
@@ -2854,6 +3120,15 @@ if ('serviceWorker' in navigator) {
                     }
                 });
             });
+            // Register periodic background sync for streak reminders (Chrome Android)
+            if ('periodicSync' in reg) {
+                try {
+                    const status = await navigator.permissions.query({ name: 'periodic-background-sync' });
+                    if (status.state === 'granted') {
+                        await reg.periodicSync.register('streak-check', { minInterval: 12 * 60 * 60 * 1000 });
+                    }
+                } catch (e) { /* not supported — silent */ }
+            }
         } catch (e) {
             console.error('SW registration failed', e);
         }
@@ -3955,6 +4230,9 @@ function updateRestTimerVisibility() {
 
 let currentServings = 1;
 
+let _foodSearchTimer = null;
+let _apiSearchCache = {};
+
 function searchFood(query) {
     const results = document.getElementById('food-search-results');
     if (!query || query.length < 2 || typeof FOOD_DB === 'undefined') {
@@ -3962,18 +4240,101 @@ function searchFood(query) {
         return;
     }
     const q = query.toLowerCase();
-    const matches = FOOD_DB.filter(f => f.name.toLowerCase().includes(q)).slice(0, 10);
-    if (matches.length === 0) {
+    const localMatches = FOOD_DB.filter(f => f.name.toLowerCase().includes(q)).slice(0, 8);
+
+    // Always show local results immediately
+    _renderFoodResults(localMatches, []);
+
+    // Debounce API search for longer queries
+    clearTimeout(_foodSearchTimer);
+    if (q.length >= 3) {
+        _foodSearchTimer = setTimeout(() => _searchFoodAPI(q, localMatches), 400);
+    }
+}
+
+function _renderFoodResults(localMatches, apiMatches) {
+    const results = document.getElementById('food-search-results');
+    if (localMatches.length === 0 && apiMatches.length === 0) {
         results.classList.add('hidden');
         return;
     }
-    results.innerHTML = matches.map((f, i) => `
-        <div class="food-result" onclick="selectFood(${FOOD_DB.indexOf(f)})">
+    let html = '';
+    localMatches.forEach((f, i) => {
+        html += `<div class="food-result" onclick="selectFood(${FOOD_DB.indexOf(f)})">
             <span class="food-result-name">${escapeHtml(f.name)}</span>
             <span class="food-result-info">${f.serving} &middot; ${f.calories} cal</span>
-        </div>
-    `).join('');
+        </div>`;
+    });
+    if (apiMatches.length > 0) {
+        if (localMatches.length > 0) html += `<div class="food-result-divider">More results</div>`;
+        apiMatches.forEach(f => {
+            html += `<div class="food-result" onclick="selectAPIFood(${f._idx})">
+                <span class="food-result-name">${escapeHtml(f.name)}</span>
+                <span class="food-result-info">${f.serving} &middot; ${f.calories} cal</span>
+            </div>`;
+        });
+    }
+    results.innerHTML = html;
     results.classList.remove('hidden');
+}
+
+let _lastAPIResults = [];
+async function _searchFoodAPI(query, localMatches) {
+    // Check cache
+    if (_apiSearchCache[query]) {
+        _lastAPIResults = _apiSearchCache[query];
+        _renderFoodResults(localMatches, _lastAPIResults);
+        return;
+    }
+    try {
+        const resp = await fetch(
+            `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,nutriments,serving_size,quantity`,
+            { signal: AbortSignal.timeout(4000) }
+        );
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (!data.products || data.products.length === 0) return;
+
+        const localNames = new Set(localMatches.map(f => f.name.toLowerCase()));
+        const apiResults = [];
+        data.products.forEach((p, i) => {
+            const name = p.product_name;
+            if (!name || localNames.has(name.toLowerCase())) return;
+            const n = p.nutriments || {};
+            const calories = Math.round(n['energy-kcal_serving'] || n['energy-kcal_100g'] || 0);
+            if (calories === 0) return;
+            apiResults.push({
+                _idx: i,
+                name,
+                serving: p.serving_size || p.quantity || '1 serving',
+                calories,
+                protein: Math.round(n.proteins_serving || n.proteins_100g || 0),
+                carbs: Math.round(n.carbohydrates_serving || n.carbohydrates_100g || 0),
+                fat: Math.round(n.fat_serving || n.fat_100g || 0),
+            });
+        });
+        _lastAPIResults = apiResults.slice(0, 6);
+        _apiSearchCache[query] = _lastAPIResults;
+        _renderFoodResults(localMatches, _lastAPIResults);
+    } catch (e) {
+        // Silent — local results are already shown
+    }
+}
+
+function selectAPIFood(idx) {
+    const food = _lastAPIResults.find(f => f._idx === idx);
+    if (!food) return;
+    selectedFood = food;
+    currentServings = 1;
+    document.getElementById('meal-name').value = food.name;
+    document.getElementById('meal-calories').value = food.calories;
+    document.getElementById('meal-protein').value = food.protein;
+    document.getElementById('meal-carbs').value = food.carbs;
+    document.getElementById('meal-fat').value = food.fat;
+    document.getElementById('food-search-results').classList.add('hidden');
+    document.getElementById('servings-group').style.display = 'block';
+    document.getElementById('serving-count').textContent = '1';
+    document.getElementById('serving-desc').textContent = food.serving;
 }
 
 function selectFood(index) {
@@ -6372,6 +6733,7 @@ function init() {
     window.addEventListener('resize', () => {
         try {
             drawWeightChart();
+            drawMeasurementsChart();
             const overloadEl = document.getElementById('overload-exercise');
             if (overloadEl && overloadEl.value) showOverloadData();
         } catch (e) { console.error('resize handler failed', e); }

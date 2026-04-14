@@ -226,6 +226,8 @@
                 </div>
             </div>
 
+            <div class="card" id="measurements-card"></div>
+
             <div class="card">
                 <h2>Weekly Volume (Last 12 Weeks)</h2>
                 <canvas id="volume-chart" height="200"></canvas>
@@ -797,6 +799,7 @@
                 <div class="social-nav">
                     <button class="social-nav-btn active" onclick="showSocialView('feed')">Feed</button>
                     <button class="social-nav-btn" onclick="showSocialView('friends')">Friends <span id="request-badge" class="request-badge hidden">0</span></button>
+                    <button class="social-nav-btn" onclick="showSocialView('notifications')">Alerts <span id="notif-badge" class="request-badge hidden">0</span></button>
                     <button class="social-nav-btn" onclick="showSocialView('profile')">Profile</button>
                 </div>
 
@@ -812,6 +815,9 @@
 
                 <!-- Friends -->
                 <div id="social-friends" class="social-view hidden"></div>
+
+                <!-- Notifications / Alerts -->
+                <div id="social-notifications" class="social-view hidden"></div>
 
                 <!-- Profile -->
                 <div id="social-profile" class="social-view hidden"></div>

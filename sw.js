@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ironfaith-v91';
+const CACHE_NAME = 'ironfaith-v92';
 
 // Allow the page to tell a waiting SW to take over immediately
 self.addEventListener('message', (event) => {
@@ -45,6 +45,40 @@ self.addEventListener('activate', e => {
             Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
         ).then(() => self.clients.claim())
     );
+});
+
+// Notification click — open / focus the app
+self.addEventListener('notificationclick', e => {
+    e.notification.close();
+    e.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+            // Focus an existing window if open
+            for (const client of windowClients) {
+                if (client.url.includes('app.html') && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            // Otherwise open a new one
+            return clients.openWindow('./app.html');
+        })
+    );
+});
+
+// Periodic background sync (Android Chrome only) — fire scheduled reminders
+self.addEventListener('periodicsync', e => {
+    if (e.tag === 'streak-check') {
+        e.waitUntil(
+            (async () => {
+                // Check localStorage isn't accessible from SW, so use a simple reminder
+                self.registration.showNotification('\u{1F525} Don\'t forget to train today', {
+                    body: 'Keep your streak alive — even 15 minutes counts.',
+                    icon: './icons/icon-192.png',
+                    badge: './icons/icon-192.png',
+                    tag: 'streak-reminder',
+                });
+            })()
+        );
+    }
 });
 
 // Fetch - network first, fall back to cache

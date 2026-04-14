@@ -1,11 +1,113 @@
 // =============================================
 // Iron Faith - Progress Photos + Image Utilities
 // =============================================
-// (Replaced the legacy on-device pose-detection coach. A single still
-//  photo + a 17-keypoint MoveNet model can't reliably analyze form, so
-//  the coach photo button now saves to a Progress Photo Timeline instead.)
+// Photos stored in IndexedDB for much larger capacity than localStorage.
+// An in-memory cache keeps the synchronous API intact for all callers.
 
 const PROGRESS_PHOTOS_KEY = 'faithfit_progress_photos';
+const PHOTOS_DB_NAME = 'ironfaith_photos';
+const PHOTOS_DB_VERSION = 1;
+const PHOTOS_STORE = 'photos';
+
+// In-memory cache — loaded from IndexedDB on startup
+let _photosCache = [];
+let _photosReady = false;
+
+function _openPhotosDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(PHOTOS_DB_NAME, PHOTOS_DB_VERSION);
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(PHOTOS_STORE)) {
+                db.createObjectStore(PHOTOS_STORE, { keyPath: 'id' });
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function _loadPhotosFromIDB() {
+    try {
+        const db = await _openPhotosDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(PHOTOS_STORE, 'readonly');
+            const store = tx.objectStore(PHOTOS_STORE);
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    } catch (e) {
+        console.error('IDB load failed:', e);
+        return [];
+    }
+}
+
+async function _savePhotoToIDB(photo) {
+    try {
+        const db = await _openPhotosDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(PHOTOS_STORE, 'readwrite');
+            const store = tx.objectStore(PHOTOS_STORE);
+            store.put(photo);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    } catch (e) { console.error('IDB save failed:', e); }
+}
+
+async function _deletePhotoFromIDB(id) {
+    try {
+        const db = await _openPhotosDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(PHOTOS_STORE, 'readwrite');
+            const store = tx.objectStore(PHOTOS_STORE);
+            store.delete(id);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    } catch (e) { console.error('IDB delete failed:', e); }
+}
+
+// Migrate localStorage photos to IndexedDB (one-time)
+async function _migratePhotosToIDB() {
+    try {
+        const raw = localStorage.getItem(PROGRESS_PHOTOS_KEY);
+        if (!raw) return;
+        const arr = JSON.parse(raw);
+        if (!Array.isArray(arr) || arr.length === 0) return;
+        const db = await _openPhotosDB();
+        const tx = db.transaction(PHOTOS_STORE, 'readwrite');
+        const store = tx.objectStore(PHOTOS_STORE);
+        arr.forEach(p => store.put(p));
+        await new Promise((resolve, reject) => {
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error);
+        });
+        localStorage.removeItem(PROGRESS_PHOTOS_KEY);
+        console.log('Migrated', arr.length, 'photos from localStorage to IndexedDB');
+    } catch (e) {
+        console.error('Photo migration failed:', e);
+    }
+}
+
+// Initialize cache on load
+(async function initPhotosCache() {
+    try {
+        await _migratePhotosToIDB();
+        _photosCache = await _loadPhotosFromIDB();
+    } catch (e) {
+        console.error('Photos cache init failed:', e);
+        // Fallback: try localStorage
+        try { _photosCache = JSON.parse(localStorage.getItem(PROGRESS_PHOTOS_KEY) || '[]'); }
+        catch (e2) { _photosCache = []; }
+    }
+    _photosReady = true;
+    // Re-render if profile tab is visible
+    if (typeof renderProgressPhotoCard === 'function') {
+        try { renderProgressPhotoCard(); } catch (e) {}
+    }
+})();
 
 // --- Image utilities (still used by post composer + progress gallery) ---
 function resizeImage(dataUrl, maxWidth) {
@@ -31,17 +133,26 @@ function openLightbox(src) {
     document.body.appendChild(lb);
 }
 
-// --- Progress photo data layer ---
+// --- Progress photo data layer (synchronous via cache, async write-through to IDB) ---
 function getProgressPhotos() {
-    try { return JSON.parse(localStorage.getItem(PROGRESS_PHOTOS_KEY) || '[]'); }
-    catch (e) { return []; }
+    return _photosCache.slice(); // return copy
 }
 function saveProgressPhotos(arr) {
-    try { localStorage.setItem(PROGRESS_PHOTOS_KEY, JSON.stringify(arr)); }
-    catch (e) { /* quota — silent */ }
+    // Only used for bulk overwrite (e.g. cloud restore)
+    _photosCache = arr.slice();
+    // Write all to IDB in background
+    (async () => {
+        try {
+            const db = await _openPhotosDB();
+            const tx = db.transaction(PHOTOS_STORE, 'readwrite');
+            const store = tx.objectStore(PHOTOS_STORE);
+            store.clear();
+            arr.forEach(p => store.put(p));
+            await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+        } catch (e) { console.error('IDB bulk save failed:', e); }
+    })();
 }
 function addProgressPhoto({ dataUrl, perspective, weightLbs, notes }) {
-    const arr = getProgressPhotos();
     const photo = {
         id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
         dataUrl,
@@ -51,16 +162,16 @@ function addProgressPhoto({ dataUrl, perspective, weightLbs, notes }) {
         weightLbs: weightLbs || null,
         notes: notes || ''
     };
-    arr.push(photo);
-    saveProgressPhotos(arr);
+    _photosCache.push(photo);
+    _savePhotoToIDB(photo); // async, fire-and-forget
     return photo;
 }
 function deleteProgressPhoto(id) {
-    const arr = getProgressPhotos().filter(p => p.id !== id);
-    saveProgressPhotos(arr);
+    _photosCache = _photosCache.filter(p => p.id !== id);
+    _deletePhotoFromIDB(id); // async, fire-and-forget
 }
 function getProgressPhotoStats() {
-    const arr = getProgressPhotos();
+    const arr = _photosCache;
     if (arr.length === 0) return { count: 0, lastDate: null, daysSinceLast: null };
     const sorted = arr.slice().sort((a, b) => b.timestamp - a.timestamp);
     const lastDate = sorted[0].date;
@@ -77,7 +188,6 @@ async function handleCoachPhoto(event) {
     const reader = new FileReader();
     reader.onload = async (e) => {
         try {
-            // Resize larger for progress photos so the timeline still looks sharp
             _pendingProgressPhotoData = await resizeImage(e.target.result, 900);
             openProgressPhotoSaveModal(_pendingProgressPhotoData);
         } catch (err) {
@@ -88,7 +198,6 @@ async function handleCoachPhoto(event) {
     reader.readAsDataURL(file);
     event.target.value = '';
 }
-
 
 // --- Save modal (perspective + optional notes) ---
 function openProgressPhotoSaveModal(dataUrl) {
@@ -139,7 +248,6 @@ function openProgressPhotoSaveModal(dataUrl) {
         modal.remove();
         if (typeof showToast === 'function') showToast('Progress photo saved', 'success');
         if (typeof renderProgressPhotoCard === 'function') renderProgressPhotoCard();
-        // If coach is open, drop a confirmation message
         if (typeof addBotMessage === 'function') {
             addBotMessage(progressPhotoSavedMessage(chosen));
         }
@@ -311,7 +419,6 @@ function openProgressPhotoCompare() {
             `<strong>${formatProgressDate(left.date)}</strong><br>${left.perspective}${left.weightLbs ? ` &middot; ${left.weightLbs} lbs` : ''}`;
         modal.querySelector('#compare-meta-right').innerHTML =
             `<strong>${formatProgressDate(right.date)}</strong><br>${right.perspective}${right.weightLbs ? ` &middot; ${right.weightLbs} lbs` : ''}`;
-        // Summary
         const days = Math.max(0, Math.round((right.timestamp - left.timestamp) / 86400000));
         let summary = `<strong>${days} day${days !== 1 ? 's' : ''}</strong> apart`;
         if (left.weightLbs && right.weightLbs) {
@@ -326,4 +433,3 @@ function openProgressPhotoCompare() {
     updateCompare();
     modal.querySelector('#compare-close').onclick = () => modal.remove();
 }
-

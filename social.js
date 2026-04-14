@@ -734,6 +734,8 @@ function subscribeToFriendRequests() {
                         try { renderFriendsView(); } catch (e) { console.error(e); }
                     }
                     if (typeof showToast === 'function') showToast('New friend request!');
+                    updateNotifBadge();
+                    if (typeof fireNotification === 'function') fireNotification('\u{1F91D} Friend Request', 'Someone wants to connect with you');
                 })
                 .subscribe();
         }
@@ -754,6 +756,7 @@ function subscribeToFriendRequests() {
                         const post = (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
                         if (post && post.uid === currentUser.id) {
                             showToast(`@${c.username} commented on your post`);
+                            if (typeof fireNotification === 'function') fireNotification('\u{1F4AC} New Comment', `@${c.username}: ${(c.text || '').slice(0, 60)}`);
                             if (socialView === 'feed' && typeof loadFeed === 'function') loadFeed();
                         }
                     } catch (e) { console.error(e); }
@@ -771,6 +774,7 @@ function subscribeToFriendRequests() {
                             const newLiker = after.find(u => !before.includes(u));
                             if (newLiker && newLiker !== currentUser.id) {
                                 showToast('Someone liked your post');
+                                if (typeof fireNotification === 'function') fireNotification('\u2764\uFE0F Post Liked', 'Someone liked your post');
                                 if (socialView === 'feed' && typeof loadFeed === 'function') loadFeed();
                             }
                         }
@@ -1977,6 +1981,7 @@ function renderSocialTab() {
     document.getElementById('social-username').textContent = `@${userProfile.username}`;
     document.getElementById('social-display-name').textContent = userProfile.display_name;
     showSocialView(socialView);
+    updateNotifBadge();
 }
 
 function showAuthTab(tab) {
@@ -1999,6 +2004,7 @@ function showSocialView(view) {
 
     if (view === 'feed') loadFeed();
     if (view === 'friends') renderFriendsView();
+    if (view === 'notifications') renderNotificationsView();
     if (view === 'profile') renderProfileView();
 }
 
@@ -2092,6 +2098,146 @@ async function renderFriendsView() {
     container.innerHTML = html;
 }
 
+// ========== NOTIFICATIONS / ALERTS ==========
+async function renderNotificationsView() {
+    const container = document.getElementById('social-notifications');
+    if (!container || !currentUser) return;
+
+    container.innerHTML = '<p class="muted" style="text-align:center;padding:20px">Loading alerts...</p>';
+
+    // Fetch: comments on my posts, friend requests, likes on my posts
+    const [myPosts, friendReqs] = await Promise.all([
+        directSelect('posts?uid=eq.' + encodeURIComponent(currentUser.id) + '&select=id,caption&order=created_at.desc&limit=50'),
+        directSelect('friend_requests?to_uid=eq.' + encodeURIComponent(currentUser.id) + '&status=eq.pending&order=created_at.desc&select=*'),
+    ]);
+
+    const notifications = [];
+
+    // Friend requests
+    if (friendReqs && friendReqs.length > 0) {
+        friendReqs.forEach(r => {
+            notifications.push({
+                type: 'friend_request',
+                icon: '\u{1F91D}',
+                text: `<strong>@${escapeHtml(r.from_username)}</strong> sent you a friend request`,
+                time: r.created_at,
+                action: `<button class="btn btn-primary btn-sm" onclick="sbAcceptFriendRequest('${r.id}');renderNotificationsView()">Accept</button>
+                         <button class="btn btn-secondary btn-sm" onclick="sbDeclineFriendRequest('${r.id}');renderNotificationsView()">Decline</button>`,
+            });
+        });
+    }
+
+    // Comments on my posts
+    if (myPosts && myPosts.length > 0) {
+        const postIds = myPosts.map(p => p.id);
+        const comments = await directSelect(
+            'comments?post_id=in.(' + postIds.join(',') + ')&uid=neq.' + encodeURIComponent(currentUser.id) +
+            '&order=created_at.desc&limit=20&select=*'
+        );
+        if (comments && comments.length > 0) {
+            comments.forEach(c => {
+                const post = myPosts.find(p => p.id === c.post_id);
+                const preview = post?.caption ? post.caption.slice(0, 30) + (post.caption.length > 30 ? '...' : '') : 'your post';
+                notifications.push({
+                    type: 'comment',
+                    icon: '\u{1F4AC}',
+                    text: `<strong class="mention-link" onclick="viewUserProfileByUsername('${escapeHtml(c.username)}')">@${escapeHtml(c.username)}</strong> commented on ${escapeHtml(preview)}: "${escapeHtml(c.text.slice(0, 60))}"`,
+                    time: c.created_at,
+                    action: '',
+                });
+            });
+        }
+
+        // Likes on my posts
+        const likes = await directSelect(
+            'likes?post_id=in.(' + postIds.join(',') + ')&uid=neq.' + encodeURIComponent(currentUser.id) +
+            '&order=created_at.desc&limit=20&select=*'
+        );
+        if (likes && likes.length > 0) {
+            // Group likes by post to avoid spam
+            const likesByPost = {};
+            likes.forEach(l => {
+                if (!likesByPost[l.post_id]) likesByPost[l.post_id] = [];
+                likesByPost[l.post_id].push(l);
+            });
+            Object.entries(likesByPost).forEach(([postId, postLikes]) => {
+                const post = myPosts.find(p => p.id === postId);
+                const preview = post?.caption ? post.caption.slice(0, 30) + (post.caption.length > 30 ? '...' : '') : 'your post';
+                const count = postLikes.length;
+                notifications.push({
+                    type: 'like',
+                    icon: '\u2764\uFE0F',
+                    text: `<strong>${count}</strong> ${count === 1 ? 'person' : 'people'} liked ${escapeHtml(preview)}`,
+                    time: postLikes[0].created_at,
+                    action: '',
+                });
+            });
+        }
+    }
+
+    // Sort by time descending
+    notifications.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+    // Update badge
+    const badge = document.getElementById('notif-badge');
+    const unreadCount = (friendReqs ? friendReqs.length : 0);
+    if (badge) {
+        if (unreadCount > 0) {
+            badge.textContent = unreadCount;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+
+    if (notifications.length === 0) {
+        container.innerHTML = `
+            <div class="card">
+                <div class="empty-state-card">
+                    <div class="empty-state-icon">\u{1F514}</div>
+                    <p class="empty-state-title">No alerts yet</p>
+                    <p class="empty-state-sub">When friends like, comment, or send requests, they'll show up here.</p>
+                </div>
+            </div>`;
+        return;
+    }
+
+    let html = '<div class="card"><h2>Alerts</h2>';
+    notifications.forEach(n => {
+        const ago = typeof timeAgo === 'function' ? timeAgo(new Date(n.time).getTime()) : '';
+        html += `<div class="notif-item">
+            <span class="notif-icon">${n.icon}</span>
+            <div class="notif-body">
+                <span class="notif-text">${n.text}</span>
+                ${ago ? `<span class="notif-time">${ago}</span>` : ''}
+                ${n.action ? `<div class="notif-actions">${n.action}</div>` : ''}
+            </div>
+        </div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// Check for notification badge on load
+async function updateNotifBadge() {
+    if (!currentUser) return;
+    const reqs = await directSelect(
+        'friend_requests?to_uid=eq.' + encodeURIComponent(currentUser.id) +
+        '&status=eq.pending&select=id'
+    );
+    const badge = document.getElementById('notif-badge');
+    const reqBadge = document.getElementById('request-badge');
+    const count = reqs ? reqs.length : 0;
+    if (badge) {
+        if (count > 0) { badge.textContent = count; badge.classList.remove('hidden'); }
+        else { badge.classList.add('hidden'); }
+    }
+    if (reqBadge) {
+        if (count > 0) { reqBadge.textContent = count; reqBadge.classList.remove('hidden'); }
+        else { reqBadge.classList.add('hidden'); }
+    }
+}
+
 function renderProfileView() {
     const container = document.getElementById('social-profile');
     if (!container || !userProfile) return;
@@ -2151,6 +2297,11 @@ function renderProfileView() {
             </div>
         </div>
 
+        <div class="card" id="social-achievements-card">
+            <h2>Achievements</h2>
+            ${_renderSocialAchievements()}
+        </div>
+
         <div class="card">
             <h2>Account</h2>
             <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">${currentUser.email}</p>
@@ -2177,6 +2328,17 @@ function renderProfileView() {
             </button>
         </div>
     `;
+}
+
+// ========== SOCIAL ACHIEVEMENTS ==========
+function _renderSocialAchievements() {
+    if (typeof ACHIEVEMENTS === 'undefined' || typeof DB === 'undefined') return '<p class="muted">Loading...</p>';
+    const unlocked = DB.get('achievements', []);
+    const earned = (typeof ACHIEVEMENTS !== 'undefined' ? ACHIEVEMENTS : []).filter(a => unlocked.includes(a.id));
+    if (earned.length === 0) return '<p class="muted">No achievements unlocked yet. Keep training!</p>';
+    return `<div class="social-achievements-grid">${earned.map(a =>
+        `<div class="social-achievement" title="${escapeHtml(a.desc)}"><span class="social-achievement-icon">${a.icon}</span><span class="social-achievement-name">${escapeHtml(a.name)}</span></div>`
+    ).join('')}</div>`;
 }
 
 // ========== @MENTION LINKING ==========
