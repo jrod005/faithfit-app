@@ -2706,6 +2706,710 @@ const TOPIC_RESPONSES = {
                 return html;
             }
         },
+
+        // ===== TRAINING PHILOSOPHIES =====
+        {
+            triggers: ['mentzer', 'heavy duty', 'hit training', 'high intensity training', 'one set', 'train less', 'less is more', 'mike mentzer'],
+            answer: (ctx) => {
+                let html = `<h3>Mike Mentzer &amp; Heavy Duty (HIT)</h3>`;
+                html += `<p>Mike Mentzer was the most intellectually rigorous bodybuilder who ever lived. His <strong>Heavy Duty</strong> system was built on one principle: <em>minimum effective dose</em>. If one hard set stimulates growth, why do five?</p>`;
+                html += `<h3>The philosophy</h3><ul>`;
+                html += `<li><strong>1–2 working sets per exercise, taken to absolute failure.</strong> Not "it's getting hard" failure — true muscular failure where you cannot complete another rep with proper form.</li>`;
+                html += `<li><strong>4–7 days between training the same muscle.</strong> Mentzer believed most lifters massively overtrain. Growth happens during recovery, not during the workout.</li>`;
+                html += `<li><strong>Progressive overload is king.</strong> If you're not adding weight or reps session to session, you're not growing — you're just exercising.</li>`;
+                html += `<li><strong>High-intensity techniques:</strong> Rest-pause, forced reps, negatives (6–8 sec eccentrics), and pre-exhaust supersets (e.g., flyes immediately into bench press).</li>`;
+                html += `</ul>`;
+                html += `<h3>Sample Heavy Duty chest workout</h3><ol>`;
+                html += `<li>Dumbbell Flyes — 1×6–10 (pre-exhaust, to failure)</li>`;
+                html += `<li>Immediately into Incline Bench Press — 1×6–10 (to failure)</li>`;
+                html += `<li>Dips — 1×6–10 (to failure, add weight if needed)</li>`;
+                html += `</ol>`;
+                html += `<p>That's it. 3 total work sets. Mentzer won the 1978 Mr. Universe with a perfect score training this way.</p>`;
+                html += insightHtml(`<strong>What the science says:</strong> Krieger 2010 meta found multiple sets produce ~40% more hypertrophy than single sets. BUT — Fisher et al. 2011 showed that single sets taken to true failure produce significant gains, especially for time-constrained lifters. Mentzer's system works if the intensity is genuinely maximal.`);
+                html += `<p><strong>Who it's best for:</strong> People who train too much and recover too little. Hard-gainers. Older lifters. Anyone who dreads 2-hour gym sessions. The trade-off: you must be willing to push into real discomfort on every set — most people won't.</p>`;
+                html += `<p><strong>Mentzer's famous quote:</strong> <em>"The key is not how much work you do, but how hard you work."</em></p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['arnold', 'schwarzenegger', 'golden era', 'volume training', 'golden age', 'arnold split', 'encyclopedia'],
+            answer: (ctx) => {
+                let html = `<h3>Arnold Schwarzenegger &amp; Volume Training</h3>`;
+                html += `<p>Arnold trained with <strong>high volume, high frequency, and relentless intensity</strong>. His approach was the opposite of Mentzer's — where Mentzer said "less is more," Arnold said "more is more, if you can recover from it."</p>`;
+                html += `<h3>Arnold's principles</h3><ul>`;
+                html += `<li><strong>20–25 sets per muscle group per session.</strong> Chest day meant 5 exercises × 5 sets. Twice per week.</li>`;
+                html += `<li><strong>Train each muscle 2× per week.</strong> The classic Arnold split: Chest/Back, Shoulders/Arms, Legs — repeated. 6 days on, 1 off.</li>`;
+                html += `<li><strong>Supersets for opposing muscles.</strong> Arnold pioneered chest/back supersets — bench press immediately into barbell rows. Saved time and increased blood flow to both muscles.</li>`;
+                html += `<li><strong>Mind-muscle connection.</strong> Arnold was obsessive about feeling every rep in the target muscle. "Put your mind in the muscle."</li>`;
+                html += `<li><strong>Shocking the muscle.</strong> Constantly vary angles, rep ranges, tempo, and intensity techniques to prevent adaptation.</li>`;
+                html += `</ul>`;
+                html += `<h3>The Arnold Split</h3>`;
+                html += `<table class="plan-table"><tr><th>Day</th><th>Muscles</th></tr>`;
+                html += `<tr><td>Monday</td><td>Chest + Back</td></tr>`;
+                html += `<tr><td>Tuesday</td><td>Shoulders + Arms</td></tr>`;
+                html += `<tr><td>Wednesday</td><td>Legs</td></tr>`;
+                html += `<tr><td>Thursday</td><td>Chest + Back</td></tr>`;
+                html += `<tr><td>Friday</td><td>Shoulders + Arms</td></tr>`;
+                html += `<tr><td>Saturday</td><td>Legs</td></tr>`;
+                html += `<tr><td>Sunday</td><td>Rest</td></tr>`;
+                html += `</table>`;
+                html += insightHtml(`<strong>Modern science supports Arnold more than you'd think.</strong> Schoenfeld 2017 dose-response meta: higher volume (10–20+ sets/muscle/week) drives more hypertrophy. Schoenfeld 2016 frequency meta: 2×/week beats 1×. Arnold was doing both — high volume AND high frequency — decades before the research caught up.`);
+                html += `<p><strong>The caveat:</strong> Arnold trained 2–3 hours per day, 6 days a week. That volume requires elite recovery (sleep, nutrition, genetics). For most natural lifters, a modified Arnold split with 12–16 sets per muscle per week is more sustainable than the full 25+.</p>`;
+                html += `<p><strong>Arnold's famous quote:</strong> <em>"The last three or four reps is what makes the muscle grow. This area of pain divides a champion from someone who is not a champion."</em></p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['ronnie', 'coleman', 'ronnie coleman', 'lightweight baby', 'yeah buddy', 'heavy.*compound', 'powerbuild'],
+            answer: (ctx) => {
+                let html = `<h3>Ronnie Coleman: The King</h3>`;
+                html += `<p>8× Mr. Olympia. Squatted 800 lbs. Deadlifted 800 lbs. Did both for reps, on camera, while yelling "LIGHTWEIGHT BABY!" Ronnie's philosophy was brutally simple: <strong>lift the heaviest weights possible for moderate reps</strong>.</p>`;
+                html += `<h3>Ronnie's principles</h3><ul>`;
+                html += `<li><strong>Heavy compound movements first.</strong> Every workout started with a barbell movement — squats, deadlifts, barbell press, barbell rows. No machines until the heavy work was done.</li>`;
+                html += `<li><strong>Moderate reps, maximum weight.</strong> 8–12 reps on most exercises, but with a weight that most people couldn't move for 1. His 200 lb dumbbell shoulder press was done for sets of 12.</li>`;
+                html += `<li><strong>Volume was moderate.</strong> 4 exercises per muscle, 3–4 sets each. Not as extreme as Arnold's volume.</li>`;
+                html += `<li><strong>Each body part twice per week.</strong> Similar to Arnold's frequency but with a different split structure.</li>`;
+                html += `<li><strong>Consistency above all.</strong> Ronnie trained the same way for 15+ years. No program hopping. No gimmicks. Just progressive overload on the basics.</li>`;
+                html += `</ul>`;
+                html += `<h3>Ronnie's Split</h3>`;
+                html += `<table class="plan-table"><tr><th>Day</th><th>Focus</th></tr>`;
+                html += `<tr><td>Monday</td><td>Back (heavy — deadlifts, rows)</td></tr>`;
+                html += `<tr><td>Tuesday</td><td>Shoulders + Triceps + Calves</td></tr>`;
+                html += `<tr><td>Wednesday</td><td>Quads + Hamstrings</td></tr>`;
+                html += `<tr><td>Thursday</td><td>Chest + Biceps</td></tr>`;
+                html += `<tr><td>Friday</td><td>Back (lighter — width focus)</td></tr>`;
+                html += `<tr><td>Saturday</td><td>Shoulders + Arms + Calves</td></tr>`;
+                html += `</table>`;
+                html += insightHtml(`<strong>The takeaway for natural lifters:</strong> Ronnie's success wasn't about his exact split — it was about progressive overload with brutal consistency. He added weight to the bar every week for years. That principle works for everyone: track your lifts, beat last week's numbers, and don't skip the compound movements.`);
+                html += `<p><strong>Ronnie's quote:</strong> <em>"Everybody wants to be a bodybuilder, but don't nobody want to lift no heavy-ass weight."</em></p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['dorian', 'yates', 'blood.?and.?guts', 'dorian yates'],
+            answer: (ctx) => {
+                let html = `<h3>Dorian Yates: Blood &amp; Guts</h3>`;
+                html += `<p>6× Mr. Olympia. Dorian was Mentzer's spiritual successor — low volume, extreme intensity. But where Mentzer did 1 set, Dorian typically did <strong>1–2 warm-up sets then 1 all-out working set to failure and beyond</strong>.</p>`;
+                html += `<h3>Blood &amp; Guts principles</h3><ul>`;
+                html += `<li><strong>One working set per exercise, to absolute failure.</strong> Then a forced rep or two with a spotter. Then a 6-second negative.</li>`;
+                html += `<li><strong>4 exercises per muscle group.</strong> So roughly 4 true working sets total per session.</li>`;
+                html += `<li><strong>Each muscle once per week.</strong> Monday: chest/biceps. Tuesday: legs. Wednesday: off. Thursday: shoulders/triceps. Friday: back. Weekend: off.</li>`;
+                html += `<li><strong>Training sessions under 45 minutes.</strong> Get in, destroy the muscle, get out, eat, grow.</li>`;
+                html += `<li><strong>Meticulous logbook.</strong> Every weight, every rep, every session written down. Beat last week or you failed.</li>`;
+                html += `</ul>`;
+                html += insightHtml(`Dorian's approach is closer to what most natural lifters can actually recover from. Fewer total sets, but maximum effort on each. The research (Fisher 2011, Giessing 2016) shows that low-volume HIT produces meaningful hypertrophy — the trade-off is that you must push genuinely hard on every set.`);
+                html += `<p><strong>Dorian's quote:</strong> <em>"I don't do this to be healthy. I do this to get big."</em></p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['5.?x.?5', 'stronglift', 'starting strength', 'rippetoe', 'mark rippetoe', 'strong.?lift', 'bill starr', 'madcow', 'texas method'],
+            answer: (ctx) => {
+                let html = `<h3>5×5 &amp; Starting Strength Programs</h3>`;
+                html += `<p>The 5×5 template (Bill Starr 1976, popularized by Reg Park, then StrongLifts and Starting Strength) is the most battle-tested beginner program in existence.</p>`;
+                html += `<h3>The structure</h3>`;
+                html += `<table class="plan-table"><tr><th>Day</th><th>Exercises</th></tr>`;
+                html += `<tr><td>A</td><td>Squat 5×5, Bench Press 5×5, Barbell Row 5×5</td></tr>`;
+                html += `<tr><td>B</td><td>Squat 5×5, Overhead Press 5×5, Deadlift 1×5</td></tr>`;
+                html += `</table>`;
+                html += `<p>Alternate A/B, 3 days per week (Mon A, Wed B, Fri A, Mon B...). Add 5 lbs to every lift every session. That's it.</p>`;
+                html += insightHtml(`<strong>Why it works for beginners:</strong> Novice lifters can recover from and adapt to stress within 48–72 hours. Linear progression (adding weight each session) is possible for 3–6 months before you need periodization. After that, move to an intermediate program (Texas Method, 5/3/1, GZCL).`);
+                html += `<p><strong>Rippetoe's philosophy:</strong> Compound barbell movements, full range of motion, progressive overload. No machines, no isolation work until you can squat 1.5× bodyweight and deadlift 2×. Controversial but effective for building a strength base.</p>`;
+                html += `<p><strong>When to move on:</strong> When you can no longer add weight every session (typically 3–6 months in). Stalling 3 sessions in a row on the same weight = time for an intermediate program.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['531', '5.?3.?1', 'wendler', 'jim wendler', 'boring but big', 'bbb'],
+            answer: (ctx) => {
+                let html = `<h3>5/3/1 by Jim Wendler</h3>`;
+                html += `<p>One of the most popular intermediate-to-advanced strength programs ever written. Built on 4 lifts: squat, bench, deadlift, overhead press.</p>`;
+                html += `<h3>The structure (4-week cycle)</h3>`;
+                html += `<table class="plan-table"><tr><th>Week</th><th>Sets × Reps (% of Training Max)</th></tr>`;
+                html += `<tr><td>Week 1 (5s)</td><td>65%×5, 75%×5, 85%×5+</td></tr>`;
+                html += `<tr><td>Week 2 (3s)</td><td>70%×3, 80%×3, 90%×3+</td></tr>`;
+                html += `<tr><td>Week 3 (5/3/1)</td><td>75%×5, 85%×3, 95%×1+</td></tr>`;
+                html += `<tr><td>Week 4 (Deload)</td><td>40%×5, 50%×5, 60%×5</td></tr>`;
+                html += `</table>`;
+                html += `<p>The "+" means AMRAP (as many reps as possible). Your training max starts at 90% of your true max and increases 5 lbs/cycle (upper) or 10 lbs/cycle (lower).</p>`;
+                html += `<p><strong>Boring But Big (BBB) template:</strong> After your 5/3/1 sets, do 5×10 of the same lift at 50–60%. This adds hypertrophy volume on top of the strength work. One of the most effective templates for building size AND strength simultaneously.</p>`;
+                html += insightHtml(`Wendler's philosophy: <em>"Start too light, progress slowly, break personal records."</em> The slow progression is the point — it prevents stalling and keeps you healthy long-term.`);
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['ppl', 'push.?pull.?leg', 'push pull', 'push day', 'pull day', 'leg day'],
+            answer: (ctx) => {
+                let html = `<h3>Push/Pull/Legs (PPL)</h3>`;
+                html += `<p>The most popular intermediate hypertrophy split. Each session hits one movement pattern, allowing high volume per muscle with adequate recovery.</p>`;
+                html += `<h3>The split</h3>`;
+                html += `<table class="plan-table"><tr><th>Day</th><th>Muscles</th><th>Key lifts</th></tr>`;
+                html += `<tr><td>Push</td><td>Chest, shoulders, triceps</td><td>Bench, OHP, incline DB, lateral raises, tricep pushdown</td></tr>`;
+                html += `<tr><td>Pull</td><td>Back, biceps, rear delts</td><td>Deadlift/row, pull-ups, lat pulldown, face pulls, curls</td></tr>`;
+                html += `<tr><td>Legs</td><td>Quads, hamstrings, glutes, calves</td><td>Squat, RDL, leg press, leg curl, calf raises</td></tr>`;
+                html += `</table>`;
+                html += `<p><strong>6-day PPL (PPL×2):</strong> Best for intermediate-advanced lifters who want maximum frequency (each muscle 2×/week). Run Push/Pull/Legs/Push/Pull/Legs/Rest.</p>`;
+                html += `<p><strong>3-day PPL:</strong> Good for beginners or busy schedules. Each muscle hit 1×/week — not ideal for hypertrophy but better than nothing.</p>`;
+                html += insightHtml(`PPL is effective because it naturally manages fatigue: pressing muscles rest on pull day and vice versa. Schoenfeld's 2016 frequency meta supports 2×/week per muscle, which PPL×2 delivers.`);
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['upper.?lower', 'upper lower', 'phul', '4.?day split', 'four day split'],
+            answer: (ctx) => {
+                let html = `<h3>Upper/Lower Split</h3>`;
+                html += `<p>Train upper body one day, lower body the next, 4 days per week. Simple, effective, and backed by research for intermediate lifters.</p>`;
+                html += `<table class="plan-table"><tr><th>Day</th><th>Focus</th></tr>`;
+                html += `<tr><td>Monday</td><td>Upper (strength focus — heavier, 3–6 reps)</td></tr>`;
+                html += `<tr><td>Tuesday</td><td>Lower (strength focus)</td></tr>`;
+                html += `<tr><td>Wednesday</td><td>Rest</td></tr>`;
+                html += `<tr><td>Thursday</td><td>Upper (hypertrophy focus — 8–15 reps)</td></tr>`;
+                html += `<tr><td>Friday</td><td>Lower (hypertrophy focus)</td></tr>`;
+                html += `</table>`;
+                html += `<p>This is the PHUL (Power Hypertrophy Upper Lower) structure. Each muscle gets hit <strong>2×/week</strong> with different stimulus — one heavy day and one volume day. This dual-stimulus approach covers both strength and size.</p>`;
+                html += `<p><strong>Best for:</strong> Intermediates who can commit to 4 days. Balances volume, frequency, and recovery better than most splits.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['full body', 'full.?body', 'three day', '3 day', 'total body'],
+            answer: (ctx) => {
+                let html = `<h3>Full Body Training</h3>`;
+                html += `<p>The oldest and arguably most efficient split: hit every major muscle group in every session, 3× per week.</p>`;
+                html += `<h3>Sample full body template</h3>`;
+                html += `<table class="plan-table"><tr><th>Slot</th><th>Movement</th><th>Example</th></tr>`;
+                html += `<tr><td>1</td><td>Squat pattern</td><td>Squat, front squat, goblet squat</td></tr>`;
+                html += `<tr><td>2</td><td>Horizontal push</td><td>Bench, DB bench, push-ups</td></tr>`;
+                html += `<tr><td>3</td><td>Horizontal pull</td><td>Barbell row, cable row, DB row</td></tr>`;
+                html += `<tr><td>4</td><td>Hip hinge</td><td>RDL, hip thrust, good morning</td></tr>`;
+                html += `<tr><td>5</td><td>Vertical push</td><td>OHP, DB press, landmine press</td></tr>`;
+                html += `<tr><td>6</td><td>Vertical pull</td><td>Pull-ups, lat pulldown, chin-ups</td></tr>`;
+                html += `<tr><td>7</td><td>Accessory</td><td>Curls, lateral raises, abs</td></tr>`;
+                html += `</table>`;
+                html += `<p>3 sets each, 3 days per week = 9 sets per movement pattern per week. That's right in the hypertrophy sweet spot.</p>`;
+                html += insightHtml(`Full body is ideal for beginners (Helms 2014) and for anyone training 3 days per week. Each muscle gets 3× frequency — the highest of any common split. The trade-off: sessions are longer (60–75 min) and systemic fatigue is higher.`);
+                html += verseHtml();
+                return html;
+            }
+        },
+
+        // ===== ADVANCED TRAINING TECHNIQUES =====
+        {
+            triggers: ['drop.?set', 'strip set', 'run.?the.?rack'],
+            answer: (ctx) => {
+                let html = `<h3>Drop Sets</h3>`;
+                html += `<p>Perform a set to failure, immediately reduce the weight by 20–30%, and continue repping to failure again. Repeat 1–3 times.</p>`;
+                html += insightHtml(`Fink et al. 2018: Drop sets produce similar hypertrophy to traditional sets in less time. Ozaki et al. 2018: One drop set was as effective as three straight sets for muscle growth. Best used on the <strong>last set</strong> of an exercise — not every set.`);
+                html += `<p><strong>Best for:</strong> Isolation movements (curls, lateral raises, leg extensions) at the end of a workout. Don't drop-set heavy compound lifts — form breaks down and injury risk skyrockets.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['super.?set', 'antagonist', 'paired set', 'giant set'],
+            answer: (ctx) => {
+                let html = `<h3>Supersets &amp; Paired Sets</h3>`;
+                html += `<p><strong>Antagonist superset:</strong> Pair opposing muscles with no rest between — bench press + barbell row, curls + tricep pushdowns, leg extension + leg curl.</p>`;
+                html += insightHtml(`Paz et al. 2017: Antagonist supersets save ~40% training time with no reduction in performance. Robbins et al. 2010: Bench press performance actually <strong>improved</strong> when paired with rows due to reciprocal inhibition.`);
+                html += `<p><strong>Same-muscle superset (compound set):</strong> Two exercises for the same muscle back-to-back. E.g., dumbbell flyes into bench press (Mentzer's pre-exhaust). Brutal for pump and metabolic stress.</p>`;
+                html += `<p><strong>Giant sets:</strong> 3–4 exercises in a row with no rest. Excellent for conditioning and time-saving. Terrible for maximal strength.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['rest.?pause', 'myo.?rep', 'myo rep', 'cluster set'],
+            answer: (ctx) => {
+                let html = `<h3>Rest-Pause &amp; Myo-Reps</h3>`;
+                html += `<p><strong>Rest-pause:</strong> Hit failure at ~8 reps, rest 10–15 seconds, do 2–3 more reps, rest 10–15 seconds, do 1–2 more reps. One "set" becomes 11–13 total reps with more of them near failure.</p>`;
+                html += `<p><strong>Myo-reps (Borge Fagerli):</strong> Do an activation set of 12–20 reps to near failure. Rest 5 breaths (~15 sec). Do 3–5 reps. Repeat for 3–5 mini-sets. Stop when you can't hit 3 reps.</p>`;
+                html += insightHtml(`Prestes et al. 2019: rest-pause training produced greater hypertrophy than traditional sets in trained men. The mechanism: more "effective reps" (the last 5 reps near failure are what drive growth — rest-pause maximizes these).`);
+                html += `<p><strong>Cluster sets (Tufano 2017):</strong> Break a heavy set into singles or doubles with 15–30 sec rest between. E.g., instead of 5×3 at 85%, do 15 singles at 85% with 20 sec rest. Maintains bar speed and reduces fatigue — used in powerlifting and Olympic lifting.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['tempo', 'eccentric', 'negative', 'time.?under.?tension', 'tut', 'slow rep', 'controlled rep'],
+            answer: (ctx) => {
+                let html = `<h3>Tempo &amp; Eccentric Training</h3>`;
+                html += `<p>Tempo is written as 4 numbers: e.g., <strong>3-1-2-0</strong> = 3 sec eccentric, 1 sec pause at bottom, 2 sec concentric, 0 sec pause at top.</p>`;
+                html += `<p><strong>Eccentric (negative) training:</strong> You're ~30% stronger eccentrically than concentrically. Slow eccentrics (3–5 sec) create more muscle damage and mechanical tension — both drivers of hypertrophy.</p>`;
+                html += insightHtml(`Schoenfeld 2017 eccentric meta: Eccentric-focused training produces slightly more hypertrophy than concentric-only training, particularly for muscle fascicle length. The practical advice: control the negative on every rep (2–3 seconds). Don't just drop the weight.`);
+                html += `<p><strong>Dedicated negative sets:</strong> Load 105–120% of your 1RM, have a spotter help you lift it, then lower it yourself over 5–6 seconds. 3–5 negatives = a brutal stimulus. Use sparingly (once per week per muscle) — recovery cost is very high.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['mind.?muscle', 'feel the muscle', 'connection', 'internal focus', 'squeeze'],
+            answer: (ctx) => {
+                let html = `<h3>Mind-Muscle Connection</h3>`;
+                html += `<p>Arnold swore by it. The science now backs him up.</p>`;
+                html += insightHtml(`Schoenfeld &amp; Contreras 2016: Focusing on the target muscle during bicep curls increased bicep activation by <strong>22%</strong> compared to just moving the weight. Calatayud et al. 2016 confirmed the same for bench press — internal focus increased chest EMG.`);
+                html += `<p><strong>When to use it:</strong> Isolation exercises and hypertrophy work (8+ reps). Focus on squeezing and feeling the target muscle through the full range of motion.</p>`;
+                html += `<p><strong>When NOT to use it:</strong> Heavy compound lifts (1–5 reps). On heavy squats and deadlifts, use an <em>external focus</em> — think "push the floor away" or "drive through the heels." Wulf 2013 meta: external focus improves force production on maximal efforts.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['periodiz', 'deload', 'training block', 'mesocycle', 'macrocycle', 'linear progression', 'undulat', 'block periodiz'],
+            answer: (ctx) => {
+                let html = `<h3>Periodization: Training in Phases</h3>`;
+                html += `<p>You can't train heavy, high-volume, and intense forever. Periodization structures your training in cycles so you peak when it matters and recover when you need to.</p>`;
+                html += `<h3>Main models</h3>`;
+                html += `<table class="plan-table"><tr><th>Model</th><th>How it works</th><th>Best for</th></tr>`;
+                html += `<tr><td>Linear</td><td>Weight goes up every session (5×5 style)</td><td>Beginners (3–6 months)</td></tr>`;
+                html += `<tr><td>Daily Undulating (DUP)</td><td>Heavy Mon, moderate Wed, light Fri each week</td><td>Intermediates wanting strength + size</td></tr>`;
+                html += `<tr><td>Block</td><td>4–6 week blocks focusing on hypertrophy → strength → peaking</td><td>Advanced, powerlifters, athletes</td></tr>`;
+                html += `<tr><td>5/3/1 style</td><td>4-week waves with built-in deload</td><td>Intermediate-advanced general strength</td></tr>`;
+                html += `</table>`;
+                html += insightHtml(`Harries et al. 2015 meta: periodized programs produce <strong>significantly greater</strong> strength gains than non-periodized programs. DUP specifically outperformed linear periodization in trained lifters (Rhea 2002 meta).`);
+                html += `<h3>Deloads</h3>`;
+                html += `<p>Every 4–8 weeks, reduce volume by 40–60% and intensity by 10–20% for one week. Issurin 2010: planned recovery weeks allow accumulated fatigue to dissipate while preserving fitness. You'll come back stronger.</p>`;
+                html += `<p><strong>Signs you need a deload:</strong> Strength regressing, chronic joint pain, poor sleep, loss of motivation, elevated resting heart rate.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['blood.?flow', 'bfr', 'occlusion', 'kaatsu'],
+            answer: (ctx) => {
+                let html = `<h3>Blood Flow Restriction (BFR) Training</h3>`;
+                html += `<p>Wrap bands around the top of a limb at ~50–70% occlusion pressure, then train with very light loads (20–30% 1RM) for high reps (15–30).</p>`;
+                html += insightHtml(`Lixandrão et al. 2018 meta: BFR with light loads produces hypertrophy comparable to traditional heavy training (70%+ 1RM). The mechanism: metabolic stress (pooled blood, lactate buildup) triggers anabolic signaling without heavy mechanical load.`);
+                html += `<p><strong>Best for:</strong> Rehabbing injuries (you can grow muscle with 20% 1RM), deload weeks, accessory work finishers, older lifters with joint issues. NOT a replacement for heavy training — it's a supplement.</p>`;
+                html += `<p><strong>Protocol:</strong> 4 sets of 30/15/15/15 reps with 30 sec rest between sets. Keep bands on the entire time. 2–3 exercises per session. Remove bands immediately after your last set.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+
+        // ===== NUTRITION SCIENCE DEEP DIVES =====
+        {
+            triggers: ['bulk', 'bulking', 'calorie surplus', 'lean bulk', 'dirty bulk', 'mass gain', 'gaining phase', 'off.?season'],
+            answer: (ctx) => {
+                let html = `<h3>Bulking: How to Gain Muscle Without Getting Fat</h3>`;
+                html += `<p>You need a calorie surplus to maximize muscle growth. The question is how much.</p>`;
+                html += `<table class="plan-table"><tr><th>Approach</th><th>Surplus</th><th>Monthly muscle</th><th>Monthly fat</th></tr>`;
+                html += `<tr><td>Lean bulk</td><td>200–300 cal/day</td><td>~1–2 lbs</td><td>~0.5–1 lb</td></tr>`;
+                html += `<tr><td>Moderate bulk</td><td>300–500 cal/day</td><td>~1–2 lbs</td><td>~1–2 lbs</td></tr>`;
+                html += `<tr><td>Dirty bulk</td><td>500–1000+ cal/day</td><td>~1–2 lbs</td><td>~3–6 lbs</td></tr>`;
+                html += `</table>`;
+                html += insightHtml(`Notice something? Muscle gain is roughly the same regardless of surplus size. Garthe et al. 2013: athletes in a large surplus gained the SAME muscle as those in a small surplus — but gained significantly more fat. <strong>A lean bulk (200–300 cal surplus) is almost always the right call.</strong>`);
+                html += `<p><strong>How to bulk:</strong></p><ol>`;
+                html += `<li>Set protein to 1.6–2.2 g/kg body weight</li>`;
+                html += `<li>Set calories to TDEE + 200–300</li>`;
+                html += `<li>Gain 0.5–1% of body weight per month (for a 180 lb person: 1–2 lbs/month)</li>`;
+                html += `<li>If gaining faster than that, you're adding unnecessary fat — pull calories back</li>`;
+                html += `<li>Bulk for 3–6 months, then cut if needed</li>`;
+                html += `</ol>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['cut', 'cutting', 'calorie deficit', 'diet down', 'shred', 'lean out', 'get lean', 'lose fat'],
+            answer: (ctx) => {
+                const wt = ctx.currentWeight || 180;
+                const wtKg = Math.round(wt * 0.453592);
+                let html = `<h3>Cutting: Lose Fat, Keep Muscle</h3>`;
+                html += `<p>The goal of a cut is to lose fat while preserving as much muscle as possible. This requires a <strong>moderate deficit + high protein + resistance training</strong>.</p>`;
+                html += `<h3>The evidence-based approach</h3><ol>`;
+                html += `<li><strong>Deficit:</strong> 300–500 cal/day below TDEE. Larger deficits (>750) increase muscle loss exponentially (Helms 2014).</li>`;
+                html += `<li><strong>Protein:</strong> Increase to the high end during a cut — ${Math.round(wtKg * 2.0)}–${Math.round(wtKg * 2.4)}g/day for you. Longland 2016: higher protein during a deficit preserved 100% of lean mass vs lower protein group.</li>`;
+                html += `<li><strong>Lifting:</strong> Maintain intensity (weight on the bar). You can reduce volume by 1/3 but do NOT drop the weight. The training stimulus is what tells your body to keep the muscle.</li>`;
+                html += `<li><strong>Rate of loss:</strong> 0.5–1% body weight per week. For you at ${wt} lbs: ~${Math.round(wt * 0.005 * 10) / 10}–${Math.round(wt * 0.01 * 10) / 10} lbs/week.</li>`;
+                html += `<li><strong>Diet breaks:</strong> Every 6–8 weeks, eat at maintenance for 1–2 weeks. Byrne et al. 2018 (MATADOR study): intermittent dieting preserved more muscle and produced more fat loss than continuous dieting.</li>`;
+                html += `</ol>`;
+                html += insightHtml(`<strong>The leaner you are, the slower you should go.</strong> At 20%+ body fat: 1% per week is fine. At 12–15%: slow to 0.5%/week. Below 12%: expect to lose some muscle no matter what — your body doesn't want to be that lean.`);
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['recomp', 'body.?recomp', 'recomposition', 'lose fat.*gain muscle', 'gain muscle.*lose fat', 'both at once'],
+            answer: (ctx) => {
+                let html = `<h3>Body Recomposition</h3>`;
+                html += `<p>Can you lose fat and gain muscle at the same time? <strong>Yes — but it's slow, and it doesn't work for everyone.</strong></p>`;
+                html += `<h3>Who recomp works for</h3><ul>`;
+                html += `<li><strong>Beginners</strong> — newbie gains are real (Helms 2014). First 6–12 months of training, you can build muscle even in a mild deficit.</li>`;
+                html += `<li><strong>Detrained lifters returning</strong> — muscle memory (Seaborne 2018 epigenetic study) means previously trained muscle regrows faster.</li>`;
+                html += `<li><strong>Overweight lifters</strong> — the excess body fat provides the energy surplus internally. You can eat at maintenance or slight deficit and still grow.</li>`;
+                html += `</ul>`;
+                html += `<h3>Who should NOT recomp</h3><ul>`;
+                html += `<li><strong>Lean, trained lifters</strong> — if you're under 15% body fat with 2+ years of training, you'll spin your wheels at maintenance. Pick bulk or cut.</li>`;
+                html += `</ul>`;
+                html += `<p><strong>Recomp protocol:</strong> Eat at maintenance calories, protein at 2.0–2.2 g/kg, train hard with progressive overload. Track body measurements and photos, not the scale — the scale may not move even as your body changes.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['reverse diet', 'metabolic adapta', 'adaptive thermogenesis', 'metabolism slow', 'damaged metabolism', 'starvation mode', 'metabolic damage'],
+            answer: (ctx) => {
+                let html = `<h3>Metabolic Adaptation &amp; Reverse Dieting</h3>`;
+                html += `<p><strong>"Starvation mode" is a myth. Metabolic adaptation is real.</strong></p>`;
+                html += `<p>When you diet, your body burns fewer calories through:</p><ul>`;
+                html += `<li>Less body mass = lower BMR</li>`;
+                html += `<li>Reduced NEAT (you fidget less, move less unconsciously)</li>`;
+                html += `<li>Adaptive thermogenesis: your body becomes ~10–15% more efficient (Rosenbaum 2010)</li>`;
+                html += `<li>Hormonal changes: lower thyroid, lower leptin, higher ghrelin (hunger)</li>`;
+                html += `</ul>`;
+                html += insightHtml(`Trexler et al. 2014 review: metabolic adaptation is real but accounts for at most 10–15% reduction in TDEE. It does NOT stop fat loss entirely — if you're truly in a deficit, you will lose weight. If the scale stops moving, your deficit has shrunk and you need to re-adjust.`);
+                html += `<h3>Reverse dieting</h3>`;
+                html += `<p>After a long cut, add 50–100 calories per week back to your intake until you reach maintenance. This lets your metabolism recover gradually, minimizes fat rebound, and restores hormone levels (especially leptin, thyroid, and testosterone).</p>`;
+                html += `<p><strong>Timeline:</strong> 4–8 weeks of reverse dieting after a cut before starting another deficit or switching to a bulk.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['carb', 'carbs', 'carbohydrate', 'glycogen', 'low.?carb', 'keto', 'ketogenic', 'no.?carb'],
+            answer: (ctx) => {
+                let html = `<h3>Carbohydrates &amp; Performance</h3>`;
+                html += `<p>Carbs are your body's preferred fuel for high-intensity exercise. Glycogen (stored carbs in muscle) is the primary energy source for sets of 6–20 reps.</p>`;
+                html += insightHtml(`Escobar et al. 2016: Low-carb diets reduce training performance by 7–15% in strength athletes. Kephart et al. 2018: Keto diets in CrossFit athletes showed no advantage for body composition vs balanced macros, and performance decreased.`);
+                html += `<p><strong>How much:</strong> 3–5 g/kg body weight for moderate training; 5–7 g/kg for heavy training days. Prioritize carbs around workouts — before, during (if 90+ min), and after.</p>`;
+                html += `<p><strong>Best sources:</strong> Rice, oats, potatoes, sweet potatoes, fruit, bread, pasta. The "clean vs dirty" distinction doesn't matter much for body composition — total calories and protein matter more (IIFYM principle, supported by Bray 2012).</p>`;
+                html += `<p><strong>Keto for lifters?</strong> Generally not recommended. It works for fat loss only because it reduces appetite (Johnstone 2015), not because of metabolic magic. You'll perform worse in the gym and likely lose more muscle during a cut. Use it only if you genuinely prefer eating that way.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['fat.*intake', 'dietary fat', 'healthy fat', 'how much fat', 'fat.*diet', 'omega', 'saturated fat', 'trans fat'],
+            answer: (ctx) => {
+                const wt = ctx.currentWeight || 180;
+                const wtKg = Math.round(wt * 0.453592);
+                const low = Math.round(wtKg * 0.8);
+                const high = Math.round(wtKg * 1.2);
+                let html = `<h3>Dietary Fat: How Much You Need</h3>`;
+                html += `<p>Fat is essential for hormone production (especially testosterone), brain function, and absorbing vitamins A, D, E, K.</p>`;
+                html += `<p><strong>Minimum:</strong> 0.8–1.2 g/kg body weight (${low}–${high}g for you). Going below 0.5 g/kg impairs testosterone production (Hämäläinen 1984, Dorgan 1996).</p>`;
+                html += `<p><strong>Best sources:</strong></p><ul>`;
+                html += `<li><strong>Monounsaturated:</strong> Olive oil, avocados, nuts — heart-healthy baseline</li>`;
+                html += `<li><strong>Polyunsaturated (omega-3):</strong> Fatty fish, walnuts, flaxseed — anti-inflammatory, 1–3g EPA/DHA per day</li>`;
+                html += `<li><strong>Saturated:</strong> Not the villain it was made out to be (Siri-Tarino 2010 meta), but don't overdo it — keep under 10% of calories</li>`;
+                html += `<li><strong>Trans fats:</strong> Genuinely harmful. Avoid hydrogenated oils completely.</li>`;
+                html += `</ul>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['caffeine', 'coffee', 'pre.?workout', 'energy drink', 'caffeine.*before'],
+            answer: (ctx) => {
+                const wt = ctx.currentWeight || 180;
+                const wtKg = Math.round(wt * 0.453592);
+                const low = Math.round(wtKg * 3);
+                const high = Math.round(wtKg * 6);
+                let html = `<h3>Caffeine &amp; Training Performance</h3>`;
+                html += `<p>Caffeine is the most well-studied legal performance enhancer in existence.</p>`;
+                html += insightHtml(`Grgic et al. 2018 meta-analysis: caffeine improves strength by <strong>2–7%</strong>, endurance by <strong>2–4%</strong>, and power output by <strong>~3%</strong>. Optimal dose: <strong>3–6 mg/kg</strong>, taken 30–60 min before training. For you: ${low}–${high} mg.`);
+                html += `<p><strong>Practical guide:</strong></p><ul>`;
+                html += `<li>A cup of coffee = ~95 mg caffeine. An espresso = ~63 mg.</li>`;
+                html += `<li>Most pre-workouts contain 150–300 mg — which is why you could just drink coffee for 1/10 the price.</li>`;
+                html += `<li><strong>Cut-off time:</strong> No caffeine after 2 PM. Caffeine has a half-life of 5–6 hours. A 3 PM coffee still has half its caffeine in your system at 9 PM — wrecking your deep sleep even if you fall asleep fine.</li>`;
+                html += `<li>Tolerance builds in 1–2 weeks. Cycle off for 1 week every 2–3 months to resensitize.</li>`;
+                html += `<li>If you don't already use caffeine, start at 100 mg and work up. Don't jump to 400 mg on day one.</li>`;
+                html += `</ul>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+
+        // ===== HORMONES & BIOLOGY =====
+        {
+            triggers: ['testosterone', 'test level', 'low.?t', 'boost test', 'natural test', 'trt', 'hormone'],
+            answer: (ctx) => {
+                let html = `<h3>Testosterone &amp; Training</h3>`;
+                html += `<p>Testosterone is one of the primary anabolic hormones. But the relationship between test levels and muscle growth is more nuanced than the internet suggests.</p>`;
+                html += insightHtml(`Morton et al. 2016 (McMaster University): Post-exercise testosterone spikes do NOT predict muscle growth. The hormone levels that matter are your <strong>baseline 24/7 levels</strong>, not what happens for 30 minutes after squats.`);
+                html += `<h3>How to optimize natural testosterone</h3>`;
+                html += `<table class="plan-table"><tr><th>Factor</th><th>Impact</th><th>Action</th></tr>`;
+                html += `<tr><td>Sleep</td><td>Leproult 2011: 5 hrs/night = 10–15% lower T</td><td>7–9 hours. Non-negotiable.</td></tr>`;
+                html += `<tr><td>Body fat</td><td>Obesity lowers T via aromatase conversion</td><td>Stay 10–20% body fat</td></tr>`;
+                html += `<tr><td>Dietary fat</td><td>Very low-fat diets reduce T (Hämäläinen 1984)</td><td>Keep fat > 0.8 g/kg/day</td></tr>`;
+                html += `<tr><td>Vitamin D</td><td>Pilz 2011: D supplementation raised T by 25% in deficient men</td><td>2,000–4,000 IU/day</td></tr>`;
+                html += `<tr><td>Zinc</td><td>Essential for T synthesis — deficiency tanks levels</td><td>15–30 mg/day or eat red meat/oysters</td></tr>`;
+                html += `<tr><td>Stress</td><td>Cortisol and testosterone are inversely related</td><td>Manage stress, don't overtrain</td></tr>`;
+                html += `<tr><td>Alcohol</td><td>Acute reduction in T for 24–72 hours</td><td>Limit to 1–2 drinks, not on training days</td></tr>`;
+                html += `</table>`;
+                html += `<p><strong>What DOESN'T work:</strong> Tribulus, fenugreek, "test boosters" — none raise testosterone in healthy men with normal levels (Qureshi 2014 review). Save your money.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['cortisol', 'stress.*hormone', 'stress.*muscle', 'overtrain.*syndrome'],
+            answer: (ctx) => {
+                let html = `<h3>Cortisol &amp; Overtraining</h3>`;
+                html += `<p>Cortisol is a catabolic hormone released during stress — including intense exercise. In small doses it's part of normal recovery. Chronically elevated, it impairs muscle growth, increases fat storage (especially abdominal), and tanks immune function.</p>`;
+                html += `<h3>Signs of overtraining / chronic cortisol elevation</h3><ul>`;
+                html += `<li>Strength going DOWN despite training hard</li>`;
+                html += `<li>Constant fatigue even after sleep</li>`;
+                html += `<li>Getting sick more often</li>`;
+                html += `<li>Elevated resting heart rate (5+ bpm above normal)</li>`;
+                html += `<li>Mood changes — irritability, depression, loss of motivation</li>`;
+                html += `<li>Joint pain that doesn't go away</li>`;
+                html += `<li>Insomnia despite being exhausted</li>`;
+                html += `</ul>`;
+                html += `<p><strong>Fix:</strong> Deload immediately (reduce volume 50%, reduce intensity 10%). Sleep 8+ hours. Eat at maintenance or slight surplus. Take 3–5 full rest days. Most "overtraining" is actually <strong>under-recovering</strong> — fix sleep, food, and stress before blaming training volume.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+
+        // ===== COMMON MYTHS =====
+        {
+            triggers: ['tone', 'toning', 'toned', 'long.*lean', 'bulky', 'get.*bulky', 'too.*muscl', 'don.*want.*big'],
+            answer: (ctx) => {
+                let html = `<h3>Myth: "I Don't Want to Get Bulky"</h3>`;
+                html += `<p><strong>"Toning" isn't a thing.</strong> There are exactly two variables: muscle size and body fat percentage. "Toned" means you have visible muscle with low body fat. "Bulky" means you have large muscle with higher body fat.</p>`;
+                html += `<p>Building significant muscle takes <strong>years</strong> of dedicated heavy training, calorie surplus, and optimal nutrition. It does not happen by accident. Nobody ever woke up and said "oops, I accidentally got too jacked."</p>`;
+                html += insightHtml(`Women produce 15–20× less testosterone than men (Vingren 2010). Even men who WANT to get big struggle to gain more than 20–25 lbs of muscle in their lifetime. You will not get "bulky" from lifting heavy — you will look athletic, strong, and lean.`);
+                html += `<p><strong>What to do:</strong> Lift heavy. Progressive overload. Moderate calorie deficit if you want to lose fat. The "toned" look you want IS the muscle + low body fat combination — and heavy lifting is the fastest way to get there.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['meal.*often', 'eat.*often', 'six meals', '6 meals', 'eating frequency', 'metaboli.*fire', 'metabolism.*boost', 'stoke.*metaboli'],
+            answer: (ctx) => {
+                let html = `<h3>Myth: Eating 6 Small Meals "Stokes the Metabolic Fire"</h3>`;
+                html += `<p><strong>This is not true.</strong> The thermic effect of food (TEF) is proportional to total calories, not meal frequency.</p>`;
+                html += insightHtml(`Schoenfeld et al. 2015 meta-analysis: meal frequency has <strong>no significant effect</strong> on fat loss or metabolic rate. Whether you eat 2 meals or 6 meals, total daily calories and protein are what matter.`);
+                html += `<p><strong>What does matter for meal frequency:</strong></p><ul>`;
+                html += `<li><strong>Protein distribution:</strong> Mamerow 2014 showed that spreading protein across 3–4 meals produces more MPS than cramming it into 1–2. Aim for 0.4 g/kg per meal.</li>`;
+                html += `<li><strong>Adherence:</strong> Eat however many meals help you stick to your calorie target. If 2 big meals keeps you satisfied, do that. If 5 small meals prevents binging, do that.</li>`;
+                html += `</ul>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['sweat', 'sweating', 'sweat.*fat', 'sauna.*fat', 'sweat.*suit', 'sweat.*lose'],
+            answer: (ctx) => {
+                let html = `<h3>Myth: Sweating = Burning Fat</h3>`;
+                html += `<p><strong>Sweat is thermoregulation, not fat loss.</strong> You lose water weight from sweating, which comes right back when you rehydrate.</p>`;
+                html += `<p>Fat is lost through a <strong>calorie deficit</strong>. The actual biochemistry: fat is broken down into CO₂ (you breathe it out) and H₂O (you excrete it). Meerman &amp; Brown 2014 (BMJ): 84% of fat leaves your body as carbon dioxide through your lungs. The sweat is just water.</p>`;
+                html += `<p><strong>Saunas:</strong> Good for relaxation, possible cardiovascular benefits (Laukkanen 2015 Finnish study), and perceived recovery. They do NOT meaningfully burn fat. Sauna suits and garbage bags are dangerous — they cause dehydration and can lead to heat stroke.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['high rep.*tone', 'light weight.*tone', 'light.*heavy', 'rep range.*matter', 'hypertrophy.*range', 'best rep range'],
+            answer: (ctx) => {
+                let html = `<h3>Rep Ranges: What Actually Matters</h3>`;
+                html += `<p>The "hypertrophy range" of 8–12 reps is a useful guideline, not a biological law.</p>`;
+                html += insightHtml(`Schoenfeld et al. 2017 rep range study: Training with 8–12 reps, 3–5 reps, OR 25–35 reps all produced <strong>similar muscle growth</strong> when volume was equated. The key variable is <strong>training close to failure</strong>, not the rep range.`);
+                html += `<table class="plan-table"><tr><th>Rep range</th><th>Best for</th><th>Notes</th></tr>`;
+                html += `<tr><td>1–5</td><td>Maximal strength</td><td>Heavy, high neural demand, long rest (3–5 min)</td></tr>`;
+                html += `<tr><td>6–12</td><td>Hypertrophy (practical sweet spot)</td><td>Best balance of mechanical tension + metabolic stress + time efficiency</td></tr>`;
+                html += `<tr><td>12–20</td><td>Muscular endurance + hypertrophy</td><td>Good for isolation work, joints feel better</td></tr>`;
+                html += `<tr><td>20–30+</td><td>Endurance, pump, rehab</td><td>Still builds muscle IF taken near failure. Mentally brutal.</td></tr>`;
+                html += `</table>`;
+                html += `<p><strong>Practical advice:</strong> Do most of your work in 6–15 reps, but include some heavy work (3–5) for compounds and some higher rep work (15–20) for isolation. Variety in rep ranges is itself a hypertrophy stimulus.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+
+        // ===== SPECIFIC CONCERNS =====
+        {
+            triggers: ['women', 'female', 'girl', 'woman', 'ladies', 'women.*train', 'train.*different'],
+            answer: (ctx) => {
+                let html = `<h3>Training for Women</h3>`;
+                html += `<p><strong>Women should train the same way as men.</strong> The fundamental biology of muscle growth is identical. The same exercises, same progressive overload, same principles apply.</p>`;
+                html += insightHtml(`Roberts et al. 2020 meta: Women respond to resistance training with the same relative muscle growth as men. The absolute amount is less (due to lower testosterone), but the training stimulus should be the same.`);
+                html += `<p><strong>Key differences:</strong></p><ul>`;
+                html += `<li>Women can generally handle <strong>more volume</strong> than men at a given intensity and recover faster between sets (Hunter 2014)</li>`;
+                html += `<li>Women tend to perform better with <strong>slightly higher rep ranges</strong> (8–15) because they have a higher proportion of Type I (endurance) muscle fibers on average</li>`;
+                html += `<li>Menstrual cycle: Strength peaks in the follicular phase (days 1–14). Some women train heavier during this phase and focus on volume/technique in the luteal phase (Wikström-Frisén 2017)</li>`;
+                html += `<li>You will NOT get "bulky." Women produce 15–20× less testosterone than men. Lifting heavy builds a lean, athletic physique — not a bodybuilder's physique.</li>`;
+                html += `</ul>`;
+                html += `<p><strong>Bottom line:</strong> Squat, bench, deadlift, overhead press, row. Progressive overload. Eat enough protein. Everything else is the same.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['knee', 'knee pain', 'squat.*knee', 'knee.*squat', 'bad.*knee', 'knee.*past'],
+            answer: (ctx) => {
+                let html = `<h3>Knee Health &amp; Training</h3>`;
+                html += `<p><strong>"Squats are bad for your knees"</strong> is one of the most persistent and harmful myths in fitness.</p>`;
+                html += insightHtml(`Hartmann et al. 2013 review: Deep squats do NOT increase injury risk in healthy knees. In fact, the forces on the ACL and PCL <strong>decrease</strong> as you squat deeper because of the wrapping effect of soft tissue around the joint.`);
+                html += `<p><strong>If you currently have knee pain:</strong></p><ul>`;
+                html += `<li>Box squats or squat to a bench — control depth, reduce bounce</li>`;
+                html += `<li>Goblet squats — the counterbalance helps you sit back more</li>`;
+                html += `<li>Leg press with limited range (don't go too deep)</li>`;
+                html += `<li>Terminal knee extensions (TKEs) — rehab staple for patellar tendon issues</li>`;
+                html += `<li>Step-ups — unilateral, low impact, highly effective</li>`;
+                html += `<li>Strengthen your VMO (inner quad) — it stabilizes the patella</li>`;
+                html += `</ul>`;
+                html += `<p><strong>Long term:</strong> Strengthening the muscles around the knee (quads, hamstrings, glutes) is the single best thing you can do for knee health. Weak legs = vulnerable joints. Strong legs = protected joints.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['back pain', 'lower back', 'herniat', 'disc', 'spine', 'back.*hurt', 'deadlift.*back'],
+            answer: (ctx) => {
+                let html = `<h3>Back Pain &amp; Training</h3>`;
+                html += `<p>Most low back pain in lifters comes from one of three causes: (1) too much volume, (2) poor bracing, or (3) ego loading. Rarely is the spine itself damaged.</p>`;
+                html += `<p><strong>If you're currently in pain:</strong></p><ul>`;
+                html += `<li>Don't stop training — controlled movement is better than bed rest (Hayden 2005 Cochrane review)</li>`;
+                html += `<li>Drop deadlifts and squats temporarily. Replace with hip thrusts, leg press, goblet squats</li>`;
+                html += `<li>McGill Big 3: curl-ups, side planks, bird dogs — core stability rehab that works (McGill 2015)</li>`;
+                html += `<li>Walk daily — increases blood flow to the spine, reduces stiffness</li>`;
+                html += `<li>If pain persists > 6 weeks or includes numbness/tingling, see a sports medicine doctor</li>`;
+                html += `</ul>`;
+                html += `<h3>Prevention</h3><ul>`;
+                html += `<li><strong>Brace before every rep.</strong> Deep breath into your belly, tighten your abs like someone's about to punch you, push your obliques out. This creates intra-abdominal pressure that supports the spine.</li>`;
+                html += `<li><strong>Neutral spine.</strong> No rounding, no hyperextending. This applies to deadlifts, squats, rows, and overhead press.</li>`;
+                html += `<li><strong>Hip hinge, don't back bend.</strong> On deadlifts and rows, the motion comes from the hips. If your lower back rounds, the weight is too heavy or your hamstrings are too tight.</li>`;
+                html += `</ul>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['shoulder.*pain', 'rotator', 'impinge', 'shoulder.*hurt', 'bench.*shoulder'],
+            answer: (ctx) => {
+                let html = `<h3>Shoulder Pain &amp; Training</h3>`;
+                html += `<p>Shoulder impingement is the #1 injury in recreational lifters, almost always caused by too much pressing volume relative to pulling volume.</p>`;
+                html += `<p><strong>The fix:</strong></p><ul>`;
+                html += `<li><strong>2:1 pull-to-push ratio.</strong> For every set of bench/overhead press, do 2 sets of rows/pull-ups/face pulls.</li>`;
+                html += `<li><strong>Face pulls every session.</strong> 2–3 sets of 15–20 reps. This strengthens the external rotators and rear delts — the muscles that protect the shoulder joint.</li>`;
+                html += `<li><strong>Stop bench pressing to the neck.</strong> Touch mid-chest. Elbows at ~45° angle, not 90°. Flared elbows impinge the supraspinatus tendon.</li>`;
+                html += `<li><strong>Neutral grip pressing</strong> (palms facing each other) is more shoulder-friendly than pronated grip for overhead work</li>`;
+                html += `<li><strong>Upright rows</strong> — replace with cable lateral raises or high pulls. The internally rotated position of upright rows is notorious for impingement.</li>`;
+                html += `</ul>`;
+                html += insightHtml(`Cools et al. 2007: External rotation strengthening reduced shoulder pain in overhead athletes by 68% over 6 weeks. Face pulls, band pull-aparts, and external rotation exercises are your insurance policy.`);
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['grip', 'grip strength', 'forearm', 'weak grip', 'can.*t hold', 'strap', 'wrist.*strap', 'grip.*fail'],
+            answer: (ctx) => {
+                let html = `<h3>Grip Strength</h3>`;
+                html += `<p>If your grip fails before your target muscle does, you're leaving gains on the table.</p>`;
+                html += `<p><strong>Use straps + train grip separately.</strong> This is not cheating — it's smart. Let your back grow on heavy rows and deadlifts by using straps, then train grip as its own thing.</p>`;
+                html += `<h3>Grip training protocol</h3><ul>`;
+                html += `<li><strong>Dead hangs:</strong> Hang from a pull-up bar for max time. 3 sets. When you hit 60 sec, add weight.</li>`;
+                html += `<li><strong>Farmer's carries:</strong> Heavy dumbbells or trap bar, walk 40–60m. 3 sets.</li>`;
+                html += `<li><strong>Plate pinches:</strong> Pinch two 10 lb plates smooth-side-out. Hold for time.</li>`;
+                html += `<li><strong>Fat grips:</strong> Wrap a towel around the bar for curls and rows — thicker grip = harder.</li>`;
+                html += `<li><strong>Wrist curls:</strong> 3×15–20 with a light barbell. Forearms respond well to high reps.</li>`;
+                html += `</ul>`;
+                html += insightHtml(`Bohannon 2008: Grip strength is one of the strongest predictors of overall health, longevity, and functional capacity. It's not just about holding deadlifts — it's about aging well.`);
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['posture', 'rounded shoulder', 'forward head', 'hunch', 'slouch', 'desk.*job', 'anterior pelvic', 'apt'],
+            answer: (ctx) => {
+                let html = `<h3>Posture &amp; Lifting</h3>`;
+                html += `<p>The best fix for bad posture isn't stretching or gadgets — it's getting stronger.</p>`;
+                html += `<p><strong>Common issues and fixes:</strong></p>`;
+                html += `<table class="plan-table"><tr><th>Problem</th><th>Weak muscles</th><th>Key exercises</th></tr>`;
+                html += `<tr><td>Rounded shoulders</td><td>Mid traps, rear delts, external rotators</td><td>Face pulls, band pull-aparts, rows</td></tr>`;
+                html += `<tr><td>Forward head</td><td>Deep neck flexors</td><td>Chin tucks (hold 5 sec × 15 reps, 3×/day)</td></tr>`;
+                html += `<tr><td>Anterior pelvic tilt</td><td>Glutes, abs</td><td>Glute bridges, dead bugs, RKC planks</td></tr>`;
+                html += `<tr><td>Upper back rounding</td><td>Thoracic extensors</td><td>Deadlifts, rows, face pulls, thoracic extensions over foam roller</td></tr>`;
+                html += `</table>`;
+                html += insightHtml(`Here's the uncomfortable truth: Sitting 8 hours/day will undo 1 hour of "posture exercises." The single biggest fix is <strong>movement variety</strong> — stand up every 30 minutes, change positions frequently, and build a strong back through heavy rows and deadlifts.`);
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['sleep.*muscle', 'sleep.*grow', 'how much sleep', 'sleep.*gain', 'sleep.*recover', 'insomnia.*gym'],
+            answer: (ctx) => {
+                let html = `<h3>Sleep &amp; Muscle Growth</h3>`;
+                html += `<p>Sleep is when growth hormone peaks, protein synthesis is highest, and your nervous system recovers. Cutting sleep is like training hard and then skipping the payoff.</p>`;
+                html += insightHtml(`<strong>The damage of poor sleep:</strong> Dattilo et al. 2011: Sleep restriction reduces anabolic hormone output by 15–30%. Leproult &amp; Van Cauter 2011: One week of 5-hour sleep reduced testosterone by 10–15%. That's equivalent to aging 10–15 years.`);
+                html += `<h3>Sleep optimization for lifters</h3><ol>`;
+                html += `<li><strong>7–9 hours minimum.</strong> Non-negotiable for recovery. 6 hours is not enough even if you "feel fine."</li>`;
+                html += `<li><strong>Consistent schedule.</strong> Same bedtime ±30 min every night. Your circadian rhythm doesn't understand weekends.</li>`;
+                html += `<li><strong>Cool room (65–68°F).</strong> Core body temperature needs to drop for deep sleep onset.</li>`;
+                html += `<li><strong>No screens 30–60 min before bed.</strong> Blue light suppresses melatonin (Chang 2015).</li>`;
+                html += `<li><strong>No caffeine after 2 PM.</strong> Half-life of 5–6 hours.</li>`;
+                html += `<li><strong>Magnesium glycinate (300–400 mg)</strong> before bed improves sleep quality (Abbasi 2012).</li>`;
+                html += `<li><strong>If you train at night:</strong> Finish 2–3 hours before bed. Post-workout cortisol and elevated heart rate interfere with sleep onset.</li>`;
+                html += `</ol>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['mental', 'anxiety', 'depression', 'mood', 'stress.*relief', 'brain.*exercise', 'exercise.*mental', 'motivation.*gone'],
+            answer: (ctx) => {
+                let html = `<h3>Exercise &amp; Mental Health</h3>`;
+                html += `<p>This might be the most important thing in this whole app.</p>`;
+                html += insightHtml(`Schuch et al. 2018 meta (49 studies, 266,939 people): Regular exercise reduces the risk of developing depression by <strong>17%</strong>. For those already experiencing depression, exercise is as effective as antidepressant medication for mild-to-moderate cases (Blumenthal 2007).`);
+                html += `<p><strong>The mechanisms:</strong></p><ul>`;
+                html += `<li><strong>Endorphins</strong> — natural painkillers and mood elevators, released during moderate-to-hard exercise</li>`;
+                html += `<li><strong>BDNF (Brain-Derived Neurotrophic Factor)</strong> — exercise increases BDNF, which promotes neuroplasticity and protects against cognitive decline</li>`;
+                html += `<li><strong>Cortisol regulation</strong> — regular exercise lowers baseline cortisol and improves stress resilience</li>`;
+                html += `<li><strong>Self-efficacy</strong> — completing hard workouts builds confidence that transfers to every other area of life</li>`;
+                html += `<li><strong>Structure and discipline</strong> — a training routine provides purpose and routine when everything else feels chaotic</li>`;
+                html += `</ul>`;
+                html += `<p>On days when you don't feel like training, show up anyway and do something — even 20 minutes of walking or a light session. You will never regret a workout. The hardest part is starting.</p>`;
+                html += verseHtml({ text: "Come to me, all you who are weary and burdened, and I will give you rest.", ref: "Matthew 11:28" });
+                return html;
+            }
+        },
+        {
+            triggers: ['creatine', 'creatine.*safe', 'creatine.*kidney', 'creatine.*hair', 'creatine.*load', 'creatine.*water'],
+            answer: (ctx) => {
+                let html = `<h3>Creatine: Everything You Need to Know</h3>`;
+                html += `<p>Creatine monohydrate is the most studied supplement in sports science history. It works. It's safe. Period.</p>`;
+                html += `<h3>What it does</h3>`;
+                html += `<p>Creatine donates a phosphate group to regenerate ATP during short, intense efforts (1–10 sec). This means more reps, more power, faster recovery between sets.</p>`;
+                html += insightHtml(`Kreider et al. 2017 (ISSN position stand): Creatine increases strength by <strong>5–15%</strong>, lean mass by <strong>1–2 kg over 4–12 weeks</strong>, and has over 500 peer-reviewed studies confirming its safety.`);
+                html += `<h3>Common concerns</h3><ul>`;
+                html += `<li><strong>"Is it bad for your kidneys?"</strong> No. Poortmans &amp; Francaux 2000, Antonio 2021: No adverse effects on kidney function in healthy individuals, even at doses up to 30g/day for 5 years.</li>`;
+                html += `<li><strong>"Does it cause hair loss?"</strong> One single study (van der Merwe 2009) showed increased DHT levels. It has never been replicated. The hair loss claim has weak evidence.</li>`;
+                html += `<li><strong>"Do I need to load?"</strong> No. Loading (20g/day for 5–7 days) saturates stores faster, but 3–5g/day reaches the same saturation in 3–4 weeks.</li>`;
+                html += `<li><strong>"Water retention?"</strong> Yes — creatine pulls water INTO the muscle cell. This is a good thing. Your muscles look fuller. It's not bloating.</li>`;
+                html += `<li><strong>"Which type?"</strong> Creatine monohydrate. Not HCl, not ethyl ester, not buffered. Monohydrate is the cheapest and has the most evidence. Everything else is marketing.</li>`;
+                html += `</ul>`;
+                html += `<p><strong>Dose:</strong> 3–5g per day, any time. With food or without. Timing doesn't matter. Just take it daily.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
+        {
+            triggers: ['whey', 'protein powder', 'protein shake', 'casein', 'plant protein', 'which protein', 'best protein'],
+            answer: (ctx) => {
+                let html = `<h3>Protein Powders: What to Buy</h3>`;
+                html += `<p>Protein powder is a <strong>convenience tool</strong>, not a magic supplement. Whole food protein (chicken, fish, eggs, dairy) is equally effective — powder just makes it easier to hit your daily target.</p>`;
+                html += `<table class="plan-table"><tr><th>Type</th><th>Pros</th><th>Best for</th></tr>`;
+                html += `<tr><td>Whey concentrate</td><td>Cheap, fast-absorbing, complete amino profile</td><td>General use, post-workout</td></tr>`;
+                html += `<tr><td>Whey isolate</td><td>Lower lactose, higher protein %</td><td>Lactose sensitivity, cutting (fewer calories per scoop)</td></tr>`;
+                html += `<tr><td>Casein</td><td>Slow-digesting (6–8 hours)</td><td>Before bed (Res 2012: nighttime casein increases overnight MPS)</td></tr>`;
+                html += `<tr><td>Plant blend (pea+rice)</td><td>Vegan-friendly, complete when blended</td><td>Dairy-free lifters</td></tr>`;
+                html += `</table>`;
+                html += insightHtml(`Messina et al. 2018 meta: No significant difference in muscle growth between whey and plant-based protein when total protein and leucine content are matched. The "whey is superior" claim is overstated.`);
+                html += `<p><strong>Dose:</strong> 20–40g per serving (Macnaughton 2016: larger athletes benefit from 40g vs 20g post-workout). 1–2 shakes per day as needed to hit your protein target.</p>`;
+                html += verseHtml();
+                return html;
+            }
+        },
     ],
 
     // Fallback for unrecognized input — tries general knowledge first, then shows help
