@@ -2563,7 +2563,7 @@ const TOPIC_RESPONSES = {
             }
         },
         {
-            triggers: ['how often.*train', 'how many.*days', 'training frequency', 'how often.*work.?out', 'days per week', 'times.*per.*week', 'how many times'],
+            triggers: ['how often.*train', 'how many.*days', 'training frequency', 'how often.*work.?out', 'days per week', 'times.*per.*week', 'how many times', 'train.*every\\s*day', 'work\\s*out.*every\\s*day', 'gym.*every\\s*day', 'lift.*every\\s*day', 'exercise.*every\\s*day', 'is\\s*it\\s*ok.*every\\s*day', 'can\\s*i.*every\\s*day', 'should\\s*i.*every\\s*day', 'daily.*training', 'train.*daily', 'too\\s*much.*training', 'overtrain'],
             answer: (ctx) => {
                 let html = `<h3>Training Frequency</h3>`;
                 html += `<p><strong>For muscle growth:</strong> Schoenfeld 2016 meta found training each muscle <strong>2× per week</strong> produces more hypertrophy than 1×. Beyond 3× shows diminishing returns for most people.</p>`;
@@ -3412,19 +3412,9 @@ const TOPIC_RESPONSES = {
         },
     ],
 
-    // Fallback for unrecognized input — tries general knowledge first, then shows help
+    // Fallback for unrecognized input — shows help menu
+    // (generalKnowledge is now checked BEFORE reaching fallback in processCoachInput)
     fallback: (ctx, input) => {
-        // Check general knowledge base
-        const lower = input.toLowerCase();
-        const gk = TOPIC_RESPONSES.generalKnowledge;
-        for (let i = 0; i < gk.length; i++) {
-            for (let j = 0; j < gk[i].triggers.length; j++) {
-                if (new RegExp(gk[i].triggers[j], 'i').test(lower)) {
-                    return gk[i].answer(ctx);
-                }
-            }
-        }
-
         const name = ctx.profile.name ? escapeHtml(ctx.profile.name) : 'there';
         let html = `<p>Hey ${name}, I didn't catch that one. Try asking about:</p>`;
         html += `<ul>`;
@@ -3842,36 +3832,315 @@ function processCoachInput(text) {
         // Reset plan capture before handler runs
         window._lastCoachPlanId = null;
 
-        // Score every topic — get top match plus runner-ups for "did you mean"
-        const ranked = rankCoachIntents(text);
         let response = null;
         let suggestions = null;
 
-        if (ranked.length > 0 && ranked[0].score >= 5) {
-            // Confident match — answer directly
-            response = ranked[0].topic.handler(ctx, text);
-        } else if (ranked.length > 0 && ranked[0].score >= 3) {
-            // Borderline — answer with the top match but offer the runner-ups as chips
-            response = ranked[0].topic.handler(ctx, text);
-            suggestions = buildDidYouMeanChips(ranked, 1);
-        } else if (ranked.length > 0) {
-            // Low confidence — show "did you mean" instead of dead-end fallback
-            response = buildDidYouMeanResponse(text, ranked, ctx);
-            suggestions = buildDidYouMeanChips(ranked, 0);
+        // 1) Try general knowledge FIRST — these have precise regex triggers
+        //    and catch natural questions like "should I bench every day"
+        const gkResponse = _tryGeneralKnowledge(text, ctx);
+
+        if (gkResponse) {
+            response = gkResponse;
         } else {
-            response = TOPIC_RESPONSES.fallback(ctx, text);
+            // 2) Try exercise-specific Q&A (catches "is X good for Y", "should I do X every day", etc.)
+            const exerciseResponse = _tryExerciseQA(text, ctx);
+            if (exerciseResponse) {
+                response = exerciseResponse;
+            } else {
+                // 3) Score against topic intents
+                const ranked = rankCoachIntents(text);
+
+                if (ranked.length > 0 && ranked[0].score >= 5) {
+                    response = ranked[0].topic.handler(ctx, text);
+                } else if (ranked.length > 0 && ranked[0].score >= 3) {
+                    response = ranked[0].topic.handler(ctx, text);
+                    suggestions = buildDidYouMeanChips(ranked, 1);
+                } else if (ranked.length > 0) {
+                    response = buildDidYouMeanResponse(text, ranked, ctx);
+                    suggestions = buildDidYouMeanChips(ranked, 0);
+                } else {
+                    response = TOPIC_RESPONSES.fallback(ctx, text);
+                }
+
+                if (ranked.length > 0 && ranked[0].topic) {
+                    window._coachLastTopicId = ranked[0].topic.id;
+                }
+            }
         }
 
         if (!suggestions) suggestions = suggestFollowUps(text, ctx);
         const planId = window._lastCoachPlanId || null;
         addBotMessage(response, { suggestions, planId });
         window._lastCoachPlanId = null;
-
-        // Remember last topic for conversational follow-ups
-        if (ranked.length > 0 && ranked[0].topic) {
-            window._coachLastTopicId = ranked[0].topic.id;
-        }
     }, 400 + Math.random() * 600);
+}
+
+// --- General Knowledge lookup (extracted so it can be called early) ---
+function _tryGeneralKnowledge(input, ctx) {
+    const lower = input.toLowerCase();
+    const gk = TOPIC_RESPONSES.generalKnowledge;
+    if (!gk) return null;
+    for (let i = 0; i < gk.length; i++) {
+        for (let j = 0; j < gk[i].triggers.length; j++) {
+            try {
+                if (new RegExp(gk[i].triggers[j], 'i').test(lower)) {
+                    return gk[i].answer(ctx);
+                }
+            } catch (e) { /* skip invalid regex */ }
+        }
+    }
+    return null;
+}
+
+// --- Exercise-specific Q&A engine ---
+// Catches natural questions like "should I bench press every day",
+// "is deadlift good for back", "how many sets of squats", "can I do curls daily"
+function _tryExerciseQA(input, ctx) {
+    const lower = input.toLowerCase();
+
+    // Detect the exercise being asked about
+    const exercise = _detectExercise(lower);
+    if (!exercise) return null;
+
+    // Detect the question pattern
+    const pattern = _detectQuestionPattern(lower);
+    if (!pattern) return null;
+
+    return _buildExerciseAnswer(exercise, pattern, ctx);
+}
+
+const _EXERCISE_MAP = {
+    'bench press': { muscles: 'chest, front delts, triceps', type: 'compound', frequency: '2-3x/week', minRest: 48, sets: '3-5', reps: '5-12', category: 'press' },
+    'squat': { muscles: 'quads, glutes, core', type: 'compound', frequency: '2-3x/week', minRest: 48, sets: '3-5', reps: '5-10', category: 'squat' },
+    'deadlift': { muscles: 'posterior chain (back, glutes, hamstrings)', type: 'compound', frequency: '1-2x/week', minRest: 72, sets: '3-5', reps: '3-8', category: 'hinge' },
+    'overhead press': { muscles: 'shoulders, triceps, upper chest', type: 'compound', frequency: '2-3x/week', minRest: 48, sets: '3-4', reps: '5-10', category: 'press' },
+    'barbell row': { muscles: 'lats, rhomboids, biceps, rear delts', type: 'compound', frequency: '2-3x/week', minRest: 48, sets: '3-5', reps: '5-12', category: 'pull' },
+    'pull-up': { muscles: 'lats, biceps, rear delts, core', type: 'compound', frequency: '3-5x/week', minRest: 24, sets: '3-5', reps: '5-15', category: 'pull' },
+    'chin-up': { muscles: 'lats, biceps, forearms', type: 'compound', frequency: '3-5x/week', minRest: 24, sets: '3-5', reps: '5-15', category: 'pull' },
+    'dip': { muscles: 'chest, triceps, front delts', type: 'compound', frequency: '2-3x/week', minRest: 48, sets: '3-4', reps: '6-15', category: 'press' },
+    'bicep curl': { muscles: 'biceps', type: 'isolation', frequency: '2-4x/week', minRest: 24, sets: '3-4', reps: '8-15', category: 'isolation' },
+    'tricep pushdown': { muscles: 'triceps', type: 'isolation', frequency: '2-4x/week', minRest: 24, sets: '3-4', reps: '10-15', category: 'isolation' },
+    'lateral raise': { muscles: 'side delts', type: 'isolation', frequency: '3-5x/week', minRest: 24, sets: '3-5', reps: '12-20', category: 'isolation' },
+    'face pull': { muscles: 'rear delts, rotator cuff', type: 'isolation', frequency: '3-5x/week', minRest: 24, sets: '3-4', reps: '15-25', category: 'isolation' },
+    'leg press': { muscles: 'quads, glutes', type: 'compound', frequency: '2-3x/week', minRest: 48, sets: '3-4', reps: '8-15', category: 'squat' },
+    'romanian deadlift': { muscles: 'hamstrings, glutes, lower back', type: 'compound', frequency: '2x/week', minRest: 48, sets: '3-4', reps: '8-12', category: 'hinge' },
+    'hip thrust': { muscles: 'glutes, hamstrings', type: 'compound', frequency: '2-3x/week', minRest: 48, sets: '3-4', reps: '8-12', category: 'hinge' },
+    'push-up': { muscles: 'chest, triceps, front delts', type: 'compound', frequency: '4-6x/week', minRest: 24, sets: '3-5', reps: '10-30', category: 'press' },
+    'plank': { muscles: 'core, shoulders', type: 'isolation', frequency: '5-7x/week', minRest: 0, sets: '3-4', reps: '30-60s', category: 'core' },
+    'crunch': { muscles: 'abs', type: 'isolation', frequency: '3-5x/week', minRest: 24, sets: '3-4', reps: '15-25', category: 'core' },
+    'leg curl': { muscles: 'hamstrings', type: 'isolation', frequency: '2-3x/week', minRest: 24, sets: '3-4', reps: '10-15', category: 'isolation' },
+    'leg extension': { muscles: 'quads', type: 'isolation', frequency: '2-3x/week', minRest: 24, sets: '3-4', reps: '10-15', category: 'isolation' },
+    'calf raise': { muscles: 'calves', type: 'isolation', frequency: '3-5x/week', minRest: 24, sets: '4-6', reps: '12-20', category: 'isolation' },
+    'cable fly': { muscles: 'chest (stretch emphasis)', type: 'isolation', frequency: '2-3x/week', minRest: 24, sets: '3-4', reps: '10-15', category: 'isolation' },
+    'lat pulldown': { muscles: 'lats, biceps', type: 'compound', frequency: '2-3x/week', minRest: 48, sets: '3-4', reps: '8-12', category: 'pull' },
+    'incline press': { muscles: 'upper chest, front delts, triceps', type: 'compound', frequency: '2-3x/week', minRest: 48, sets: '3-4', reps: '6-12', category: 'press' },
+    'front squat': { muscles: 'quads, core, upper back', type: 'compound', frequency: '2x/week', minRest: 48, sets: '3-4', reps: '5-8', category: 'squat' },
+    'lunges': { muscles: 'quads, glutes, balance', type: 'compound', frequency: '2-3x/week', minRest: 48, sets: '3-4', reps: '8-12 each', category: 'squat' },
+    'hammer curl': { muscles: 'brachialis, biceps, forearms', type: 'isolation', frequency: '2-4x/week', minRest: 24, sets: '3-4', reps: '8-15', category: 'isolation' },
+    'skull crusher': { muscles: 'triceps (long head)', type: 'isolation', frequency: '2-3x/week', minRest: 24, sets: '3-4', reps: '8-12', category: 'isolation' },
+    'shrug': { muscles: 'upper traps', type: 'isolation', frequency: '2-3x/week', minRest: 24, sets: '3-4', reps: '10-15', category: 'isolation' },
+};
+
+// Aliases that map to canonical exercise names
+const _EXERCISE_ALIASES = {
+    'bench': 'bench press', 'flat bench': 'bench press', 'chest press': 'bench press', 'barbell bench': 'bench press',
+    'squat': 'squat', 'back squat': 'squat', 'barbell squat': 'squat', 'squats': 'squat',
+    'deadlift': 'deadlift', 'deadlifts': 'deadlift', 'dead lift': 'deadlift', 'conventional deadlift': 'deadlift', 'sumo deadlift': 'deadlift',
+    'ohp': 'overhead press', 'shoulder press': 'overhead press', 'military press': 'overhead press', 'press overhead': 'overhead press',
+    'row': 'barbell row', 'rows': 'barbell row', 'bent over row': 'barbell row', 'barbell row': 'barbell row', 'dumbbell row': 'barbell row',
+    'pull up': 'pull-up', 'pullup': 'pull-up', 'pull-up': 'pull-up', 'pullups': 'pull-up', 'pull ups': 'pull-up',
+    'chin up': 'chin-up', 'chinup': 'chin-up', 'chin-up': 'chin-up', 'chinups': 'chin-up', 'chin ups': 'chin-up',
+    'dip': 'dip', 'dips': 'dip', 'chest dip': 'dip', 'tricep dip': 'dip',
+    'curl': 'bicep curl', 'curls': 'bicep curl', 'bicep curl': 'bicep curl', 'bicep curls': 'bicep curl', 'barbell curl': 'bicep curl', 'dumbbell curl': 'bicep curl',
+    'pushdown': 'tricep pushdown', 'pushdowns': 'tricep pushdown', 'tricep pushdown': 'tricep pushdown', 'rope pushdown': 'tricep pushdown',
+    'lateral raise': 'lateral raise', 'lateral raises': 'lateral raise', 'side raise': 'lateral raise', 'side raises': 'lateral raise', 'side delts': 'lateral raise',
+    'face pull': 'face pull', 'face pulls': 'face pull', 'facepull': 'face pull', 'facepulls': 'face pull',
+    'leg press': 'leg press',
+    'rdl': 'romanian deadlift', 'romanian deadlift': 'romanian deadlift', 'stiff leg deadlift': 'romanian deadlift',
+    'hip thrust': 'hip thrust', 'hip thrusts': 'hip thrust', 'glute bridge': 'hip thrust',
+    'push up': 'push-up', 'pushup': 'push-up', 'push-up': 'push-up', 'pushups': 'push-up', 'push ups': 'push-up',
+    'plank': 'plank', 'planks': 'plank',
+    'crunch': 'crunch', 'crunches': 'crunch', 'sit up': 'crunch', 'situp': 'crunch', 'sit-up': 'crunch',
+    'leg curl': 'leg curl', 'leg curls': 'leg curl', 'hamstring curl': 'leg curl',
+    'leg extension': 'leg extension', 'leg extensions': 'leg extension',
+    'calf raise': 'calf raise', 'calf raises': 'calf raise', 'calves': 'calf raise',
+    'cable fly': 'cable fly', 'cable flies': 'cable fly', 'pec fly': 'cable fly', 'chest fly': 'cable fly',
+    'lat pulldown': 'lat pulldown', 'lat pull down': 'lat pulldown', 'pulldown': 'lat pulldown',
+    'incline bench': 'incline press', 'incline press': 'incline press', 'incline dumbbell press': 'incline press',
+    'front squat': 'front squat', 'front squats': 'front squat',
+    'lunge': 'lunges', 'lunges': 'lunges', 'walking lunge': 'lunges', 'walking lunges': 'lunges', 'split squat': 'lunges', 'bulgarian split squat': 'lunges',
+    'hammer curl': 'hammer curl', 'hammer curls': 'hammer curl',
+    'skull crusher': 'skull crusher', 'skull crushers': 'skull crusher', 'skullcrusher': 'skull crusher',
+    'shrug': 'shrug', 'shrugs': 'shrug',
+};
+
+function _detectExercise(lower) {
+    // Try longest alias match first (multi-word)
+    const sortedAliases = Object.keys(_EXERCISE_ALIASES).sort((a, b) => b.length - a.length);
+    for (const alias of sortedAliases) {
+        if (lower.includes(alias)) {
+            const canonical = _EXERCISE_ALIASES[alias];
+            return { name: canonical, ..._EXERCISE_MAP[canonical] };
+        }
+    }
+    // Try canonical names directly
+    for (const [name, data] of Object.entries(_EXERCISE_MAP)) {
+        if (lower.includes(name)) return { name, ...data };
+    }
+    return null;
+}
+
+function _detectQuestionPattern(lower) {
+    // Frequency: "every day", "daily", "how often", "times per week", "x per week"
+    if (/every\s*day|daily|everyday|too\s*much|too\s*often|over\s*train/i.test(lower)) return 'frequency_daily';
+    if (/how\s*often|how\s*many\s*times|times?\s*(?:per|a)\s*week|days?\s*(?:per|a)\s*week|how\s*frequent/i.test(lower)) return 'frequency';
+    // Volume: "how many sets", "how many reps", "sets and reps"
+    if (/how\s*many\s*sets|sets?\s*(?:should|do|for)|volume\s*for/i.test(lower)) return 'sets';
+    if (/how\s*many\s*reps|reps?\s*(?:should|do|for)|rep\s*range/i.test(lower)) return 'reps';
+    if (/sets?\s*and\s*reps|reps?\s*and\s*sets/i.test(lower)) return 'sets_and_reps';
+    // Benefit: "is X good for", "does X work", "will X help", "benefits of X"
+    if (/good\s*for|help\s*(?:with|me|build|grow|lose)|benefit|effective|worth|useful/i.test(lower)) return 'benefit';
+    // Safety: "safe", "bad for", "hurt", "dangerous", "risk"
+    if (/safe|dangerous|bad\s*for|hurt|injur|risk|harmful|damage/i.test(lower)) return 'safety';
+    // Technique/how: "how to", "proper form", "correct way", "tips for"
+    if (/how\s*(?:to|do\s*i)|proper\s*(?:form|way|technique)|correct\s*(?:form|way)|tips?\s*for|form\s*(?:on|for|check)/i.test(lower)) return 'form';
+    // Alternatives: "alternative", "substitute", "replace", "instead of"
+    if (/alternative|substitute|replace|instead\s*of|swap|switch.*from/i.test(lower)) return 'alternative';
+    // Should I: "should I", "can I", "is it okay"
+    if (/should\s*i|can\s*i|is\s*it\s*(?:ok|okay|fine|good)|do\s*i\s*need/i.test(lower)) return 'should';
+    // What muscles: "what muscles", "which muscles", "what does X work"
+    if (/what\s*muscle|which\s*muscle|what\s*does.*work|muscles?\s*(?:does|do)/i.test(lower)) return 'muscles';
+    return null;
+}
+
+function _buildExerciseAnswer(exercise, pattern, ctx) {
+    const name = exercise.name.charAt(0).toUpperCase() + exercise.name.slice(1);
+    let html = '';
+
+    switch (pattern) {
+        case 'frequency_daily':
+            html += `<h3>Should You ${name} Every Day?</h3>`;
+            if (exercise.type === 'compound') {
+                html += `<p><strong>No.</strong> ${name} is a ${exercise.type} movement hitting <strong>${exercise.muscles}</strong>. These muscles need <strong>${exercise.minRest}+ hours</strong> to recover between hard sessions.</p>`;
+                html += `<p><strong>Optimal frequency:</strong> ${exercise.frequency}. Training the same compound lift daily leads to accumulated fatigue, form breakdown, and eventually injury or plateau.</p>`;
+                html += insightHtml(`Schoenfeld 2016 frequency meta: 2\u20133× per muscle per week is the sweet spot. Beyond that, diminishing returns and recovery debt. ${exercise.minRest === 72 ? 'Deadlifts are especially taxing on the CNS — most programs only program them heavy 1×/week.' : ''}`);
+            } else {
+                html += `<p><strong>It depends.</strong> ${name} is an isolation movement for <strong>${exercise.muscles}</strong>. Isolation exercises are less fatiguing, so higher frequency is possible.</p>`;
+                html += `<p><strong>Optimal frequency:</strong> ${exercise.frequency}. You <em>can</em> do light sets daily, but hard sets still need recovery. Rotating intensity (heavy one day, light the next) works if you insist on daily.</p>`;
+            }
+            html += `<p><strong>Better approach:</strong> Train ${name.toLowerCase()} ${exercise.frequency} with proper intensity (${exercise.sets} sets of ${exercise.reps} reps), then hit different muscle groups on other days. You'll grow faster with rest than without it.</p>`;
+            html += verseHtml();
+            return html;
+
+        case 'frequency':
+            html += `<h3>How Often Should You ${name}?</h3>`;
+            html += `<p><strong>${exercise.frequency}</strong> is optimal for most people.</p>`;
+            html += `<p>${name} targets <strong>${exercise.muscles}</strong>. Allow at least <strong>${exercise.minRest} hours</strong> between sessions hitting the same muscle group.</p>`;
+            html += `<table class="plan-table"><tr><th>Level</th><th>Frequency</th></tr>`;
+            html += `<tr><td>Beginner</td><td>${exercise.type === 'compound' ? '2×/week' : '2-3×/week'}</td></tr>`;
+            html += `<tr><td>Intermediate</td><td>${exercise.frequency}</td></tr>`;
+            html += `<tr><td>Advanced</td><td>${exercise.type === 'compound' ? '2-4×/week (varying intensity)' : exercise.frequency}</td></tr>`;
+            html += `</table>`;
+            html += verseHtml();
+            return html;
+
+        case 'sets':
+        case 'reps':
+        case 'sets_and_reps':
+            html += `<h3>${name} \u2014 Sets & Reps</h3>`;
+            html += `<p><strong>Recommended:</strong> ${exercise.sets} sets of ${exercise.reps} reps.</p>`;
+            html += `<table class="plan-table"><tr><th>Goal</th><th>Sets × Reps</th><th>Rest</th></tr>`;
+            if (exercise.type === 'compound') {
+                html += `<tr><td>Strength</td><td>4-5 × 3-5</td><td>3-5 min</td></tr>`;
+                html += `<tr><td>Hypertrophy</td><td>3-4 × 8-12</td><td>60-90 sec</td></tr>`;
+                html += `<tr><td>Endurance</td><td>3 × 15-20</td><td>45-60 sec</td></tr>`;
+            } else {
+                html += `<tr><td>Hypertrophy</td><td>3-4 × 10-15</td><td>60-90 sec</td></tr>`;
+                html += `<tr><td>Endurance/pump</td><td>3 × 15-25</td><td>30-45 sec</td></tr>`;
+            }
+            html += `</table>`;
+            html += insightHtml(`Schoenfeld 2017 dose-response meta: 10\u201320+ sets per muscle per week drives the most hypertrophy. Count all exercises for that muscle group, not just ${name.toLowerCase()}.`);
+            html += verseHtml();
+            return html;
+
+        case 'benefit':
+            html += `<h3>Is ${name} Worth Doing?</h3>`;
+            html += `<p><strong>Yes.</strong> ${name} is a ${exercise.type} exercise targeting <strong>${exercise.muscles}</strong>.</p>`;
+            if (exercise.type === 'compound') {
+                html += `<p>Compound lifts like ${name.toLowerCase()} are the foundation of any serious program because they:</p><ul>`;
+                html += `<li>Work multiple muscle groups simultaneously</li>`;
+                html += `<li>Allow heavier loads = stronger strength signal</li>`;
+                html += `<li>Have the best strength-to-time ratio</li>`;
+                html += `<li>Increase anabolic hormone response (Kraemer 1999)</li></ul>`;
+            } else {
+                html += `<p>As an isolation exercise, ${name.toLowerCase()} is best used to:</p><ul>`;
+                html += `<li>Target a specific weak point</li>`;
+                html += `<li>Add volume to a lagging muscle without systemic fatigue</li>`;
+                html += `<li>Achieve a strong mind-muscle connection</li></ul>`;
+            }
+            html += verseHtml();
+            return html;
+
+        case 'safety':
+            html += `<h3>Is ${name} Safe?</h3>`;
+            html += `<p><strong>Yes, when performed correctly.</strong> No exercise is inherently dangerous — bad form and ego loading are.</p>`;
+            html += `<p><strong>Key safety rules for ${name.toLowerCase()}:</strong></p><ul>`;
+            html += `<li>Warm up with 2-3 lighter sets before working sets</li>`;
+            html += `<li>Use a weight you can control through the full range of motion</li>`;
+            html += `<li>Stop if you feel sharp or unusual pain (discomfort ≠ pain)</li>`;
+            if (exercise.category === 'squat' || exercise.category === 'hinge') {
+                html += `<li>Keep a neutral spine — brace your core like someone's about to punch you</li>`;
+                html += `<li>Use a belt for heavy sets (85%+ 1RM) if it feels right</li>`;
+            }
+            if (exercise.category === 'press') {
+                html += `<li>Don't bounce the bar or use momentum</li>`;
+                html += `<li>Use a spotter or safety pins for heavy sets</li>`;
+            }
+            html += `</ul>`;
+            html += verseHtml();
+            return html;
+
+        case 'form':
+            // Delegate to the existing form topic handler
+            return null; // Let the topic system handle this
+
+        case 'alternative':
+            html += `<h3>Alternatives to ${name}</h3>`;
+            const altMap = {
+                'bench press': ['Dumbbell Bench Press', 'Machine Chest Press', 'Push-ups (weighted)', 'Floor Press'],
+                'squat': ['Leg Press', 'Hack Squat', 'Bulgarian Split Squat', 'Goblet Squat'],
+                'deadlift': ['Romanian Deadlift', 'Trap Bar Deadlift', 'Cable Pull-Through', 'Hip Thrust'],
+                'overhead press': ['Dumbbell Shoulder Press', 'Arnold Press', 'Landmine Press', 'Machine Press'],
+                'pull-up': ['Lat Pulldown', 'Assisted Pull-ups', 'Inverted Rows', 'Band-assisted Pull-ups'],
+            };
+            const alts = altMap[exercise.name] || ['Dumbbell variation', 'Machine variation', 'Cable variation', 'Bodyweight variation'];
+            html += `<p>Good alternatives that hit the same muscles (<strong>${exercise.muscles}</strong>):</p><ol>`;
+            alts.forEach(a => { html += `<li><strong>${a}</strong></li>`; });
+            html += `</ol>`;
+            html += verseHtml();
+            return html;
+
+        case 'should':
+            html += `<h3>${name} \u2014 Quick Answer</h3>`;
+            html += `<p><strong>Yes, ${name.toLowerCase()} is a great exercise.</strong> It targets <strong>${exercise.muscles}</strong> and is a ${exercise.type} movement.</p>`;
+            html += `<p><strong>Program it:</strong> ${exercise.frequency}, ${exercise.sets} sets of ${exercise.reps} reps. Allow ${exercise.minRest}+ hours between sessions.</p>`;
+            if (exercise.type === 'compound') {
+                html += `<p>As a compound lift, it should be one of the first exercises in your workout when you're freshest.</p>`;
+            }
+            html += verseHtml();
+            return html;
+
+        case 'muscles':
+            html += `<h3>What Does ${name} Work?</h3>`;
+            html += `<p><strong>Primary muscles:</strong> ${exercise.muscles}.</p>`;
+            html += `<p><strong>Type:</strong> ${exercise.type} (${exercise.type === 'compound' ? 'multi-joint, works multiple muscle groups' : 'single-joint, isolates one muscle group'}).</p>`;
+            html += `<p><strong>Programming:</strong> ${exercise.sets} sets of ${exercise.reps} reps, ${exercise.frequency}.</p>`;
+            html += verseHtml();
+            return html;
+
+        default:
+            return null;
+    }
 }
 
 // Convert a topic id to a human-friendly suggestion phrase
