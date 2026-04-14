@@ -263,6 +263,8 @@ async function ensureProfileExists() {
             'Prefer': 'resolution=merge-duplicates,return=representation',
         });
         if (!headers) return null;
+        // Only set id, username, display_name, stats — do NOT include friends
+        // or bio so that merge-duplicates won't overwrite existing values.
         const resp = await fetch(SUPABASE_URL + '/rest/v1/profiles?on_conflict=id', {
             method: 'POST',
             headers,
@@ -270,9 +272,7 @@ async function ensureProfileExists() {
                 id: currentUser.id,
                 username,
                 display_name: displayName,
-                bio: '',
                 stats,
-                friends: [],
             }),
             cache: 'no-store',
         });
