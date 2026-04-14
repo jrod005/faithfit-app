@@ -340,13 +340,17 @@ function ironfaithSocialBootstrap() {
             currentUser = stored.user;
             try { renderSocialTab(); } catch (e) {}
             // Background profile fetch via direct REST
-            directFetchProfile(currentUser.id).then(profile => {
+            directFetchProfile(currentUser.id).then(async profile => {
                 if (profile) {
                     userProfile = profile;
                     try { renderSocialTab(); } catch (e) {}
                     try { pullSocialNameToLocal(); } catch (e) {}
                     if (typeof syncStatsToSupabase === 'function') {
                         try { syncStatsToSupabase(); } catch (e) {}
+                    }
+                    // Auto-recover friends if array got wiped
+                    if (!profile.friends || profile.friends.length === 0) {
+                        try { await recoverFriendsFromRequests(); } catch (e) {}
                     }
                 }
             }).catch(e => console.error('directFetchProfile failed:', e));
@@ -920,9 +924,7 @@ async function directProfileSetup() {
                 id: uid,
                 username,
                 display_name: email?.split('@')[0] || username,
-                bio: '',
                 stats,
-                friends: [],
             }),
         });
         if (!insertResp.ok) {
@@ -1052,9 +1054,7 @@ async function setupUsername() {
                 id: currentUser.id,
                 username: raw,
                 display_name: displayName,
-                bio: '',
                 stats,
-                friends: [],
             }),
             cache: 'no-store',
         });
@@ -1379,6 +1379,38 @@ async function sbRemoveFriend(friendUid) {
     if (fresh) userProfile = fresh;
     renderFriendsView();
     showToast('Friend removed');
+}
+
+// --- Recover friends from accepted friend_requests if profile.friends got wiped ---
+async function recoverFriendsFromRequests() {
+    if (!currentUser) return;
+    const uid = currentUser.id;
+    // Find all accepted friend requests where we're either sender or receiver
+    const sent = await directSelect(
+        'friend_requests?from_uid=eq.' + encodeURIComponent(uid) +
+        '&status=eq.accepted&select=to_uid'
+    );
+    const received = await directSelect(
+        'friend_requests?to_uid=eq.' + encodeURIComponent(uid) +
+        '&status=eq.accepted&select=from_uid'
+    );
+    const friendIds = new Set();
+    if (Array.isArray(sent)) sent.forEach(r => friendIds.add(r.to_uid));
+    if (Array.isArray(received)) received.forEach(r => friendIds.add(r.from_uid));
+    if (friendIds.size === 0) return;
+    // Patch our profile's friends array
+    const ok = await directUpdate(
+        'profiles',
+        'id=eq.' + encodeURIComponent(uid),
+        { friends: [...friendIds] }
+    );
+    if (ok) {
+        const fresh = await directFetchProfile(uid);
+        if (fresh) userProfile = fresh;
+        console.log('Recovered', friendIds.size, 'friends from accepted requests');
+        showToast('Recovered ' + friendIds.size + ' friend' + (friendIds.size !== 1 ? 's' : '') + '!');
+        renderFriendsView();
+    }
 }
 
 // ========== POSTS / FEED ==========
