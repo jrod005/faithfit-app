@@ -89,12 +89,6 @@ async function handleCoachPhoto(event) {
     event.target.value = '';
 }
 
-// removeCoachPhoto kept as a no-op alias so legacy onclicks don't crash
-function removeCoachPhoto() {
-    _pendingProgressPhotoData = null;
-    const prev = document.getElementById('coach-photo-preview');
-    if (prev) prev.classList.add('hidden');
-}
 
 // --- Save modal (perspective + optional notes) ---
 function openProgressPhotoSaveModal(dataUrl) {
@@ -333,15 +327,3 @@ function openProgressPhotoCompare() {
     modal.querySelector('#compare-close').onclick = () => modal.remove();
 }
 
-// --- Stub: legacy entry points the coach used to call ---
-// Kept so old code paths don't throw if anything still references them.
-async function analyzePoseFromPhoto(_base64, _ctx, _userText) {
-    return analyzePhoto();
-}
-function analyzePhoto() {
-    let html = `<h3>Photos Are Now Progress Photos</h3>`;
-    html += `<p>I used to try to analyze your form from a single still photo. I'm being honest: it didn't work — one frame and joint angles can't tell me what your bar path looks like or whether your brace held.</p>`;
-    html += `<p>Instead, photos you attach now go into your <strong>Progress Photo Timeline</strong> on the Profile tab. Take one every 2&ndash;4 weeks and you'll have undeniable visual proof of your changes.</p>`;
-    html += `<p>For real form feedback, ask me about a specific lift &mdash; "<em>bench press form</em>" or "<em>how do I deadlift</em>" &mdash; and I'll give you the cues, common mistakes, and how to film yourself for self-review.</p>`;
-    return html;
-}

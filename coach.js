@@ -4086,8 +4086,3 @@ function rankCoachIntents(text) {
     return scored;
 }
 
-function addUserMessageWithPhoto(text, photoData) {
-    const time = Date.now();
-    renderUserMessage(text, time, photoData);
-    saveCoachHistoryEntry({ role: 'user', text, time, photo: photoData });
-}

@@ -727,7 +727,7 @@
                 <button class="quick-btn" onclick="coachAsk('How is my consistency?')">My Streak</button>
                 <button class="quick-btn" onclick="coachAsk('Warm-up routine')">Warm-Up</button>
                 <button class="quick-btn" onclick="coachAsk('Weak point analysis')">Weak Points</button>
-                <button class="quick-btn" onclick="document.getElementById('coach-photo-input').click()">Attach Photo</button>
+                <button class="quick-btn" onclick="coachAsk('How do progress photos work?')">Progress Photos</button>
             </div>
 
             <div id="coach-messages" class="coach-messages">
@@ -735,16 +735,9 @@
             </div>
 
             <div class="coach-input-area">
-                <button class="btn btn-secondary coach-photo-btn" onclick="document.getElementById('coach-photo-input').click()" title="Add photo">&#x1F4F7;</button>
-                <input type="file" id="coach-photo-input" accept="image/*" style="display:none" onchange="handleCoachPhoto(event)">
                 <input type="text" id="coach-input" placeholder="Ask your coach anything..." onkeydown="if(event.key==='Enter')sendCoachMessage()">
                 <button id="coach-mic-btn" class="btn btn-secondary coach-mic-btn" onclick="toggleCoachVoice()" title="Voice input">&#x1F3A4;</button>
                 <button class="btn btn-primary coach-send-btn" onclick="sendCoachMessage()">&#x27A4;</button>
-            </div>
-            <div id="coach-photo-preview" class="coach-photo-preview hidden">
-                <img id="coach-preview-img" src="">
-                <button class="photo-preview-remove" onclick="removeCoachPhoto()">&times;</button>
-                <span class="photo-preview-label">Photo attached</span>
             </div>
         </section>
 
