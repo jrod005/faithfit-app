@@ -4146,6 +4146,25 @@ canvas {
     margin-bottom: 8px;
     font-style: italic;
 }
+.active-suggest {
+    font-size: 11px;
+    color: var(--text);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.active-suggest .btn-xs {
+    padding: 3px 10px;
+    font-size: 11px;
+    border-radius: 999px;
+}
+.active-rpe-input {
+    max-width: 56px;
+    flex: 0 0 56px !important;
+    text-align: center;
+}
 .active-sets { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .active-set-row {
     display: flex;

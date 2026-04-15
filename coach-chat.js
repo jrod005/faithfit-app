@@ -225,6 +225,63 @@ function addBotMessage(html, opts) {
     saveCoachHistoryEntry(entry);
 }
 
+// Streaming bot bubble: creates an empty message, exposes appendText to
+// grow it as LLM deltas arrive, and finalize() to swap in sanitized HTML
+// + suggestions and persist to history.
+function appendStreamingBotMessage() {
+    const container = document.getElementById('coach-messages');
+    const wrap = document.createElement('div');
+    wrap.className = 'coach-msg-wrap bot';
+    const msg = document.createElement('div');
+    msg.className = 'coach-msg bot streaming';
+    msg.textContent = '';
+    wrap.appendChild(msg);
+    container.appendChild(wrap);
+    container.scrollTop = container.scrollHeight;
+    const time = Date.now();
+
+    return {
+        appendText(txt) {
+            msg.textContent += txt;
+            container.scrollTop = container.scrollHeight;
+        },
+        finalize(finalHtml, suggestions, planId) {
+            msg.classList.remove('streaming');
+            msg.innerHTML = finalHtml;
+            if (planId && window._coachPlans && window._coachPlans[planId]) {
+                const saveBar = document.createElement('div');
+                saveBar.className = 'coach-plan-actions';
+                saveBar.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="saveCoachPlanToRoutines('${planId}')">&#x2B; Save as routine</button>`;
+                msg.appendChild(saveBar);
+            }
+            const meta = document.createElement('div');
+            meta.className = 'coach-msg-time';
+            meta.textContent = formatCoachTime(time);
+            wrap.appendChild(meta);
+            if (suggestions && suggestions.length) {
+                const chips = document.createElement('div');
+                chips.className = 'coach-suggestions';
+                suggestions.forEach(s => {
+                    const b = document.createElement('button');
+                    b.className = 'coach-chip';
+                    b.textContent = s;
+                    b.onclick = () => coachAsk(s);
+                    chips.appendChild(b);
+                });
+                wrap.appendChild(chips);
+            }
+            container.scrollTop = container.scrollHeight;
+            const entry = { role: 'bot', html: finalHtml, time, suggestions };
+            if (planId) {
+                entry.planId = planId;
+                entry.planRoutine = window._coachPlans?.[planId] || null;
+            }
+            saveCoachHistoryEntry(entry);
+        },
+        remove() { wrap.remove(); },
+    };
+}
+
 function addUserMessage(text) {
     const time = Date.now();
     renderUserMessage(text, time, null);
@@ -390,6 +447,63 @@ function sendCoachMessage() {
     processCoachInput(text);
 }
 
+// --- Form-check photo upload ---
+function coachPickPhoto() {
+    if (typeof coachLLMAvailable !== 'function' || !coachLLMAvailable()) {
+        showToast('Form check needs your Claude API key \u2014 set it in Profile', 'warn');
+        return;
+    }
+    const input = document.getElementById('coach-photo-file');
+    if (input) input.click();
+}
+
+async function coachHandlePhotoSelected(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    await sendCoachPhoto(file);
+}
+
+async function sendCoachPhoto(file) {
+    if (typeof coachLLMAvailable !== 'function' || !coachLLMAvailable()) {
+        showToast('Form check needs your Claude API key', 'warn');
+        return;
+    }
+    initCoach();
+    DB.set('coachUsed', true);
+
+    let dataUrl;
+    try {
+        dataUrl = await coachResizeImage(file, 1024, 0.85);
+    } catch (e) {
+        console.error('Image resize failed', e);
+        showToast('Could not read that image', 'error');
+        return;
+    }
+
+    const time = Date.now();
+    const promptText = 'Form check \u2014 what should I fix?';
+    renderUserMessage(promptText, time, dataUrl);
+    saveCoachHistoryEntry({ role: 'user', text: promptText, time, photo: dataUrl });
+
+    const ctx = getCoachContext();
+    const bubble = appendStreamingBotMessage();
+    const llm = await askCoachLLM({
+        text: 'The user attached a photo of themselves performing an exercise. (1) Identify the movement. (2) Give 2\u20134 specific, actionable form cues \u2014 call out what is off AND what looks solid. (3) If something looks concerning (rounded back on deadlift, knees caving on squat, etc.), say so plainly. (4) If the image is blurry / obscured / not an exercise, say that instead of guessing. Cite visible details to prove you saw the image.',
+        ctx,
+        imageDataUrl: dataUrl,
+        onDelta: (chunk) => bubble.appendText(chunk),
+    });
+
+    if (llm?.html) {
+        bubble.finalize(llm.html, ['Cues for next set', 'Alternate exercises for this movement', 'How to progress this lift'], null);
+        _coachMemory.push({ input: '[photo]', pattern: 'form_check' });
+    } else {
+        bubble.remove();
+        addBotMessage('<p>I could not analyze that image \u2014 ' + (llm?.error || 'unknown error') + '. Try again, or check your API key in Profile.</p>');
+    }
+}
+
 function processCoachInput(text) {
     initCoach();
     DB.set('coachUsed', true);
@@ -397,82 +511,87 @@ function processCoachInput(text) {
     addUserMessage(text);
     showTyping();
 
-    // Brief delay for natural feel
-    setTimeout(() => {
-        removeTyping();
+    setTimeout(async () => {
         const ctx = getCoachContext();
-
-        // Reset plan capture before handler runs
         window._lastCoachPlanId = null;
 
-        let response = null;
-        let suggestions = null;
-
-        // 0) Correct typos & misspellings first
         const corrected = _correctTypos(text);
 
-        // 1) Try follow-up / contextual continuation (short messages building on prior Q&A)
-        const followUpResponse = _tryFollowUp(corrected, ctx);
-        if (followUpResponse) {
-            response = followUpResponse;
-        }
-
-        // 2) Try general knowledge — precise regex triggers
+        // --- 1) Local handlers: fast, free, high-confidence paths first.
+        let response = _tryFollowUp(corrected, ctx);
         if (!response) {
-            const gkResponse = _tryGeneralKnowledge(corrected, ctx);
-            if (gkResponse) {
-                response = gkResponse;
-                _coachMemory.push({ input: corrected, pattern: 'general_knowledge' });
-            }
+            const gk = _tryGeneralKnowledge(corrected, ctx);
+            if (gk) { response = gk; _coachMemory.push({ input: corrected, pattern: 'general_knowledge' }); }
         }
-
-        // 3) Try muscle group Q&A ("best exercises for chest", "how many sets for legs")
         if (!response) {
-            const muscleResponse = _tryMuscleGroupQA(corrected, ctx);
-            if (muscleResponse) {
-                response = muscleResponse;
-                // Memory push already handled inside _tryMuscleGroupQA
-            }
+            const mg = _tryMuscleGroupQA(corrected, ctx);
+            if (mg) response = mg;
         }
-
-        // 4) Try exercise-specific Q&A ("should I bench every day", "how many sets of squats")
         if (!response) {
-            const exerciseResponse = _tryExerciseQA(corrected, ctx);
-            if (exerciseResponse) {
-                response = exerciseResponse;
-                // Detect exercise & pattern for memory
-                const ex = _detectExercise(corrected.toLowerCase());
+            const exR = _tryExerciseQA(corrected, ctx);
+            if (exR) {
+                response = exR;
+                const exd = _detectExercise(corrected.toLowerCase());
                 const pat = _detectQuestionPattern(corrected.toLowerCase());
-                _coachMemory.push({ input: corrected, exercise: ex ? ex.name : null, pattern: pat || 'exercise_qa' });
+                _coachMemory.push({ input: corrected, exercise: exd ? exd.name : null, pattern: pat || 'exercise_qa' });
             }
         }
-
-        // 5) Score against topic intents
+        let ranked = null;
         if (!response) {
-            const ranked = rankCoachIntents(corrected);
-
+            ranked = rankCoachIntents(corrected);
             if (ranked.length > 0 && ranked[0].score >= 5) {
                 response = ranked[0].topic.handler(ctx, corrected);
                 _coachMemory.push({ input: corrected, topicId: ranked[0].topic.id });
-            } else if (ranked.length > 0 && ranked[0].score >= 3) {
-                response = ranked[0].topic.handler(ctx, corrected);
-                suggestions = buildDidYouMeanChips(ranked, 1);
-                _coachMemory.push({ input: corrected, topicId: ranked[0].topic.id });
-            } else if (ranked.length > 0) {
-                response = buildDidYouMeanResponse(corrected, ranked, ctx);
-                suggestions = buildDidYouMeanChips(ranked, 0);
-            } else {
-                response = TOPIC_RESPONSES.fallback(ctx, corrected);
-            }
-
-            if (ranked.length > 0 && ranked[0].topic) {
                 window._coachLastTopicId = ranked[0].topic.id;
             }
         }
 
-        if (!suggestions) suggestions = suggestFollowUps(corrected, ctx);
+        if (response) {
+            removeTyping();
+            const planId = window._lastCoachPlanId || null;
+            addBotMessage(response, { suggestions: suggestFollowUps(corrected, ctx), planId });
+            window._lastCoachPlanId = null;
+            return;
+        }
+
+        // --- 2) LLM fallback (streaming). Only when a key is configured.
+        if (typeof coachLLMAvailable === 'function' && coachLLMAvailable()) {
+            removeTyping();
+            const bubble = appendStreamingBotMessage();
+            const llm = await askCoachLLM({
+                text: corrected,
+                ctx,
+                onDelta: (chunk) => bubble.appendText(chunk),
+            });
+            if (llm?.html) {
+                bubble.finalize(llm.html, suggestFollowUps(corrected, ctx), null);
+                _coachMemory.push({ input: corrected, pattern: 'llm' });
+                return;
+            }
+            bubble.remove();
+            console.warn('Coach LLM failed, falling back to local:', llm?.error, llm?.message);
+        } else {
+            removeTyping();
+        }
+
+        // --- 3) Low-confidence local fallback: did-you-mean / generic.
+        let finalResponse, finalSuggestions = null;
+        if (ranked && ranked.length > 0 && ranked[0].score >= 3) {
+            finalResponse = ranked[0].topic.handler(ctx, corrected);
+            finalSuggestions = buildDidYouMeanChips(ranked, 1);
+            _coachMemory.push({ input: corrected, topicId: ranked[0].topic.id });
+            window._coachLastTopicId = ranked[0].topic.id;
+        } else if (ranked && ranked.length > 0) {
+            finalResponse = buildDidYouMeanResponse(corrected, ranked, ctx);
+            finalSuggestions = buildDidYouMeanChips(ranked, 0);
+        } else {
+            finalResponse = TOPIC_RESPONSES.fallback(ctx, corrected);
+        }
         const planId = window._lastCoachPlanId || null;
-        addBotMessage(response, { suggestions, planId });
+        addBotMessage(finalResponse, {
+            suggestions: finalSuggestions || suggestFollowUps(corrected, ctx),
+            planId,
+        });
         window._lastCoachPlanId = null;
     }, 400 + Math.random() * 600);
 }

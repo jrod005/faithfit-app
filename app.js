@@ -6319,6 +6319,46 @@ function getPreviousWorkoutData(exerciseName) {
     return last.sets;
 }
 
+// --- Auto-regulation: suggest next session's top load based on last RPE ---
+// Returns { suggestedWeight, reason } or null if not enough data.
+// Rules (only fires when at least one set in the last session has RPE):
+//   avgRPE <= 7.5  → +5 lbs (or +2.5 if top <= 65)
+//   avgRPE 7.5-8.5 → same load (hold)
+//   avgRPE >= 9    → -5% (round to nearest 5)
+// Without RPE, fall through to existing overloadReady heuristic.
+function suggestNextLoad(exerciseName) {
+    const all = DB.get('workouts', []).filter(w => w.name === exerciseName);
+    if (all.length === 0) return null;
+    const last = all.sort((a, b) => b.timestamp - a.timestamp)[0];
+    if (!last.sets || last.sets.length === 0) return null;
+    const topWeight = Math.max(...last.sets.map(s => s.weight || 0));
+    const rpeSets = last.sets.filter(s => typeof s.rpe === 'number' && s.rpe >= 6 && s.rpe <= 10);
+    if (rpeSets.length === 0) return null;
+    const avgRpe = rpeSets.reduce((s, x) => s + x.rpe, 0) / rpeSets.length;
+    let suggested = topWeight;
+    let reason;
+    if (avgRpe <= 7.5) {
+        const inc = topWeight <= 65 ? 2.5 : 5;
+        suggested = topWeight + inc;
+        reason = `avg RPE ${avgRpe.toFixed(1)} \u2014 push +${inc}`;
+    } else if (avgRpe >= 9) {
+        suggested = Math.round((topWeight * 0.95) / 5) * 5;
+        reason = `avg RPE ${avgRpe.toFixed(1)} \u2014 deload 5%`;
+    } else {
+        reason = `avg RPE ${avgRpe.toFixed(1)} \u2014 hold`;
+    }
+    return { suggestedWeight: suggested, topWeight, avgRpe, reason };
+}
+
+function applySuggestedLoad(exIdx, weightLbs) {
+    if (!activeWorkout || !activeWorkout.exercises[exIdx]) return;
+    const display = isMetric() ? (weightLbs * 0.453592).toFixed(1) : weightLbs.toString();
+    activeWorkout.exercises[exIdx].logged.forEach(s => { s.w = display; });
+    renderActiveWorkout();
+    persistActiveWorkout();
+    haptic(15);
+}
+
 function startActiveWorkout(routine, day) {
     activeWorkout = {
         routineName: routine.name,
@@ -6329,7 +6369,7 @@ function startActiveWorkout(routine, day) {
             targetSets: e.sets,
             targetReps: e.reps,
             rest: e.rest || 90,
-            logged: Array.from({ length: e.sets }, () => ({ w: '', r: '' }))
+            logged: Array.from({ length: e.sets }, () => ({ w: '', r: '', rpe: '' }))
         }))
     };
     document.querySelectorAll('.hub-view').forEach(v => v.classList.add('hidden'));
@@ -6363,9 +6403,22 @@ function renderActiveWorkout() {
 
     activeWorkout.exercises.forEach((ex, exIdx) => {
         const prev = getPreviousWorkoutData(ex.name);
-        const prevHtml = prev
-            ? `<div class="active-prev">Last: ${prev.map(s => `${lbsToDisplay(s.weight)}${wu()}&times;${s.reps}`).join(', ')}</div>`
-            : `<div class="active-prev">No history yet</div>`;
+        const suggestion = suggestNextLoad(ex.name);
+        let prevHtml;
+        if (prev) {
+            const setSummary = prev.map(s => {
+                const r = (typeof s.rpe === 'number') ? ` @${s.rpe}` : '';
+                return `${lbsToDisplay(s.weight)}${wu()}&times;${s.reps}${r}`;
+            }).join(', ');
+            let suggHtml = '';
+            if (suggestion) {
+                const dispW = lbsToDisplay(suggestion.suggestedWeight);
+                suggHtml = `<div class="active-suggest">Try <strong>${dispW}${wu()}</strong> &mdash; ${suggestion.reason} <button class="btn btn-secondary btn-xs" onclick="applySuggestedLoad(${exIdx}, ${suggestion.suggestedWeight})">Apply</button></div>`;
+            }
+            prevHtml = `<div class="active-prev">Last: ${setSummary}</div>${suggHtml}`;
+        } else {
+            prevHtml = `<div class="active-prev">No history yet</div>`;
+        }
 
         const safeExName = escapeHtml(ex.name).replace(/'/g, '&#39;');
         html += `<div class="active-ex">
@@ -6382,6 +6435,7 @@ function renderActiveWorkout() {
                 <input type="number" placeholder="Weight" value="${s.w}" oninput="updateActiveSet(${exIdx},${sIdx},'w',this.value)" step="2.5">
                 <span>&times;</span>
                 <input type="number" placeholder="Reps" value="${s.r}" oninput="updateActiveSet(${exIdx},${sIdx},'r',this.value)">
+                <input type="number" inputmode="decimal" placeholder="RPE" min="6" max="10" step="0.5" value="${s.rpe || ''}" oninput="updateActiveSet(${exIdx},${sIdx},'rpe',this.value)" class="active-rpe-input" title="RPE 6-10 (optional)">
                 <button class="active-done-btn" onclick="completeSet(${exIdx},${sIdx})">&#x2713;</button>
                 <button class="active-remove-set-btn" aria-label="Remove set" onclick="removeSetFromActive(${exIdx},${sIdx})">&times;</button>
             </div>`;
@@ -6419,7 +6473,7 @@ function updateActiveSet(exIdx, sIdx, field, value) {
 }
 
 function addSetToActive(exIdx) {
-    activeWorkout.exercises[exIdx].logged.push({ w: '', r: '' });
+    activeWorkout.exercises[exIdx].logged.push({ w: '', r: '', rpe: '' });
     renderActiveWorkout();
     persistActiveWorkout();
 }
@@ -6457,7 +6511,7 @@ function addExerciseToActive() {
         targetSets: 3,
         targetReps: '8-12',
         rest: 90,
-        logged: [{ w: '', r: '' }, { w: '', r: '' }, { w: '', r: '' }]
+        logged: [{ w: '', r: '', rpe: '' }, { w: '', r: '', rpe: '' }, { w: '', r: '', rpe: '' }]
     });
     input.value = '';
     renderActiveWorkout();
@@ -6553,12 +6607,21 @@ async function finishActiveWorkout() {
     activeWorkout.exercises.forEach(ex => {
         const validSets = ex.logged
             .filter(s => s.w && s.r)
-            .map(s => ({ weight: parseFloat(s.w), reps: parseInt(s.r) }));
+            .map(s => {
+                const rpe = s.rpe ? parseFloat(s.rpe) : NaN;
+                const out = { weight: parseFloat(s.w), reps: parseInt(s.r) };
+                if (!isNaN(rpe) && rpe >= 6 && rpe <= 10) out.rpe = rpe;
+                return out;
+            });
         if (validSets.length === 0) return;
-        const realWeights = validSets.map(s => ({
-            weight: getCurrentUnits() === 'metric' ? s.weight * 2.20462 : s.weight,
-            reps: s.reps
-        }));
+        const realWeights = validSets.map(s => {
+            const out = {
+                weight: getCurrentUnits() === 'metric' ? s.weight * 2.20462 : s.weight,
+                reps: s.reps,
+            };
+            if (typeof s.rpe === 'number') out.rpe = s.rpe;
+            return out;
+        });
         realWeights.forEach(s => {
             totalVolume += s.weight * s.reps;
             setCount++;

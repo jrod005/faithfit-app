@@ -760,6 +760,8 @@
 
             <div class="coach-input-area">
                 <input type="text" id="coach-input" placeholder="Ask your coach anything..." onkeydown="if(event.key==='Enter')sendCoachMessage()">
+                <button id="coach-photo-btn" class="btn btn-secondary coach-mic-btn" onclick="coachPickPhoto()" title="Form check (photo)">&#x1F4CE;</button>
+                <input type="file" id="coach-photo-file" accept="image/*" style="display:none" onchange="coachHandlePhotoSelected(event)">
                 <button id="coach-mic-btn" class="btn btn-secondary coach-mic-btn" onclick="toggleCoachVoice()" title="Voice input">&#x1F3A4;</button>
                 <button class="btn btn-primary coach-send-btn" onclick="sendCoachMessage()">&#x27A4;</button>
             </div>
@@ -914,6 +916,23 @@
                             <button class="btn btn-secondary btn-sm" onclick="manualRestoreNow()">&#x2193; Restore from cloud</button>
                         </div>
                         <p class="notif-note">Your workouts, meals, weights, routines, and prayer entries sync automatically while signed in. Sign in on the Social tab to enable.</p>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>AI Coach (Claude)</label>
+                    <div class="unit-toggle">
+                        <button class="unit-btn" id="coach-ai-on" onclick="showCoachApiKeyInput()">On</button>
+                        <button class="unit-btn active" id="coach-ai-off" onclick="clearCoachApiKeyAndHide()">Off</button>
+                    </div>
+                    <div id="coach-ai-settings" class="hidden" style="margin-top:12px">
+                        <p id="coach-ai-status" class="cloud-status">Not connected</p>
+                        <input type="password" id="coach-ai-key" placeholder="Paste your Claude API key (sk-ant-...)" autocomplete="off" style="width:100%;margin-top:6px">
+                        <div class="form-row" style="margin-top:8px">
+                            <button class="btn btn-primary btn-sm" onclick="saveCoachApiKeyFromInput()">Save</button>
+                            <button class="btn btn-secondary btn-sm" onclick="testCoachApiKeyFromInput()">Test</button>
+                            <button class="btn btn-secondary btn-sm" onclick="clearCoachApiKeyAndHide()">Clear</button>
+                        </div>
+                        <p class="notif-note">Key is stored only on this device (localStorage) &mdash; never synced to cloud. Get a key at console.anthropic.com. Billing is on your Anthropic account.</p>
                     </div>
                 </div>
                 <div class="form-group">
@@ -1101,6 +1120,7 @@
     <script src="coach-responses.js"></script>
     <script src="coach-chat.js"></script>
     <script src="coach-nlp.js"></script>
+    <script src="coach-llm.js"></script>
     <script src="social.js"></script>
     <script src="cloud-sync.js"></script>
 </body>
