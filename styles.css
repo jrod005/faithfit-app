@@ -1389,6 +1389,21 @@ input::placeholder {
     margin-top: 2px;
 }
 
+.coach-disclaimer {
+    font-size: 11px;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 6px 10px;
+    margin: 0 0 8px 0;
+    line-height: 1.4;
+}
+.coach-disclaimer a {
+    color: var(--gold, #c9a769);
+    text-decoration: underline;
+}
+
 .quick-actions {
     display: flex;
     flex-wrap: wrap;

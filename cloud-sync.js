@@ -337,6 +337,42 @@ if (document.readyState === 'loading') {
     setTimeout(initCloudSyncAuthHook, 0);
 }
 
+// Self-serve cloud deletion: removes this user's row from user_data and
+// profiles. The auth.users row (email, password hash) remains — requires
+// admin API to remove, which we can't do from the browser. Email us to
+// complete full account removal.
+async function deleteCloudDataForCurrentUser() {
+    if (typeof currentUser === 'undefined' || !currentUser) {
+        return { ok: false, reason: 'not-signed-in' };
+    }
+    const uid = currentUser.id;
+    const headers = await directHeaders({ 'Content-Type': 'application/json' });
+    if (!headers) return { ok: false, reason: 'no-token' };
+
+    const endpoints = [
+        SUPABASE_URL + '/rest/v1/user_data?user_id=eq.' + encodeURIComponent(uid),
+        SUPABASE_URL + '/rest/v1/profiles?id=eq.' + encodeURIComponent(uid),
+    ];
+    const errors = [];
+    for (const url of endpoints) {
+        try {
+            const resp = await fetch(url, { method: 'DELETE', headers, cache: 'no-store' });
+            if (!resp.ok) {
+                const body = await resp.text().catch(() => '');
+                errors.push(url + ' -> ' + resp.status + ' ' + body.slice(0, 120));
+            }
+        } catch (e) {
+            errors.push(url + ' -> ' + (e.message || e));
+        }
+    }
+    if (errors.length) {
+        console.error('Cloud delete errors:', errors);
+        if (typeof logClientError === 'function') logClientError('cloud-delete', errors.join(' | ').slice(0, 500));
+        return { ok: false, reason: 'partial', errors };
+    }
+    return { ok: true };
+}
+
 // =============================================
 // Fresh-install restore prompt
 // On a brand-new PWA install (or fresh browser), if there is no local

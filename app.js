@@ -3030,13 +3030,34 @@ function exportData() {
 }
 
 async function clearAllData() {
-    const ok1 = await confirmDialog('Delete ALL your data? This cannot be undone.', { danger: true, okText: 'Continue' });
+    const ok1 = await confirmDialog('Delete ALL your local data? This cannot be undone.', { danger: true, okText: 'Continue' });
     if (!ok1) return;
-    const ok2 = await confirmDialog('Really? This will erase all workouts, meals, and weight history.', { danger: true, okText: 'Erase Everything' });
+
+    let alsoCloud = false;
+    const signedIn = (typeof currentUser !== 'undefined' && currentUser);
+    if (signedIn && typeof deleteCloudDataForCurrentUser === 'function') {
+        alsoCloud = await confirmDialog('Also delete your cloud backup? If you skip this, cloud data will restore on next sign-in.', { danger: true, okText: 'Delete cloud too' });
+    }
+
+    const ok2 = await confirmDialog('Final confirmation — erase everything?', { danger: true, okText: 'Erase Everything' });
     if (!ok2) return;
-    ['profile', 'workouts', 'meals', 'weights'].forEach(key => {
-        localStorage.removeItem('faithfit_' + key);
-    });
+
+    if (alsoCloud) {
+        try {
+            const res = await deleteCloudDataForCurrentUser();
+            if (!res.ok) showToast('Cloud delete failed — local wiped only', 'warn');
+        } catch (e) {
+            console.error('Cloud delete threw', e);
+            showToast('Cloud delete failed — local wiped only', 'warn');
+        }
+    }
+
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('faithfit_')) toRemove.push(k);
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
     location.reload();
 }
 
