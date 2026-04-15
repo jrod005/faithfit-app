@@ -8,6 +8,7 @@
     "background_color": "#0E0E0E",
     "theme_color": "#1a1a1a",
     "orientation": "portrait",
+    "categories": ["health", "fitness", "lifestyle"],
     "icons": [
         {
             "src": "icons/icon-192.png",
@@ -20,6 +21,26 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Start Workout",
+            "short_name": "Workout",
+            "url": "./app.html#workouts",
+            "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Log Meal",
+            "short_name": "Meal",
+            "url": "./app.html#nutrition",
+            "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Ask Coach",
+            "short_name": "Coach",
+            "url": "./app.html#coach",
+            "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
         }
     ]
 }

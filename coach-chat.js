@@ -576,6 +576,7 @@ function processCoachInput(text) {
 
         // --- 3) Low-confidence local fallback: did-you-mean / generic.
         let finalResponse, finalSuggestions = null;
+        let lowConfidence = false;
         if (ranked && ranked.length > 0 && ranked[0].score >= 3) {
             finalResponse = ranked[0].topic.handler(ctx, corrected);
             finalSuggestions = buildDidYouMeanChips(ranked, 1);
@@ -584,9 +585,20 @@ function processCoachInput(text) {
         } else if (ranked && ranked.length > 0) {
             finalResponse = buildDidYouMeanResponse(corrected, ranked, ctx);
             finalSuggestions = buildDidYouMeanChips(ranked, 0);
+            lowConfidence = true;
         } else {
             finalResponse = TOPIC_RESPONSES.fallback(ctx, corrected);
+            lowConfidence = true;
         }
+
+        // Soft upsell: if we fell through to low-confidence local and the LLM
+        // isn't configured, nudge the user to enable it (once per session).
+        const keyMissing = !(typeof coachLLMAvailable === 'function' && coachLLMAvailable());
+        if (lowConfidence && keyMissing && !window._coachUpsellShown) {
+            window._coachUpsellShown = true;
+            finalResponse += '<div class="coach-upsell"><strong>Want a smarter answer?</strong><p>Enable the AI Coach (Claude) for deep questions like this. You bring your own API key &mdash; no subscription, no markup. It takes 60 seconds.</p><button class="btn btn-primary btn-sm" onclick="switchTab(\'profile\');setTimeout(()=>{const b=document.getElementById(\'coach-ai-on\');if(b)b.click();const i=document.getElementById(\'coach-ai-key\');if(i)i.focus();},300)">Enable AI Coach</button></div>';
+        }
+
         const planId = window._lastCoachPlanId || null;
         addBotMessage(finalResponse, {
             suggestions: finalSuggestions || suggestFollowUps(corrected, ctx),

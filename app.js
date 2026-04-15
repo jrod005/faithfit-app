@@ -5403,6 +5403,11 @@ function nextOnboardingStep() {
     if (obStep === 2) {
         const name = document.getElementById('ob-name').value.trim();
         if (!name) { alert('Please enter your name.'); return; }
+        const ageVal = parseInt(document.getElementById('ob-age').value);
+        if (ageVal && ageVal < 13) {
+            alert('Iron Faith is for users 13 and older. Thanks for understanding.');
+            return;
+        }
     }
     if (obStep === 4 && !obExperience) {
         alert('Pick your experience level.');
@@ -6660,6 +6665,11 @@ function init() {
     safeCall('installMuscleAwareSearch', installMuscleAwareSearch);
     safeCall('restoreActiveWorkout', restoreActiveWorkout);
     safeCall('showOnboarding', showOnboarding);
+
+    // PWA shortcut deep-links: open to the tab named in location.hash
+    const hash = (location.hash || '').replace(/^#/, '');
+    const validTabs = ['dashboard', 'workouts', 'nutrition', 'coach', 'progress', 'profile', 'social'];
+    if (validTabs.includes(hash)) safeCall('switchTab', () => switchTab(hash));
 
     // Auto-fill exercise inputs from history when name changes
     const exNameEl = document.getElementById('exercise-name');
