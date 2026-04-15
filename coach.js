@@ -3835,44 +3835,456 @@ function processCoachInput(text) {
         let response = null;
         let suggestions = null;
 
-        // 1) Try general knowledge FIRST — these have precise regex triggers
-        //    and catch natural questions like "should I bench every day"
-        const gkResponse = _tryGeneralKnowledge(text, ctx);
+        // 0) Correct typos & misspellings first
+        const corrected = _correctTypos(text);
 
-        if (gkResponse) {
-            response = gkResponse;
-        } else {
-            // 2) Try exercise-specific Q&A (catches "is X good for Y", "should I do X every day", etc.)
-            const exerciseResponse = _tryExerciseQA(text, ctx);
-            if (exerciseResponse) {
-                response = exerciseResponse;
-            } else {
-                // 3) Score against topic intents
-                const ranked = rankCoachIntents(text);
+        // 1) Try follow-up / contextual continuation (short messages building on prior Q&A)
+        const followUpResponse = _tryFollowUp(corrected, ctx);
+        if (followUpResponse) {
+            response = followUpResponse;
+        }
 
-                if (ranked.length > 0 && ranked[0].score >= 5) {
-                    response = ranked[0].topic.handler(ctx, text);
-                } else if (ranked.length > 0 && ranked[0].score >= 3) {
-                    response = ranked[0].topic.handler(ctx, text);
-                    suggestions = buildDidYouMeanChips(ranked, 1);
-                } else if (ranked.length > 0) {
-                    response = buildDidYouMeanResponse(text, ranked, ctx);
-                    suggestions = buildDidYouMeanChips(ranked, 0);
-                } else {
-                    response = TOPIC_RESPONSES.fallback(ctx, text);
-                }
-
-                if (ranked.length > 0 && ranked[0].topic) {
-                    window._coachLastTopicId = ranked[0].topic.id;
-                }
+        // 2) Try general knowledge — precise regex triggers
+        if (!response) {
+            const gkResponse = _tryGeneralKnowledge(corrected, ctx);
+            if (gkResponse) {
+                response = gkResponse;
+                _coachMemory.push({ input: corrected, pattern: 'general_knowledge' });
             }
         }
 
-        if (!suggestions) suggestions = suggestFollowUps(text, ctx);
+        // 3) Try muscle group Q&A ("best exercises for chest", "how many sets for legs")
+        if (!response) {
+            const muscleResponse = _tryMuscleGroupQA(corrected, ctx);
+            if (muscleResponse) {
+                response = muscleResponse;
+                // Memory push already handled inside _tryMuscleGroupQA
+            }
+        }
+
+        // 4) Try exercise-specific Q&A ("should I bench every day", "how many sets of squats")
+        if (!response) {
+            const exerciseResponse = _tryExerciseQA(corrected, ctx);
+            if (exerciseResponse) {
+                response = exerciseResponse;
+                // Detect exercise & pattern for memory
+                const ex = _detectExercise(corrected.toLowerCase());
+                const pat = _detectQuestionPattern(corrected.toLowerCase());
+                _coachMemory.push({ input: corrected, exercise: ex ? ex.name : null, pattern: pat || 'exercise_qa' });
+            }
+        }
+
+        // 5) Score against topic intents
+        if (!response) {
+            const ranked = rankCoachIntents(corrected);
+
+            if (ranked.length > 0 && ranked[0].score >= 5) {
+                response = ranked[0].topic.handler(ctx, corrected);
+                _coachMemory.push({ input: corrected, topicId: ranked[0].topic.id });
+            } else if (ranked.length > 0 && ranked[0].score >= 3) {
+                response = ranked[0].topic.handler(ctx, corrected);
+                suggestions = buildDidYouMeanChips(ranked, 1);
+                _coachMemory.push({ input: corrected, topicId: ranked[0].topic.id });
+            } else if (ranked.length > 0) {
+                response = buildDidYouMeanResponse(corrected, ranked, ctx);
+                suggestions = buildDidYouMeanChips(ranked, 0);
+            } else {
+                response = TOPIC_RESPONSES.fallback(ctx, corrected);
+            }
+
+            if (ranked.length > 0 && ranked[0].topic) {
+                window._coachLastTopicId = ranked[0].topic.id;
+            }
+        }
+
+        if (!suggestions) suggestions = suggestFollowUps(corrected, ctx);
         const planId = window._lastCoachPlanId || null;
         addBotMessage(response, { suggestions, planId });
         window._lastCoachPlanId = null;
     }, 400 + Math.random() * 600);
+}
+
+// ========== CONVERSATION MEMORY ==========
+// Tracks last 5 exchanges so follow-ups like "what about for legs?" or "how many sets?" work
+const _coachMemory = {
+    turns: [],       // last N { input, exercise, muscleGroup, pattern, topicId }
+    maxTurns: 5,
+
+    push(entry) {
+        this.turns.push(entry);
+        if (this.turns.length > this.maxTurns) this.turns.shift();
+    },
+    lastExercise() {
+        for (let i = this.turns.length - 1; i >= 0; i--) {
+            if (this.turns[i].exercise) return this.turns[i].exercise;
+        }
+        return null;
+    },
+    lastMuscleGroup() {
+        for (let i = this.turns.length - 1; i >= 0; i--) {
+            if (this.turns[i].muscleGroup) return this.turns[i].muscleGroup;
+        }
+        return null;
+    },
+    lastPattern() {
+        for (let i = this.turns.length - 1; i >= 0; i--) {
+            if (this.turns[i].pattern) return this.turns[i].pattern;
+        }
+        return null;
+    },
+};
+
+// ========== FUZZY MATCHING (Levenshtein) ==========
+function _levenshtein(a, b) {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            const cost = b[i - 1] === a[j - 1] ? 0 : 1;
+            matrix[i][j] = Math.min(
+                matrix[i - 1][j] + 1,
+                matrix[i][j - 1] + 1,
+                matrix[i - 1][j - 1] + cost
+            );
+        }
+    }
+    return matrix[b.length][a.length];
+}
+
+// Fuzzy-match a word against a list, return best match if within threshold
+function _fuzzyMatch(word, candidates, maxDist) {
+    if (!word || word.length < 3) return null;
+    let best = null, bestDist = maxDist + 1;
+    for (const c of candidates) {
+        // Quick reject: length difference > maxDist
+        if (Math.abs(word.length - c.length) > maxDist) continue;
+        const d = _levenshtein(word, c);
+        if (d < bestDist) { bestDist = d; best = c; }
+    }
+    return bestDist <= maxDist ? best : null;
+}
+
+// ========== COMMON TYPO / MISSPELLING DICTIONARY ==========
+const _TYPO_MAP = {
+    // Exercise typos
+    'benchpress': 'bench press', 'bech press': 'bench press', 'benchh': 'bench', 'benhc': 'bench',
+    'sqaut': 'squat', 'squaat': 'squat', 'squatt': 'squat', 'sqats': 'squat',
+    'deadlif': 'deadlift', 'deadift': 'deadlift', 'deadlit': 'deadlift', 'dedlift': 'deadlift',
+    'pullups': 'pull ups', 'pushups': 'push ups', 'chinups': 'chin ups',
+    'dumbel': 'dumbbell', 'dumbell': 'dumbbell', 'dumbbel': 'dumbbell', 'barbell': 'barbell',
+    'trisep': 'tricep', 'triseps': 'triceps', 'bisep': 'bicep', 'biseps': 'biceps',
+    'exersize': 'exercise', 'exercize': 'exercise', 'excercise': 'exercise', 'excersize': 'exercise',
+    // Nutrition typos
+    'protien': 'protein', 'protine': 'protein', 'proteen': 'protein', 'protean': 'protein',
+    'calroies': 'calories', 'caloreis': 'calories', 'caloris': 'calories', 'caloires': 'calories',
+    'carbohydrat': 'carbohydrate', 'carbohidrate': 'carbohydrate', 'carbohidrates': 'carbohydrates',
+    'nutrtion': 'nutrition', 'nutriton': 'nutrition', 'nurtition': 'nutrition',
+    'supplment': 'supplement', 'suppliment': 'supplement', 'supliment': 'supplement',
+    'creatine': 'creatine', 'creatien': 'creatine', 'creatin': 'creatine', 'kreatine': 'creatine',
+    // Fitness concept typos
+    'hypertorphy': 'hypertrophy', 'hipertrophy': 'hypertrophy', 'hypertropy': 'hypertrophy',
+    'strenght': 'strength', 'strengh': 'strength', 'stength': 'strength',
+    'musle': 'muscle', 'muscl': 'muscle', 'mucsle': 'muscle', 'muscel': 'muscle',
+    'wieght': 'weight', 'weigth': 'weight', 'wight': 'weight', 'weght': 'weight',
+    'trainning': 'training', 'trianing': 'training', 'traning': 'training',
+    'workou': 'workout', 'wrokout': 'workout', 'workut': 'workout', 'workoit': 'workout',
+    'recovry': 'recovery', 'recoverey': 'recovery', 'recoverry': 'recovery',
+    'streching': 'stretching', 'strethcing': 'stretching', 'strentching': 'stretching',
+    'flexability': 'flexibility', 'flexibilty': 'flexibility',
+    'endurnace': 'endurance', 'endurace': 'endurance',
+    'cardoi': 'cardio', 'cardo': 'cardio', 'caridio': 'cardio',
+    'condtioning': 'conditioning', 'conditoning': 'conditioning',
+    'overwieght': 'overweight', 'overweigt': 'overweight',
+    'obiesity': 'obesity', 'obseity': 'obesity',
+    'diabtes': 'diabetes', 'diabeties': 'diabetes',
+    'plateua': 'plateau', 'plataeu': 'plateau', 'plateu': 'plateau',
+    'periodzation': 'periodization', 'periodisation': 'periodization',
+    'testoterone': 'testosterone', 'testosteron': 'testosterone', 'testostorone': 'testosterone',
+    'metebolism': 'metabolism', 'metablism': 'metabolism', 'metabolsim': 'metabolism',
+    'defecit': 'deficit', 'defict': 'deficit', 'deficet': 'deficit',
+    'surpluss': 'surplus', 'surpuls': 'surplus',
+    'maintence': 'maintenance', 'maintenace': 'maintenance', 'maintainance': 'maintenance',
+    'overtraning': 'overtraining', 'overtaining': 'overtraining',
+    'progresion': 'progression', 'progession': 'progression',
+    'deit': 'diet', 'deiting': 'dieting',
+    'loosing': 'losing', 'lossing': 'losing',
+    'gainnig': 'gaining', 'ganing': 'gaining',
+    'buliking': 'bulking', 'bukking': 'bulking',
+    'cuting': 'cutting', 'cutitng': 'cutting',
+    'recomp': 'recomp', 'recomposition': 'recomposition',
+    'suplementation': 'supplementation',
+    'starimaster': 'stairmaster', 'stairmaseter': 'stairmaster',
+    'tredmill': 'treadmill', 'treadmil': 'treadmill', 'tredmil': 'treadmill',
+    'eliptical': 'elliptical', 'elipitcal': 'elliptical',
+};
+
+// Apply typo corrections and fuzzy matching to input text
+function _correctTypos(text) {
+    let corrected = text.toLowerCase();
+    // Direct typo dictionary
+    for (const [typo, fix] of Object.entries(_TYPO_MAP)) {
+        if (corrected.includes(typo)) {
+            corrected = corrected.replace(new RegExp(typo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), fix);
+        }
+    }
+    // Fuzzy match individual words against exercise aliases
+    const allAliases = Object.keys(_EXERCISE_ALIASES);
+    const words = corrected.split(/\s+/);
+    const fuzzyWords = words.map(w => {
+        if (w.length < 4) return w;
+        // Try 2-word combinations with next word
+        const idx = words.indexOf(w);
+        if (idx < words.length - 1) {
+            const twoWord = w + ' ' + words[idx + 1];
+            const match2 = _fuzzyMatch(twoWord, allAliases, 2);
+            if (match2) return w; // keep as-is, the 2-word will match naturally
+        }
+        const match = _fuzzyMatch(w, allAliases, 2);
+        if (match && match !== w) return match;
+        return w;
+    });
+    return fuzzyWords.join(' ');
+}
+
+// ========== MUSCLE GROUP Q&A ENGINE ==========
+const _MUSCLE_GROUPS = {
+    'chest': {
+        muscles: 'pectoralis major (upper, mid, lower), pectoralis minor',
+        bestExercises: ['Bench Press', 'Incline Dumbbell Press', 'Cable Fly', 'Dips (chest-focused)', 'Push-ups'],
+        sets: '12-20 sets/week', frequency: '2x/week',
+        tips: 'Hit from multiple angles: flat for mid-chest, incline for upper, decline/dips for lower. Cable flies for stretch-mediated hypertrophy.',
+    },
+    'back': {
+        muscles: 'lats, traps, rhomboids, teres major, erector spinae',
+        bestExercises: ['Barbell Row', 'Pull-ups/Lat Pulldown', 'Seated Cable Row', 'Face Pulls', 'Deadlift'],
+        sets: '12-20 sets/week', frequency: '2x/week',
+        tips: 'Vertical pulls (pulldowns/pull-ups) emphasize lats. Horizontal rows build thickness. Face pulls for rear delts and shoulder health.',
+    },
+    'shoulders': {
+        muscles: 'anterior (front) delt, lateral (side) delt, posterior (rear) delt',
+        bestExercises: ['Overhead Press', 'Lateral Raises', 'Face Pulls', 'Arnold Press', 'Rear Delt Fly'],
+        sets: '12-18 sets/week (including pressing)', frequency: '2-3x/week',
+        tips: 'Front delts get hit on all pressing. Focus extra volume on side and rear delts — lateral raises and face pulls are essential.',
+    },
+    'arms': {
+        muscles: 'biceps (long & short head), triceps (long, lateral, medial head), brachialis, forearms',
+        bestExercises: ['Barbell Curl', 'Hammer Curl', 'Tricep Pushdown', 'Skull Crushers', 'Overhead Tricep Extension'],
+        sets: '10-16 sets/week per biceps and triceps', frequency: '2-3x/week',
+        tips: 'Triceps are 2/3 of arm size. Overhead extensions hit the long head (the one that makes your arm look big from the side). Compound pressing already trains triceps; compound pulling trains biceps.',
+    },
+    'biceps': {
+        muscles: 'biceps brachii (long & short head), brachialis, brachioradialis',
+        bestExercises: ['Barbell Curl', 'Incline Dumbbell Curl', 'Hammer Curl', 'Preacher Curl', 'Cable Curl'],
+        sets: '10-14 sets/week', frequency: '2-3x/week',
+        tips: 'Incline curls target the long head (peak). Hammer curls hit brachialis (arm width). Don\'t forget that rows and pulldowns already train biceps.',
+    },
+    'triceps': {
+        muscles: 'triceps brachii (long, lateral, medial head)',
+        bestExercises: ['Close-Grip Bench Press', 'Tricep Pushdown', 'Overhead Extension', 'Skull Crushers', 'Dips'],
+        sets: '10-14 sets/week', frequency: '2-3x/week',
+        tips: 'Overhead movements hit the long head hardest (biggest head). Pushdowns target lateral head. Pressing movements already count toward tricep volume.',
+    },
+    'legs': {
+        muscles: 'quads, hamstrings, glutes, calves, adductors',
+        bestExercises: ['Squat', 'Romanian Deadlift', 'Leg Press', 'Lunges', 'Leg Curl', 'Calf Raises'],
+        sets: '14-22 sets/week', frequency: '2x/week',
+        tips: 'Squat patterns hit quads and glutes. Hinge patterns (RDL) hit hamstrings and glutes. Don\'t skip calves — they need high frequency (3-5x/week) and volume (4-6 sets).',
+    },
+    'quads': {
+        muscles: 'rectus femoris, vastus lateralis, vastus medialis, vastus intermedius',
+        bestExercises: ['Squat', 'Front Squat', 'Leg Press', 'Leg Extension', 'Bulgarian Split Squat'],
+        sets: '10-16 sets/week', frequency: '2x/week',
+        tips: 'Deep squats hit all four heads. Leg extensions isolate quads without lower back fatigue. Front squats shift load to quads over glutes.',
+    },
+    'hamstrings': {
+        muscles: 'biceps femoris, semitendinosus, semimembranosus',
+        bestExercises: ['Romanian Deadlift', 'Leg Curl (lying/seated)', 'Stiff-Leg Deadlift', 'Nordic Curl', 'Good Morning'],
+        sets: '8-14 sets/week', frequency: '2x/week',
+        tips: 'RDLs train the hip-extension function. Leg curls train the knee-flexion function. You need BOTH for complete hamstring development.',
+    },
+    'glutes': {
+        muscles: 'gluteus maximus, gluteus medius, gluteus minimus',
+        bestExercises: ['Hip Thrust', 'Squat', 'Romanian Deadlift', 'Bulgarian Split Squat', 'Cable Kickback'],
+        sets: '10-16 sets/week', frequency: '2-3x/week',
+        tips: 'Hip thrusts produce the highest glute EMG. Deep squats work glutes hard too. Bret Contreras research: hip thrusts + squats together outperform either alone.',
+    },
+    'calves': {
+        muscles: 'gastrocnemius (upper calf), soleus (lower calf)',
+        bestExercises: ['Standing Calf Raise', 'Seated Calf Raise', 'Leg Press Calf Raise', 'Single-Leg Calf Raise'],
+        sets: '12-20 sets/week', frequency: '3-5x/week',
+        tips: 'Calves are stubborn. High frequency + full ROM (deep stretch at bottom, hard squeeze at top) is key. Standing = gastrocnemius, seated = soleus.',
+    },
+    'abs': {
+        muscles: 'rectus abdominis, obliques, transverse abdominis',
+        bestExercises: ['Hanging Leg Raise', 'Cable Crunch', 'Ab Wheel Rollout', 'Pallof Press', 'Plank'],
+        sets: '8-14 sets/week', frequency: '3-4x/week',
+        tips: 'Abs are built in the gym, revealed in the kitchen. Heavy compounds already train core. Add 2-3 direct exercises for hypertrophy. Vispute 2011: ab exercises alone don\'t reduce belly fat.',
+    },
+    'core': {
+        muscles: 'rectus abdominis, obliques, transverse abdominis, erector spinae, hip flexors',
+        bestExercises: ['Plank', 'Ab Wheel Rollout', 'Pallof Press', 'Dead Bug', 'Hanging Leg Raise', 'Bird Dog'],
+        sets: '8-14 sets/week', frequency: '3-4x/week',
+        tips: 'Core = more than abs. Anti-rotation (Pallof press) and anti-extension (plank, ab wheel) build functional stability. Squats and deadlifts already train core heavily.',
+    },
+    'forearms': {
+        muscles: 'wrist flexors, wrist extensors, brachioradialis',
+        bestExercises: ['Wrist Curls', 'Reverse Curls', 'Farmer\'s Walks', 'Dead Hangs', 'Hammer Curls'],
+        sets: '6-10 sets/week', frequency: '2-3x/week',
+        tips: 'Heavy pulling (deadlifts, rows) trains forearms passively. Add direct work only if grip is a limiting factor or forearm size is a priority.',
+    },
+    'traps': {
+        muscles: 'upper traps, middle traps, lower traps',
+        bestExercises: ['Shrugs', 'Face Pulls', 'Barbell Row', 'Farmer\'s Walks', 'Deadlift'],
+        sets: '8-12 sets/week', frequency: '2x/week',
+        tips: 'Heavy deadlifts and rows already build traps. Shrugs add upper trap mass. Face pulls and Y-raises hit the often-neglected lower traps.',
+    },
+};
+
+// Muscle group aliases for detection
+const _MUSCLE_ALIASES = {
+    'chest': 'chest', 'pecs': 'chest', 'pec': 'chest', 'pectoral': 'chest', 'pectorals': 'chest', 'titties': 'chest',
+    'back': 'back', 'lats': 'back', 'lat': 'back', 'upper back': 'back', 'mid back': 'back', 'lower back': 'back', 'rhomboids': 'back',
+    'shoulders': 'shoulders', 'shoulder': 'shoulders', 'delts': 'shoulders', 'delt': 'shoulders', 'deltoids': 'shoulders',
+    'arms': 'arms', 'arm': 'arms', 'guns': 'arms',
+    'biceps': 'biceps', 'bicep': 'biceps', 'bis': 'biceps',
+    'triceps': 'triceps', 'tricep': 'triceps', 'tris': 'triceps',
+    'legs': 'legs', 'leg': 'legs', 'lower body': 'legs', 'leg day': 'legs',
+    'quads': 'quads', 'quad': 'quads', 'quadriceps': 'quads', 'thighs': 'quads', 'thigh': 'quads',
+    'hamstrings': 'hamstrings', 'hamstring': 'hamstrings', 'hams': 'hamstrings',
+    'glutes': 'glutes', 'glute': 'glutes', 'butt': 'glutes', 'booty': 'glutes', 'bum': 'glutes', 'buttocks': 'glutes', 'ass': 'glutes',
+    'calves': 'calves', 'calf': 'calves',
+    'abs': 'abs', 'abdominals': 'abs', 'six pack': 'abs', 'sixpack': 'abs', 'stomach': 'abs', 'tummy': 'abs', 'belly': 'abs', 'midsection': 'abs',
+    'core': 'core',
+    'forearms': 'forearms', 'forearm': 'forearms', 'grip': 'forearms', 'wrist': 'forearms', 'wrists': 'forearms',
+    'traps': 'traps', 'trap': 'traps', 'trapezius': 'traps',
+};
+
+function _detectMuscleGroup(lower) {
+    const sorted = Object.keys(_MUSCLE_ALIASES).sort((a, b) => b.length - a.length);
+    for (const alias of sorted) {
+        if (lower.includes(alias)) {
+            const key = _MUSCLE_ALIASES[alias];
+            return { key, ..._MUSCLE_GROUPS[key] };
+        }
+    }
+    return null;
+}
+
+// ========== MUSCLE GROUP Q&A PATTERNS ==========
+function _tryMuscleGroupQA(input, ctx) {
+    const lower = input.toLowerCase();
+    const mg = _detectMuscleGroup(lower);
+    if (!mg) return null;
+
+    // What pattern?
+    const name = mg.key.charAt(0).toUpperCase() + mg.key.slice(1);
+
+    // "best exercises for X" / "how to grow X" / "X workout" / "exercises for X"
+    if (/best\s*(?:exercise|lift|movement)|exercise.*for|workout.*for|how\s*(?:to|do\s*i)\s*(?:grow|build|train|work|hit|target)|for\s*(?:bigger|growing|building)|(?:grow|build|train|hit|target|develop|work)\s*(?:my|the|your)?/.test(lower)) {
+        let html = `<h3>Best Exercises for ${name}</h3>`;
+        html += `<p><strong>Muscles involved:</strong> ${mg.muscles}.</p>`;
+        html += `<p><strong>Top exercises:</strong></p><ol>`;
+        mg.bestExercises.forEach(e => { html += `<li><strong>${e}</strong></li>`; });
+        html += `</ol>`;
+        html += `<p><strong>Volume:</strong> ${mg.sets} for optimal growth (Schoenfeld 2017).</p>`;
+        html += `<p><strong>Frequency:</strong> ${mg.frequency}.</p>`;
+        html += insightHtml(mg.tips);
+        html += verseHtml();
+        _coachMemory.push({ input, muscleGroup: mg.key, pattern: 'best_exercises' });
+        return html;
+    }
+
+    // "how many sets for X" / "volume for X"
+    if (/how\s*many\s*sets|volume|sets?\s*(?:per|for|should)|how\s*much.*(?:train|work|do)/.test(lower)) {
+        let html = `<h3>${name} Volume Guide</h3>`;
+        html += `<p><strong>Optimal weekly volume:</strong> ${mg.sets}.</p>`;
+        html += `<p><strong>Frequency:</strong> ${mg.frequency}.</p>`;
+        html += `<table class="plan-table"><tr><th>Level</th><th>Sets/week</th></tr>`;
+        html += `<tr><td>Beginner</td><td>8-12</td></tr>`;
+        html += `<tr><td>Intermediate</td><td>12-18</td></tr>`;
+        html += `<tr><td>Advanced</td><td>16-22+</td></tr>`;
+        html += `</table>`;
+        html += insightHtml(mg.tips);
+        html += verseHtml();
+        _coachMemory.push({ input, muscleGroup: mg.key, pattern: 'volume' });
+        return html;
+    }
+
+    // Generic "X" mention with a question word — give overview
+    if (/how|what|best|should|can|which|why|does|do|is|are|will/.test(lower)) {
+        let html = `<h3>${name} Training Guide</h3>`;
+        html += `<p><strong>Muscles:</strong> ${mg.muscles}.</p>`;
+        html += `<p><strong>Best exercises:</strong></p><ol>`;
+        mg.bestExercises.slice(0, 4).forEach(e => { html += `<li><strong>${e}</strong></li>`; });
+        html += `</ol>`;
+        html += `<p><strong>Volume:</strong> ${mg.sets} | <strong>Frequency:</strong> ${mg.frequency}.</p>`;
+        html += insightHtml(mg.tips);
+        html += verseHtml();
+        _coachMemory.push({ input, muscleGroup: mg.key, pattern: 'overview' });
+        return html;
+    }
+
+    return null;
+}
+
+// ========== FOLLOW-UP / CONTEXT-AWARE HANDLER ==========
+function _tryFollowUp(input, ctx) {
+    const lower = input.toLowerCase();
+
+    // Detect if this is a follow-up (short message referencing prior context)
+    const isFollowUp = /^(?:what about|and for|how about|ok (?:and|but)|same (?:for|thing|question)|for\s+\w+\??$)/i.test(lower)
+        || (lower.split(/\s+/).length <= 5 && /^(?:and|but|also|what|how)\b/i.test(lower));
+
+    if (!isFollowUp && lower.split(/\s+/).length > 6) return null;
+
+    // Check if there's a new muscle group or exercise mentioned
+    const newMuscle = _detectMuscleGroup(lower);
+    const newExercise = _detectExercise(lower);
+
+    // If new entity + last pattern → rebuild answer with new entity
+    const lastPattern = _coachMemory.lastPattern();
+    const lastExercise = _coachMemory.lastExercise();
+
+    if (newExercise && lastPattern) {
+        _coachMemory.push({ input, exercise: newExercise.name, pattern: lastPattern });
+        const result = _buildExerciseAnswer(newExercise, lastPattern, ctx);
+        if (result) return result;
+    }
+
+    if (newMuscle) {
+        // Re-answer the last pattern for the new muscle group
+        const name = newMuscle.key.charAt(0).toUpperCase() + newMuscle.key.slice(1);
+        let html = `<h3>${name} Training Guide</h3>`;
+        html += `<p><strong>Muscles:</strong> ${newMuscle.muscles}.</p>`;
+        html += `<p><strong>Best exercises:</strong></p><ol>`;
+        newMuscle.bestExercises.slice(0, 4).forEach(e => { html += `<li><strong>${e}</strong></li>`; });
+        html += `</ol>`;
+        html += `<p><strong>Volume:</strong> ${newMuscle.sets} | <strong>Frequency:</strong> ${newMuscle.frequency}.</p>`;
+        html += insightHtml(newMuscle.tips);
+        html += verseHtml();
+        _coachMemory.push({ input, muscleGroup: newMuscle.key, pattern: lastPattern || 'overview' });
+        return html;
+    }
+
+    // Pattern-only follow-up on last exercise: "how many sets?" after discussing bench
+    if (lastExercise && !newExercise) {
+        const pattern = _detectQuestionPattern(lower);
+        if (pattern) {
+            const exercise = _detectExercise(lastExercise) || (function() {
+                const data = _EXERCISE_MAP[lastExercise];
+                return data ? { name: lastExercise, ...data } : null;
+            })();
+            if (exercise) {
+                _coachMemory.push({ input, exercise: exercise.name, pattern });
+                return _buildExerciseAnswer(exercise, pattern, ctx);
+            }
+        }
+    }
+
+    return null;
 }
 
 // --- General Knowledge lookup (extracted so it can be called early) ---
