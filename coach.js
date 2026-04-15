@@ -117,13 +117,52 @@ function getCoachContext() {
         ? getProgressPhotoStats()
         : { count: 0, lastDate: null, daysSinceLast: null };
 
+    // Progressive overload readiness detection
+    const overloadReady = [];
+    for (const [name, logs] of Object.entries(exercisesByName)) {
+        if (logs.length < 3) continue;
+        const last2 = logs.slice(-2);
+        const allRepsHit = last2.every(l =>
+            l.sets.every(s => s.reps >= 8)
+        );
+        const lastMax = Math.max(...last2[1].sets.map(s => s.weight));
+        const prevMax = Math.max(...last2[0].sets.map(s => s.weight));
+        if (allRepsHit && lastMax === prevMax && !stagnant.includes(name)) {
+            overloadReady.push({ name, currentMax: lastMax, suggestedIncrease: lastMax <= 100 ? 5 : 10 });
+        }
+    }
+
     return {
         profile, workouts, meals, weights, todayWorkouts, todayMeals,
         weekWorkouts, weekDays, monthWorkouts, exerciseFreq, weekMuscleVolume,
         muscleMap, weightTrend, weekNutrition, exercisePRs, stagnant,
-        exercisesByName, progressPhotos,
+        exercisesByName, progressPhotos, overloadReady,
+        equipment: DB.get('equipment', 'gym'),
+        experience: DB.get('experience', null),
         hasProfile: !!profile.name, currentWeight: weights.length > 0 ? weights[weights.length - 1].weight : 0
     };
+}
+
+// --- Shared Helpers ---
+function getUserLevel(ctx) {
+    if (ctx.experience) return ctx.experience;
+    if (ctx.workouts.length > 100) return 'advanced';
+    if (ctx.workouts.length > 30) return 'intermediate';
+    return 'beginner';
+}
+
+function computeTDEE(ctx) {
+    const wt = ctx.currentWeight || 180;
+    const kg = wt / 2.20462;
+    const age = ctx.profile.age || 30;
+    const heightIn = (ctx.profile.heightFeet || 5) * 12 + (ctx.profile.heightInches || 9);
+    const cm = heightIn * 2.54;
+    const isFemale = (ctx.profile.gender || '').toLowerCase().startsWith('f');
+    const bmr = isFemale
+        ? Math.round(10 * kg + 6.25 * cm - 5 * age - 161)
+        : Math.round(10 * kg + 6.25 * cm - 5 * age + 5);
+    const activityFactor = ctx.weekDays >= 5 ? 1.55 : ctx.weekDays >= 3 ? 1.45 : 1.35;
+    return { bmr, tdee: Math.round(bmr * activityFactor), kg, wt };
 }
 
 // --- Verse Pool for Coach ---
@@ -1039,18 +1078,22 @@ const TOPIC_RESPONSES = {
                 let html = `<h3>Breaking Through Your Plateau</h3>`;
 
                 if (ctx.stagnant.length > 0) {
+                    const unit = wu();
                     html += insightHtml(`I can see these exercises have stagnated: <strong>${ctx.stagnant.join(', ')}</strong>`);
                     html += `<p>Here are specific strategies for each:</p><ul>`;
                     ctx.stagnant.forEach(name => {
-                        html += `<li><strong>${name}:</strong> `;
+                        const pr = ctx.exercisePRs[name] || 0;
+                        const prStr = pr > 0 ? ` (stuck at ${lbsToDisplay(pr)} ${unit})` : '';
+                        const deloadWt = pr > 0 ? ` Drop to ${lbsToDisplay(Math.round(pr * 0.9))} ${unit} and work back up.` : '';
+                        html += `<li><strong>${name}</strong>${prStr}: `;
                         if (name.includes('Bench') || name.includes('Press')) {
-                            html += `Try paused reps (2 sec pause at chest), switch grip width, or add close-grip bench as an accessory`;
+                            html += `Try paused reps (2 sec pause at chest), switch grip width, or add close-grip bench as an accessory.${deloadWt}`;
                         } else if (name.includes('Squat')) {
-                            html += `Try box squats, add pause squats, or switch to front squats for 2-3 weeks`;
+                            html += `Try box squats, add pause squats, or switch to front squats for 2-3 weeks.${deloadWt}`;
                         } else if (name.includes('Deadlift')) {
-                            html += `Try deficit deadlifts, add rack pulls, or switch stance (sumo vs conventional)`;
+                            html += `Try deficit deadlifts, add rack pulls, or switch stance (sumo vs conventional).${deloadWt}`;
                         } else {
-                            html += `Drop weight by 10%, increase reps to 10-12, then build back up. Or try a close variation.`;
+                            html += `Drop weight by 10%, increase reps to 10-12, then build back up. Or try a close variation.${deloadWt}`;
                         }
                         html += `</li>`;
                     });
@@ -1302,22 +1345,11 @@ const TOPIC_RESPONSES = {
 
                 // Adaptive personalized math (Mifflin-St Jeor + activity)
                 if (ctx.currentWeight > 0) {
-                    const lbs = ctx.currentWeight;
-                    const kg = lbs / 2.20462;
-                    const age = ctx.profile.age || 30;
-                    const heightIn = (ctx.profile.heightFeet || 5) * 12 + (ctx.profile.heightInches || 9);
-                    const cm = heightIn * 2.54;
-                    const isFemale = (ctx.profile.gender || '').toLowerCase().startsWith('f');
-                    // Mifflin-St Jeor BMR
-                    const bmr = isFemale
-                        ? Math.round(10 * kg + 6.25 * cm - 5 * age - 161)
-                        : Math.round(10 * kg + 6.25 * cm - 5 * age + 5);
-                    // Activity multiplier — default lightly active for lifters
-                    const activityFactor = ctx.weekDays >= 5 ? 1.55 : ctx.weekDays >= 3 ? 1.45 : 1.35;
-                    const tdee = Math.round(bmr * activityFactor);
-                    const cutCal = tdee - 500;        // ~1 lb/wk loss
-                    const aggressive = tdee - 750;     // ~1.5 lb/wk
-                    const proteinG = Math.round(lbs * 1.0); // 1.0 g/lb during a deficit (Helms/Aragon, Phillips)
+                    const { tdee, wt } = computeTDEE(ctx);
+                    const lbs = wt;
+                    const cutCal = tdee - 500;
+                    const aggressive = tdee - 750;
+                    const proteinG = Math.round(lbs * 1.0);
                     html += insightHtml(`At ${lbsToDisplay(lbs)}${unit}, your estimated maintenance is ~<strong>${tdee} kcal/day</strong> (Mifflin-St Jeor BMR \u00d7 activity). For sustainable fat loss, eat <strong>${cutCal} kcal</strong> with <strong>${proteinG}g protein</strong>. If you want to push harder, ${aggressive} kcal is the floor I'd recommend.`);
                 }
 
@@ -1355,20 +1387,10 @@ const TOPIC_RESPONSES = {
 
                 // Adaptive personalized calorie + protein target
                 if (ctx.currentWeight > 0) {
-                    const lbs = ctx.currentWeight;
-                    const kg = lbs / 2.20462;
-                    const age = ctx.profile.age || 30;
-                    const heightIn = (ctx.profile.heightFeet || 5) * 12 + (ctx.profile.heightInches || 9);
-                    const cm = heightIn * 2.54;
-                    const isFemale = (ctx.profile.gender || '').toLowerCase().startsWith('f');
-                    const bmr = isFemale
-                        ? Math.round(10 * kg + 6.25 * cm - 5 * age - 161)
-                        : Math.round(10 * kg + 6.25 * cm - 5 * age + 5);
-                    const activityFactor = ctx.weekDays >= 5 ? 1.55 : ctx.weekDays >= 3 ? 1.45 : 1.35;
-                    const tdee = Math.round(bmr * activityFactor);
-                    const surplus = tdee + 250;          // ~0.25\u20130.5% bw/wk lean gain
+                    const { tdee, wt: lbs } = computeTDEE(ctx);
+                    const surplus = tdee + 250;
                     const aggressiveSurplus = tdee + 400;
-                    const proteinG = Math.round(lbs * 0.8); // 0.8 g/lb is the sweet spot
+                    const proteinG = Math.round(lbs * 0.8);
                     html += insightHtml(`At ${lbsToDisplay(lbs)}${unit}, your maintenance is ~<strong>${tdee} kcal</strong>. Lean bulk: <strong>${surplus} kcal</strong>. Faster bulk (more fat gain): <strong>${aggressiveSurplus} kcal</strong>. Protein target: <strong>${proteinG}g</strong>.`);
                 }
 
@@ -1593,9 +1615,12 @@ const TOPIC_RESPONSES = {
         },
         {
             id: 'rest_timer',
-            keywords: ['rest time', 'rest period', 'how long.*rest', 'rest between', 'rest timer', 'break between'],
+            keywords: ['rest time', 'rest period', 'how long.*rest', 'rest between', 'rest timer', 'break between', 'how long.*between.*set'],
             handler: (ctx) => {
+                const goal = ctx.profile.goal || 'maintain';
+                const goalLabel = goal === 'lose' ? 'fat loss' : goal === 'gain' ? 'muscle building' : 'general fitness';
                 let html = `<h3>Rest Periods: Longer Than You Think</h3>`;
+                html += insightHtml(`Since your goal is <strong>${goalLabel}</strong>, focus on <strong>${goal === 'lose' ? '60-90 sec (isolation) and 2-3 min (compounds)' : '2-3 min (compounds) and 90-120 sec (isolation)'}</strong>. Preserve strength to preserve muscle.`);
                 html += insightHtml(`Schoenfeld 2016 directly compared <strong>1-min vs 3-min rest</strong> for hypertrophy: 3-min produced <strong>67% more muscle thickness gain</strong>. The "short rest = pump = growth" idea is one of bro-science's worst leftovers.`);
 
                 html += `<h3>The current evidence</h3>`;
@@ -2424,6 +2449,561 @@ const TOPIC_RESPONSES = {
                 html += `<p>I used to try to grade your form from a single still photo using a 17-keypoint pose model. I'm being honest with you: it didn't work. One frame can't see your bar path, can't tell if your brace held, and gets the joint angles wrong because of camera tilt. Progress photos are honest. AI form-grading from a still wasn't.</p>`;
                 html += `<p>For real form feedback, ask me about a specific lift \u2014 "<em>bench press form</em>" or "<em>how do I deadlift</em>" \u2014 and I'll give you the cues, common mistakes, and how to film yourself for self-review.</p>`;
 
+                html += verseHtml();
+                return html;
+            },
+        },
+        // ========== NUTRITION CALCULATOR ==========
+        {
+            id: 'nutrition_calculator',
+            keywords: ['how much.*eat', 'macro.*calculator', 'calculate.*macro', 'my macro', 'what.*my.*macro',
+                'how many.*carb', 'how much.*fat.*eat', 'calorie.*need', 'tdee', 'maintenance.*calorie',
+                'macro.*split', 'calorie.*calculator', 'how much.*eat.*to.*lose', 'how much.*eat.*to.*gain',
+                'what should i eat', 'how many calories', 'caloric.*need', 'macro.*breakdown'],
+            handler: (ctx, input) => {
+                const unit = wu();
+                const { tdee, wt, kg } = computeTDEE(ctx);
+                const goal = ctx.profile.goal || 'maintain';
+                const level = getUserLevel(ctx);
+                let html = `<h3>Your Personalized Nutrition Calculator</h3>`;
+
+                if (ctx.currentWeight <= 0) {
+                    html += `<p>Log your body weight in the app so I can give you exact numbers. For now, here are general guidelines:</p>`;
+                    html += `<ul><li>Protein: 0.8-1g per lb bodyweight</li><li>Calories: depends on your TDEE</li></ul>`;
+                    html += verseHtml();
+                    return html;
+                }
+
+                // Calorie targets by goal
+                let targetCal, proteinG, carbG, fatG, goalLabel;
+                if (goal === 'lose') {
+                    targetCal = tdee - 500;
+                    proteinG = Math.round(wt * 1.0);
+                    fatG = Math.round(wt * 0.35);
+                    carbG = Math.round((targetCal - (proteinG * 4) - (fatG * 9)) / 4);
+                    goalLabel = 'Fat Loss (-500 kcal deficit)';
+                } else if (goal === 'gain') {
+                    targetCal = tdee + 300;
+                    proteinG = Math.round(wt * 0.85);
+                    fatG = Math.round(wt * 0.4);
+                    carbG = Math.round((targetCal - (proteinG * 4) - (fatG * 9)) / 4);
+                    goalLabel = 'Lean Bulk (+300 kcal surplus)';
+                } else {
+                    targetCal = tdee;
+                    proteinG = Math.round(wt * 0.8);
+                    fatG = Math.round(wt * 0.35);
+                    carbG = Math.round((targetCal - (proteinG * 4) - (fatG * 9)) / 4);
+                    goalLabel = 'Maintenance';
+                }
+
+                html += insightHtml(`At <strong>${lbsToDisplay(wt)} ${unit}</strong>, training <strong>${ctx.weekDays}x/week</strong>, your estimated TDEE is <strong>${tdee} kcal/day</strong>.`);
+
+                html += `<h3>${goalLabel}</h3>`;
+                html += `<table class="plan-table">`;
+                html += `<tr><th>Macro</th><th>Daily</th><th>Per Meal (4 meals)</th><th>Calories</th></tr>`;
+                html += `<tr><td><strong>Protein</strong></td><td>${proteinG}g</td><td>${Math.round(proteinG/4)}g</td><td>${proteinG*4} kcal</td></tr>`;
+                html += `<tr><td><strong>Carbs</strong></td><td>${carbG}g</td><td>${Math.round(carbG/4)}g</td><td>${carbG*4} kcal</td></tr>`;
+                html += `<tr><td><strong>Fat</strong></td><td>${fatG}g</td><td>${Math.round(fatG/4)}g</td><td>${fatG*9} kcal</td></tr>`;
+                html += `<tr><td><strong>Total</strong></td><td colspan="2"></td><td><strong>${targetCal} kcal</strong></td></tr>`;
+                html += `</table>`;
+
+                // Compare to actual intake if available
+                if (ctx.weekNutrition.days > 0) {
+                    const diff = ctx.weekNutrition.calories - targetCal;
+                    const protDiff = ctx.weekNutrition.protein - proteinG;
+                    html += `<h3>Your Actual vs Target (7-day avg)</h3>`;
+                    html += `<ul>`;
+                    html += `<li>Calories: <strong>${ctx.weekNutrition.calories}</strong> vs ${targetCal} target (${diff > 0 ? '+' : ''}${diff})</li>`;
+                    html += `<li>Protein: <strong>${ctx.weekNutrition.protein}g</strong> vs ${proteinG}g target (${protDiff > 0 ? '+' : ''}${protDiff}g)</li>`;
+                    html += `</ul>`;
+                    if (Math.abs(diff) > 300) html += insightHtml(diff > 0 ? `You're eating ${diff} cal over target. ${goal === 'gain' ? 'Might be gaining more fat than needed.' : 'This could slow your progress.'}` : `You're ${Math.abs(diff)} cal under. ${goal === 'lose' ? 'Be careful not to go too low — muscle loss increases below BMR.' : 'You may need to eat more to support your goals.'}`);
+                }
+
+                html += `<h3>Quick Reference</h3><ul>`;
+                html += `<li><strong>Protein sources:</strong> Chicken breast (31g/4oz), Greek yogurt (15g/cup), eggs (6g each), whey protein (25g/scoop)</li>`;
+                html += `<li><strong>Timing:</strong> Spread protein across 4+ meals for optimal MPS (Schoenfeld & Aragon 2018)</li>`;
+                html += `<li><strong>Adjust every 2 weeks:</strong> If weight isn't moving in the right direction, adjust by 200 cal</li>`;
+                html += `</ul>`;
+                html += verseHtml({ text: "Therefore, whether you eat or drink, or whatever you do, do all to the glory of God.", ref: "1 Corinthians 10:31" });
+                return html;
+            },
+        },
+        // ========== PROGRESSIVE OVERLOAD ADVISOR ==========
+        {
+            id: 'progressive_overload',
+            keywords: ['progressive overload', 'increase weight', 'go up in weight', 'add weight', 'when.*increase',
+                'should.*go.*heavier', 'ready.*increase', 'move up.*weight', 'weight.*progression',
+                'how.*progress', 'am i ready', 'can i go heavier', 'overload', 'progression'],
+            handler: (ctx) => {
+                const unit = wu();
+                let html = `<h3>Progressive Overload Analysis</h3>`;
+
+                if (ctx.workouts.length < 5) {
+                    html += `<p>I need more workout data to analyze your progression. Keep logging your sets and weights, and I'll be able to tell you exactly when to increase.</p>`;
+                    html += verseHtml();
+                    return html;
+                }
+
+                // Exercises ready to increase
+                if (ctx.overloadReady.length > 0) {
+                    html += `<h3>Ready to Increase</h3>`;
+                    html += `<p>You hit all your reps in the last 2 sessions on these — time to go up:</p>`;
+                    html += `<table class="plan-table"><tr><th>Exercise</th><th>Current</th><th>Next Session</th></tr>`;
+                    ctx.overloadReady.forEach(e => {
+                        html += `<tr><td><strong>${e.name}</strong></td><td>${lbsToDisplay(e.currentMax)} ${unit}</td><td><strong>${lbsToDisplay(e.currentMax + e.suggestedIncrease)} ${unit}</strong> (+${lbsToDisplay(e.suggestedIncrease)})</td></tr>`;
+                    });
+                    html += `</table>`;
+                }
+
+                // Stagnant exercises
+                if (ctx.stagnant.length > 0) {
+                    html += `<h3>Stagnant — Needs a Change</h3>`;
+                    html += `<p>Same weight for 4+ sessions. Try one of these strategies:</p><ul>`;
+                    ctx.stagnant.forEach(name => {
+                        const pr = ctx.exercisePRs[name] || 0;
+                        html += `<li><strong>${name}</strong> (stuck at ${lbsToDisplay(pr)} ${unit}): `;
+                        html += `Drop to ${lbsToDisplay(Math.round(pr * 0.85))} ${unit} for 2 weeks at higher reps (10-12), then rebuild. Or try a variation.</li>`;
+                    });
+                    html += `</ul>`;
+                }
+
+                // Progressing well
+                const progressing = [];
+                for (const [name, logs] of Object.entries(ctx.exercisesByName)) {
+                    if (logs.length >= 4 && !ctx.stagnant.includes(name) && !ctx.overloadReady.find(e => e.name === name)) {
+                        const early = logs.slice(-4, -2);
+                        const late = logs.slice(-2);
+                        const earlyMax = Math.max(...early.map(l => Math.max(...l.sets.map(s => s.weight))));
+                        const lateMax = Math.max(...late.map(l => Math.max(...l.sets.map(s => s.weight))));
+                        if (lateMax > earlyMax) progressing.push({ name, gain: lateMax - earlyMax });
+                    }
+                }
+                if (progressing.length > 0) {
+                    html += `<h3>Progressing Well</h3><ul>`;
+                    progressing.slice(0, 5).forEach(e => {
+                        html += `<li><strong>${e.name}:</strong> +${lbsToDisplay(e.gain)} ${unit} over last 4 sessions</li>`;
+                    });
+                    html += `</ul>`;
+                }
+
+                if (ctx.overloadReady.length === 0 && ctx.stagnant.length === 0 && progressing.length === 0) {
+                    html += `<p>Not enough session history for specific advice yet. Keep logging and I'll track your progression automatically.</p>`;
+                }
+
+                html += `<h3>Overload Rules of Thumb</h3><ul>`;
+                html += `<li><strong>Compounds:</strong> Add ${lbsToDisplay(5)}-${lbsToDisplay(10)} ${unit} when you hit all prescribed reps for 2 sessions</li>`;
+                html += `<li><strong>Isolation:</strong> Add ${lbsToDisplay(2.5)}-${lbsToDisplay(5)} ${unit} or add 1-2 reps first</li>`;
+                html += `<li><strong>Double progression:</strong> Work in a rep range (e.g. 8-12). When you can do 12 on all sets, increase weight and drop back to 8</li>`;
+                html += `</ul>`;
+                html += verseHtml({ text: "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.", ref: "Galatians 6:9" });
+                return html;
+            },
+        },
+        // ========== EQUIPMENT-BASED SUBSTITUTIONS ==========
+        {
+            id: 'equipment_swap',
+            keywords: ['no barbell', 'don\'t have.*barbell', 'only.*dumbbell', 'home gym', 'no.*equipment',
+                'just.*bodyweight', 'resistance band', 'no cable', 'don\'t have.*bench',
+                'hotel.*gym', 'travel.*workout', 'equipment.*substitute', 'what.*can.*use.*instead',
+                'dumbbell.*only', 'apartment.*workout', 'no rack', 'minimal.*equipment'],
+            handler: (ctx, input) => {
+                const lower = input.toLowerCase();
+                let html = `<h3>Equipment-Based Exercise Swaps</h3>`;
+
+                // Detect what equipment they have or are missing
+                let available = ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'];
+                if (/no\s*(?:barbell|bar\b)|don't have.*barbell|without.*barbell/.test(lower)) available = available.filter(e => e !== 'barbell');
+                if (/no\s*(?:machine|cable)|don't have.*machine|don't have.*cable/.test(lower)) { available = available.filter(e => e !== 'machine' && e !== 'cable'); }
+                if (/home\s*gym|apartment|at\s*home|no\s*gym/.test(lower)) available = ['dumbbell', 'bodyweight', 'bands'];
+                if (/bodyweight\s*only|no\s*(?:weight|equipment)|just\s*body/.test(lower)) available = ['bodyweight'];
+                if (/hotel|travel/.test(lower)) available = ['bodyweight', 'bands'];
+                if (/dumbbell.*only|only.*dumbbell/.test(lower)) available = ['dumbbell', 'bodyweight'];
+
+                const swapDB = {
+                    'Bench Press':     { barbell: 'Barbell Bench Press', dumbbell: 'Dumbbell Bench Press', bodyweight: 'Push-ups (elevated feet for intensity)', machine: 'Machine Chest Press', bands: 'Band Chest Press', cable: 'Cable Fly' },
+                    'Squat':           { barbell: 'Barbell Back Squat', dumbbell: 'Goblet Squat / DB Split Squat', bodyweight: 'Bulgarian Split Squat / Pistol Squat', machine: 'Hack Squat / Leg Press', bands: 'Band Squat', cable: 'Cable Squat' },
+                    'Deadlift':        { barbell: 'Barbell Deadlift', dumbbell: 'Dumbbell RDL', bodyweight: 'Single-Leg RDL / Nordic Curl', machine: 'Leg Curl + Back Extension', bands: 'Band Good Morning', cable: 'Cable Pull-Through' },
+                    'Overhead Press':  { barbell: 'Barbell OHP', dumbbell: 'Seated DB Shoulder Press', bodyweight: 'Pike Push-up / Handstand Push-up', machine: 'Machine Shoulder Press', bands: 'Band Overhead Press', cable: 'Cable Lateral Raise' },
+                    'Barbell Row':     { barbell: 'Barbell Row', dumbbell: 'Dumbbell Row', bodyweight: 'Inverted Row (under table)', machine: 'Machine Row', bands: 'Band Row', cable: 'Seated Cable Row' },
+                    'Pull-ups':        { barbell: 'Barbell Row', dumbbell: 'Dumbbell Row', bodyweight: 'Inverted Row / Door Pull-ups', machine: 'Lat Pulldown', bands: 'Band Lat Pulldown', cable: 'Cable Lat Pulldown' },
+                    'Lat Pulldown':    { barbell: 'Pull-ups', dumbbell: 'DB Pullover', bodyweight: 'Pull-ups / Chin-ups', machine: 'Lat Pulldown', bands: 'Band Lat Pulldown', cable: 'Cable Lat Pulldown' },
+                    'Leg Press':       { barbell: 'Squat', dumbbell: 'Goblet Squat', bodyweight: 'Bulgarian Split Squat', machine: 'Leg Press', bands: 'Band Squat', cable: 'N/A — use squat variation' },
+                    'Leg Curl':        { barbell: 'Romanian Deadlift', dumbbell: 'DB Romanian Deadlift', bodyweight: 'Nordic Curl / Slider Curl', machine: 'Leg Curl Machine', bands: 'Band Leg Curl', cable: 'Cable Leg Curl' },
+                    'Bicep Curls':     { barbell: 'Barbell Curl', dumbbell: 'Dumbbell Curl', bodyweight: 'Chin-ups (underhand)', machine: 'Machine Curl', bands: 'Band Curl', cable: 'Cable Curl' },
+                    'Tricep Pushdown': { barbell: 'Close-Grip Bench', dumbbell: 'DB Overhead Extension', bodyweight: 'Diamond Push-ups / Dips', machine: 'Machine Tricep Press', bands: 'Band Pushdown', cable: 'Cable Pushdown' },
+                    'Cable Fly':       { barbell: 'Dumbbell Fly', dumbbell: 'Dumbbell Fly', bodyweight: 'Wide Push-ups', machine: 'Pec Deck', bands: 'Band Fly', cable: 'Cable Fly' },
+                    'Hip Thrust':      { barbell: 'Barbell Hip Thrust', dumbbell: 'DB Hip Thrust', bodyweight: 'Single-Leg Glute Bridge', machine: 'Hip Thrust Machine', bands: 'Band Hip Thrust', cable: 'Cable Pull-Through' },
+                };
+
+                html += `<p><strong>Available equipment:</strong> ${available.join(', ')}</p>`;
+                html += `<table class="plan-table"><tr><th>Exercise</th><th>Your Best Option</th></tr>`;
+                for (const [exercise, options] of Object.entries(swapDB)) {
+                    const best = available.map(eq => options[eq]).find(v => v) || 'No direct substitute — skip or ask me';
+                    html += `<tr><td>${exercise}</td><td><strong>${best}</strong></td></tr>`;
+                }
+                html += `</table>`;
+
+                html += `<h3>Tips for Limited Equipment</h3><ul>`;
+                if (!available.includes('barbell')) html += `<li><strong>No barbell?</strong> Dumbbells are actually better for hypertrophy in many cases — more ROM, unilateral work fixes imbalances</li>`;
+                if (available.includes('bodyweight') && available.length <= 2) html += `<li><strong>Bodyweight only?</strong> Use tempo (4 sec down), pause reps, and unilateral progressions. A backpack with books adds load</li>`;
+                if (available.includes('bands')) html += `<li><strong>Bands:</strong> Great for accessories. Ascending resistance matches your strength curve on pressing movements</li>`;
+                html += `<li><strong>Progressive overload still applies.</strong> More reps, slower tempo, harder variations, less rest — all are overload</li>`;
+                html += `</ul>`;
+                html += verseHtml();
+                return html;
+            },
+        },
+        // ========== CUSTOM WORKOUT PLAN GENERATOR ==========
+        {
+            id: 'custom_plan',
+            keywords: ['ppl', 'push.?pull.?legs', 'upper.?lower', 'bro split', '\\d+.?day.*program',
+                '\\d+.?day.*split', '\\d+.?day.*routine', 'full body.*program', 'give me a.*split',
+                'make me a.*program', 'create.*split', 'create.*program', 'design.*program',
+                'write me a.*program', 'build.*program', 'custom.*plan', 'custom.*split',
+                'arnold split', '3 day', '4 day', '5 day', '6 day'],
+            handler: (ctx, input) => {
+                const lower = input.toLowerCase();
+                const unit = wu();
+                const level = getUserLevel(ctx);
+                const goal = ctx.profile.goal || 'maintain';
+
+                // Detect requested split type
+                let splitType = 'auto';
+                if (/push.?pull.?leg|ppl/i.test(lower)) splitType = 'ppl';
+                else if (/upper.?lower|upper.?\/?.?lower/i.test(lower)) splitType = 'upper_lower';
+                else if (/full.?body/i.test(lower)) splitType = 'full_body';
+                else if (/bro.?split/i.test(lower)) splitType = 'bro_split';
+                else if (/arnold/i.test(lower)) splitType = 'arnold';
+
+                // Detect day count
+                let days = 0;
+                const dayMatch = lower.match(/(\d)\s*(?:day|x)/);
+                if (dayMatch) days = parseInt(dayMatch[1]);
+
+                // Auto-detect best split if not specified
+                if (splitType === 'auto') {
+                    if (days <= 3) splitType = 'full_body';
+                    else if (days === 4) splitType = 'upper_lower';
+                    else if (days >= 5) splitType = 'ppl';
+                    else splitType = level === 'beginner' ? 'full_body' : 'ppl';
+                }
+
+                const splits = {
+                    ppl: {
+                        name: 'Push / Pull / Legs', daysPerWeek: 6, note: 'Run as 3-on-1-off or PPL/rest/PPL',
+                        days: [
+                            { day: 'Push', exercises: [
+                                { name: 'Bench Press', sets: '4x6-8' }, { name: 'Overhead Press', sets: '3x8-10' },
+                                { name: 'Incline Dumbbell Press', sets: '3x10-12' }, { name: 'Lateral Raises', sets: '4x12-15' },
+                                { name: 'Tricep Pushdown', sets: '3x10-12' }, { name: 'Overhead Tricep Extension', sets: '3x12-15' },
+                            ]},
+                            { day: 'Pull', exercises: [
+                                { name: 'Barbell Row', sets: '4x6-8' }, { name: 'Pull-ups / Lat Pulldown', sets: '3x8-10' },
+                                { name: 'Seated Cable Row', sets: '3x10-12' }, { name: 'Face Pulls', sets: '4x15-20' },
+                                { name: 'Barbell Curl', sets: '3x10-12' }, { name: 'Hammer Curls', sets: '3x12-15' },
+                            ]},
+                            { day: 'Legs', exercises: [
+                                { name: 'Squat', sets: '4x6-8' }, { name: 'Romanian Deadlift', sets: '3x8-10' },
+                                { name: 'Leg Press', sets: '3x10-12' }, { name: 'Leg Curl', sets: '3x10-12' },
+                                { name: 'Calf Raises', sets: '4x12-15' }, { name: 'Hanging Leg Raise', sets: '3x12-15' },
+                            ]},
+                        ]
+                    },
+                    upper_lower: {
+                        name: 'Upper / Lower', daysPerWeek: 4, note: 'Mon/Tue/Thu/Fri or any 2-on-1-off pattern',
+                        days: [
+                            { day: 'Upper A (Strength)', exercises: [
+                                { name: 'Bench Press', sets: '4x5' }, { name: 'Barbell Row', sets: '4x5' },
+                                { name: 'Overhead Press', sets: '3x8' }, { name: 'Pull-ups', sets: '3x8' },
+                                { name: 'Lateral Raises', sets: '3x15' }, { name: 'Barbell Curl', sets: '2x12' },
+                            ]},
+                            { day: 'Lower A (Strength)', exercises: [
+                                { name: 'Squat', sets: '4x5' }, { name: 'Romanian Deadlift', sets: '3x8' },
+                                { name: 'Leg Press', sets: '3x10' }, { name: 'Leg Curl', sets: '3x10' },
+                                { name: 'Calf Raises', sets: '4x12' }, { name: 'Ab Wheel Rollout', sets: '3x10' },
+                            ]},
+                            { day: 'Upper B (Hypertrophy)', exercises: [
+                                { name: 'Incline Dumbbell Press', sets: '4x10' }, { name: 'Seated Cable Row', sets: '4x10' },
+                                { name: 'Dumbbell Shoulder Press', sets: '3x12' }, { name: 'Lat Pulldown', sets: '3x12' },
+                                { name: 'Cable Fly', sets: '3x15' }, { name: 'Tricep Pushdown', sets: '3x12' },
+                            ]},
+                            { day: 'Lower B (Hypertrophy)', exercises: [
+                                { name: 'Front Squat', sets: '3x10' }, { name: 'Hip Thrust', sets: '4x10' },
+                                { name: 'Walking Lunges', sets: '3x12/leg' }, { name: 'Leg Extension', sets: '3x15' },
+                                { name: 'Seated Calf Raise', sets: '4x15' }, { name: 'Hanging Leg Raise', sets: '3x12' },
+                            ]},
+                        ]
+                    },
+                    full_body: {
+                        name: 'Full Body', daysPerWeek: 3, note: 'Mon/Wed/Fri with rest days between',
+                        days: [
+                            { day: 'Day A', exercises: [
+                                { name: 'Squat', sets: '3x8' }, { name: 'Bench Press', sets: '3x8' },
+                                { name: 'Barbell Row', sets: '3x8' }, { name: 'Overhead Press', sets: '3x10' },
+                                { name: 'Bicep Curls', sets: '2x12' }, { name: 'Plank', sets: '3x30-45s' },
+                            ]},
+                            { day: 'Day B', exercises: [
+                                { name: 'Deadlift', sets: '3x5' }, { name: 'Dumbbell Bench Press', sets: '3x10' },
+                                { name: 'Pull-ups / Lat Pulldown', sets: '3x8-10' }, { name: 'Lunges', sets: '3x10/leg' },
+                                { name: 'Face Pulls', sets: '3x15' }, { name: 'Cable Crunch', sets: '3x12' },
+                            ]},
+                        ]
+                    },
+                    bro_split: {
+                        name: '5-Day Bro Split', daysPerWeek: 5, note: 'Mon-Fri, weekends off',
+                        days: [
+                            { day: 'Chest', exercises: [
+                                { name: 'Bench Press', sets: '4x6-8' }, { name: 'Incline Dumbbell Press', sets: '4x8-10' },
+                                { name: 'Cable Fly', sets: '3x12-15' }, { name: 'Dips', sets: '3x10-12' },
+                            ]},
+                            { day: 'Back', exercises: [
+                                { name: 'Deadlift', sets: '4x5' }, { name: 'Barbell Row', sets: '4x8' },
+                                { name: 'Lat Pulldown', sets: '3x10-12' }, { name: 'Seated Cable Row', sets: '3x10-12' },
+                            ]},
+                            { day: 'Shoulders', exercises: [
+                                { name: 'Overhead Press', sets: '4x6-8' }, { name: 'Lateral Raises', sets: '4x12-15' },
+                                { name: 'Face Pulls', sets: '3x15-20' }, { name: 'Rear Delt Fly', sets: '3x15' },
+                            ]},
+                            { day: 'Legs', exercises: [
+                                { name: 'Squat', sets: '4x6-8' }, { name: 'Romanian Deadlift', sets: '3x8-10' },
+                                { name: 'Leg Press', sets: '3x10-12' }, { name: 'Leg Curl', sets: '3x10-12' },
+                                { name: 'Calf Raises', sets: '4x12-15' },
+                            ]},
+                            { day: 'Arms', exercises: [
+                                { name: 'Barbell Curl', sets: '4x8-10' }, { name: 'Close-Grip Bench Press', sets: '4x8-10' },
+                                { name: 'Hammer Curls', sets: '3x10-12' }, { name: 'Skull Crushers', sets: '3x10-12' },
+                                { name: 'Cable Curl', sets: '3x12-15' }, { name: 'Tricep Pushdown', sets: '3x12-15' },
+                            ]},
+                        ]
+                    },
+                    arnold: {
+                        name: 'Arnold Split', daysPerWeek: 6, note: 'Chest+Back / Shoulders+Arms / Legs, repeated 2x',
+                        days: [
+                            { day: 'Chest + Back', exercises: [
+                                { name: 'Bench Press', sets: '4x6-8' }, { name: 'Barbell Row', sets: '4x6-8' },
+                                { name: 'Incline Dumbbell Press', sets: '3x10' }, { name: 'Pull-ups', sets: '3x10' },
+                                { name: 'Cable Fly', sets: '3x12' }, { name: 'Seated Cable Row', sets: '3x12' },
+                            ]},
+                            { day: 'Shoulders + Arms', exercises: [
+                                { name: 'Arnold Press', sets: '4x8-10' }, { name: 'Lateral Raises', sets: '4x12-15' },
+                                { name: 'Barbell Curl', sets: '3x10' }, { name: 'Skull Crushers', sets: '3x10' },
+                                { name: 'Hammer Curls', sets: '3x12' }, { name: 'Tricep Pushdown', sets: '3x12' },
+                            ]},
+                            { day: 'Legs', exercises: [
+                                { name: 'Squat', sets: '4x6-8' }, { name: 'Romanian Deadlift', sets: '3x8-10' },
+                                { name: 'Leg Press', sets: '3x10-12' }, { name: 'Leg Curl', sets: '3x10-12' },
+                                { name: 'Calf Raises', sets: '4x12-15' }, { name: 'Hanging Leg Raise', sets: '3x12' },
+                            ]},
+                        ]
+                    },
+                };
+
+                const split = splits[splitType] || splits.ppl;
+                let html = `<h3>${split.name} Program</h3>`;
+                html += insightHtml(`<strong>${split.daysPerWeek} days/week</strong> | Level: ${level} | Goal: ${goal} | ${split.note}`);
+
+                // Add PR-based weight suggestions
+                const hasPRs = Object.keys(ctx.exercisePRs).length > 0;
+
+                split.days.forEach(d => {
+                    html += `<h3>${d.day}</h3>`;
+                    html += `<table class="plan-table"><tr><th>Exercise</th><th>Sets x Reps</th>${hasPRs ? '<th>Target Weight</th>' : ''}</tr>`;
+                    d.exercises.forEach(e => {
+                        let targetWeight = '';
+                        if (hasPRs && ctx.exercisePRs[e.name]) {
+                            const pr = ctx.exercisePRs[e.name];
+                            const isStrength = e.sets.includes('x5') || e.sets.includes('x6');
+                            const pct = isStrength ? 0.85 : 0.7;
+                            targetWeight = `~${lbsToDisplay(Math.round(pr * pct / 5) * 5)} ${unit}`;
+                        }
+                        html += `<tr><td><strong>${e.name}</strong></td><td>${e.sets}</td>${hasPRs ? `<td>${targetWeight}</td>` : ''}</tr>`;
+                    });
+                    html += `</table>`;
+                });
+
+                html += `<h3>Progression Protocol</h3><ul>`;
+                html += `<li><strong>Double progression:</strong> Work within the rep range. When you hit the top of the range on all sets, increase weight by ${lbsToDisplay(5)} ${unit} (compounds) or ${lbsToDisplay(2.5)} ${unit} (isolation)</li>`;
+                html += `<li><strong>Deload every 6-8 weeks:</strong> Drop to 60% working weight for 1 week</li>`;
+                html += `</ul>`;
+                html += verseHtml({ text: "For I know the plans I have for you, declares the LORD, plans to prosper you and not to harm you.", ref: "Jeremiah 29:11" });
+                return html;
+            },
+        },
+        // ========== INJURY / PAIN GUIDANCE ==========
+        {
+            id: 'injury_guidance',
+            keywords: ['shoulder.*hurt', 'knee.*hurt', 'back.*hurt', 'elbow.*hurt', 'wrist.*hurt',
+                'hip.*hurt', 'pain.*when', 'hurts.*when', 'shoulder.*pain', 'knee.*pain',
+                'back.*pain', 'elbow.*pain', 'hip.*pain', 'can\'t.*without.*pain',
+                'sharp.*pain', 'pinch.*in', 'tweaked.*my', 'pulled.*my', 'strained.*my',
+                'sore.*after', 'injured', 'injury.*help', 'hurts to'],
+            handler: (ctx, input) => {
+                const lower = input.toLowerCase();
+                const bodyParts = {
+                    shoulder: {
+                        causes: ['Poor bench form (elbows flared past 75\u00b0)', 'Too much pressing volume without rear delt work', 'Weak rotator cuff muscles', 'Sleeping on one side'],
+                        avoid: ['Behind-the-neck press', 'Upright rows above nipple height', 'Wide-grip bench press', 'Any movement that reproduces the pain'],
+                        alternatives: { 'Bench Press': 'Floor Press, Neutral-grip DB Press', 'Overhead Press': 'Landmine Press, Cable Lateral Raise', 'Dips': 'Close-grip Bench Press', 'Lateral Raises': 'Cable Lateral Raise (arm slightly forward)' },
+                        mobility: ['Band pull-aparts: 3x20 daily', 'Face pulls: 3x15 daily', 'Sleeper stretch: 30s each side', 'Wall slides: 2x10', 'Thoracic spine foam rolling: 2 min'],
+                        redFlags: ['Pain at rest that wakes you up', 'Numbness or tingling down the arm', 'Cannot lift arm above shoulder height', 'Popping with sharp pain', 'Visible swelling or deformity'],
+                    },
+                    knee: {
+                        causes: ['Quad dominance without hamstring work', 'Sudden increases in squat volume', 'Poor ankle mobility forcing knee cave', 'Running on hard surfaces'],
+                        avoid: ['Deep heavy squats (temporarily)', 'Full-range leg extensions with heavy load', 'Plyometrics / jumping'],
+                        alternatives: { 'Squat': 'Box Squat (to pain-free depth), Leg Press (limited ROM)', 'Lunges': 'Reverse Lunges (less knee stress)', 'Leg Extension': 'Terminal Knee Extensions with band' },
+                        mobility: ['Foam roll quads and IT band: 2 min each', 'Wall ankle stretches: 3x30s', 'Banded terminal knee extensions: 3x15', 'Glute activation (clamshells, band walks)'],
+                        redFlags: ['Knee locks or gives way', 'Significant swelling within hours', 'Cannot bear weight', 'Clicking with pain', 'Pain persists more than 2 weeks'],
+                    },
+                    'lower back': {
+                        causes: ['Rounding during deadlifts', 'Weak core / poor bracing', 'Sitting 8+ hours/day', 'Sudden jump in deadlift/squat volume'],
+                        avoid: ['Heavy conventional deadlifts (temporarily)', 'Good mornings with heavy weight', 'Sit-ups and crunches (spinal flexion under load)'],
+                        alternatives: { 'Deadlift': 'Trap Bar Deadlift, Hip Thrust, Cable Pull-Through', 'Squat': 'Goblet Squat, Belt Squat, Leg Press', 'Barbell Row': 'Chest-Supported Row, Seated Cable Row' },
+                        mobility: ['Cat-cow stretches: 2x10', 'Dead bug: 3x10 (core activation)', 'Bird dog: 3x10 each side', 'Child\'s pose: hold 60s', 'McGill Big 3: curl-up, side plank, bird dog'],
+                        redFlags: ['Pain radiating down the leg (sciatica)', 'Numbness or tingling in legs/feet', 'Loss of bladder/bowel control (ER immediately)', 'Pain that worsens over days despite rest'],
+                    },
+                    elbow: {
+                        causes: ['Too much curl volume', 'Poor grip during pressing (wrist bent back)', 'Sudden increase in pulling volume', 'Tennis or golf (lateral vs medial epicondylitis)'],
+                        avoid: ['Skull crushers (high elbow stress)', 'Heavy barbell curls with straight bar', 'Behind-the-neck tricep extensions'],
+                        alternatives: { 'Barbell Curl': 'EZ Bar Curl, Hammer Curls (neutral grip)', 'Skull Crushers': 'Cable Pushdown, Overhead Cable Extension', 'Pull-ups': 'Neutral-grip Pull-ups, Lat Pulldown' },
+                        mobility: ['Wrist extensor stretches: 3x30s', 'Wrist flexor stretches: 3x30s', 'Tyler Twist with Therabar: 3x15 (gold standard for tennis elbow)', 'Eccentric wrist extensions: 3x15'],
+                        redFlags: ['Pain with gripping everyday objects', 'Persistent numbness in fingers', 'Pain lasting more than 4 weeks', 'Visible swelling at the elbow'],
+                    },
+                    hip: {
+                        causes: ['Tight hip flexors from sitting', 'Squat depth beyond current mobility', 'Weak glute medius (hip drop during single-leg work)', 'Overuse from running'],
+                        avoid: ['Deep sumo deadlifts (temporarily)', 'Heavy hip abduction machine', 'Aggressive stretching into pain'],
+                        alternatives: { 'Squat': 'Box Squat to pain-free depth, Leg Press', 'Deadlift': 'Trap Bar Deadlift, Romanian Deadlift', 'Lunges': 'Step-ups, Sled Push' },
+                        mobility: ['90/90 hip stretch: 3x30s each', 'Pigeon pose: hold 60s each', 'Hip flexor stretch (half-kneeling): 3x30s', 'Clamshells: 3x15 (glute med activation)', 'Adductor rocks: 2x10'],
+                        redFlags: ['Clicking or locking in the hip joint', 'Pain in the groin that worsens with activity', 'Cannot put weight on the leg', 'Pain that persists more than 3 weeks'],
+                    },
+                    wrist: {
+                        causes: ['Bent wrist during bench press or front rack', 'Heavy barbell curls straining wrist extensors', 'Excessive typing + heavy lifting combo'],
+                        avoid: ['Straight bar curls (use EZ bar)', 'Heavy wrist curls', 'Push-ups on flat hands if painful'],
+                        alternatives: { 'Bench Press': 'Bench with wrist wraps, Neutral-grip DB Press', 'Barbell Curl': 'EZ Bar Curl, Hammer Curls', 'Push-ups': 'Push-ups on knuckles or parallettes' },
+                        mobility: ['Wrist circles: 2x10 each direction', 'Prayer stretch + reverse prayer: 3x30s', 'Finger extensions with rubber band: 3x20', 'Wrist roller: 2 sets'],
+                        redFlags: ['Numbness in thumb, index, or middle finger (carpal tunnel)', 'Visible swelling or deformity', 'Cannot grip at all', 'Pain worsening despite 2 weeks rest'],
+                    },
+                };
+
+                // Detect body part
+                let part = null;
+                if (/shoulder/i.test(lower)) part = 'shoulder';
+                else if (/knee/i.test(lower)) part = 'knee';
+                else if (/(?:lower\s*)?back|spine|lumbar/i.test(lower)) part = 'lower back';
+                else if (/elbow/i.test(lower)) part = 'elbow';
+                else if (/hip|groin/i.test(lower)) part = 'hip';
+                else if (/wrist/i.test(lower)) part = 'wrist';
+
+                if (!part) {
+                    let html = `<h3>Injury & Pain Guidance</h3>`;
+                    html += `<p>Tell me which body part is bothering you and I'll give you specific guidance:</p><ul>`;
+                    html += `<li>"My <strong>shoulder</strong> hurts when I bench"</li>`;
+                    html += `<li>"<strong>Knee</strong> pain during squats"</li>`;
+                    html += `<li>"<strong>Lower back</strong> pain after deadlifts"</li>`;
+                    html += `<li>"<strong>Elbow</strong> hurts when I curl"</li>`;
+                    html += `<li>"<strong>Hip</strong> pain during squats"</li>`;
+                    html += `<li>"<strong>Wrist</strong> pain on bench press"</li>`;
+                    html += `</ul>`;
+                    html += verseHtml();
+                    return html;
+                }
+
+                const info = bodyParts[part];
+                const partTitle = part.charAt(0).toUpperCase() + part.slice(1);
+                let html = `<h3>${partTitle} Pain Guide</h3>`;
+
+                // Check if they mentioned a specific exercise
+                const exercise = _detectExercise(lower);
+                if (exercise) {
+                    html += insightHtml(`You mentioned ${exercise.name} \u2014 I'll focus my advice on that.`);
+                }
+
+                html += `<h3>Common Causes</h3><ul>`;
+                info.causes.forEach(c => html += `<li>${c}</li>`);
+                html += `</ul>`;
+
+                html += `<h3>What to Avoid (Temporarily)</h3><ul>`;
+                info.avoid.forEach(a => html += `<li>${a}</li>`);
+                html += `</ul>`;
+
+                html += `<h3>Exercise Swaps</h3>`;
+                html += `<table class="plan-table"><tr><th>Instead of</th><th>Try</th></tr>`;
+                for (const [from, to] of Object.entries(info.alternatives)) {
+                    html += `<tr><td>${from}</td><td><strong>${to}</strong></td></tr>`;
+                }
+                html += `</table>`;
+
+                html += `<h3>Mobility / Rehab Work</h3><ol>`;
+                info.mobility.forEach(m => html += `<li>${m}</li>`);
+                html += `</ol>`;
+
+                html += `<h3>When to See a Doctor / Physio</h3><ul>`;
+                info.redFlags.forEach(f => html += `<li>\u26a0\ufe0f ${f}</li>`);
+                html += `</ul>`;
+
+                html += insightHtml(`<strong>General rule:</strong> If it's a sharp pain, stop. If it's a dull ache that improves with warm-up, you can likely train around it with modifications. If it persists more than 2 weeks, see a professional.`);
+                html += verseHtml({ text: "He heals the brokenhearted and binds up their wounds.", ref: "Psalm 147:3" });
+                return html;
+            },
+        },
+        // ========== REST & TEMPO RECOMMENDATIONS ==========
+        {
+            id: 'rest_tempo',
+            keywords: ['tempo', 'eccentric', 'concentric', 'time under tension', 'tut',
+                'how fast.*rep', 'rep.*speed', 'slow.*rep', 'rep.*tempo', 'counting.*rep',
+                'lowering.*phase', 'negative.*rep'],
+            handler: (ctx, input) => {
+                const lower = input.toLowerCase();
+                const goal = ctx.profile.goal || 'maintain';
+                let html = `<h3>Tempo & Rep Speed Guide</h3>`;
+
+                const tempoGuide = {
+                    strength: { tempo: '1-0-X-0', desc: '1 sec down, no pause, explosive up, no pause at top', rest: '3-5 min', repRange: '1-5 reps' },
+                    hypertrophy: { tempo: '2-1-1-0', desc: '2 sec eccentric, 1 sec pause at stretch, 1 sec up, no pause at top', rest: '2-3 min (compound) / 60-90s (isolation)', repRange: '6-12 reps' },
+                    endurance: { tempo: '2-0-2-0', desc: '2 sec down, 2 sec up, steady controlled pace', rest: '30-60 sec', repRange: '15-25 reps' },
+                };
+
+                const goalMap = { lose: 'hypertrophy', gain: 'hypertrophy', maintain: 'hypertrophy' };
+                const primaryGoal = goalMap[goal] || 'hypertrophy';
+                const rec = tempoGuide[primaryGoal];
+
+                html += insightHtml(`Based on your goal (<strong>${goal}</strong>), your primary tempo should be <strong>${rec.tempo}</strong> (${rec.desc}).`);
+
+                html += `<h3>Tempo Notation Explained</h3>`;
+                html += `<p>A tempo like <strong>3-1-1-0</strong> means:</p>`;
+                html += `<table class="plan-table"><tr><th>Phase</th><th>Seconds</th><th>Example (Bench Press)</th></tr>`;
+                html += `<tr><td>Eccentric (lowering)</td><td>3</td><td>3 sec lowering the bar to chest</td></tr>`;
+                html += `<tr><td>Pause (stretched)</td><td>1</td><td>1 sec pause at chest</td></tr>`;
+                html += `<tr><td>Concentric (lifting)</td><td>1</td><td>1 sec pressing up</td></tr>`;
+                html += `<tr><td>Pause (top)</td><td>0</td><td>No pause at lockout</td></tr>`;
+                html += `</table>`;
+
+                html += `<h3>Tempo by Goal</h3>`;
+                html += `<table class="plan-table"><tr><th>Goal</th><th>Tempo</th><th>Rest</th><th>Reps</th></tr>`;
+                for (const [g, t] of Object.entries(tempoGuide)) {
+                    const label = g.charAt(0).toUpperCase() + g.slice(1);
+                    html += `<tr><td><strong>${label}</strong></td><td>${t.tempo}</td><td>${t.rest}</td><td>${t.repRange}</td></tr>`;
+                }
+                html += `</table>`;
+
+                // Exercise-specific if detected
+                const exercise = _detectExercise(lower);
+                if (exercise) {
+                    const isCompound = exercise.type === 'compound';
+                    html += `<h3>For ${exercise.name}</h3>`;
+                    html += `<ul>`;
+                    html += `<li><strong>Type:</strong> ${isCompound ? 'Compound' : 'Isolation'}</li>`;
+                    html += `<li><strong>Recommended rest:</strong> ${isCompound ? '2-3 min' : '60-90 sec'}</li>`;
+                    html += `<li><strong>Recommended tempo:</strong> ${isCompound ? '2-1-1-0' : '3-1-1-0'} for hypertrophy</li>`;
+                    html += `<li><strong>Key tip:</strong> ${isCompound ? 'Control the eccentric, explode on the concentric. Brace before every rep.' : 'Slow the eccentric to 3 sec. Feel the target muscle stretch. Squeeze at peak contraction.'}</li>`;
+                    html += `</ul>`;
+                }
+
+                html += `<h3>Why Tempo Matters</h3><ul>`;
+                html += `<li><strong>Slower eccentrics = more muscle damage = more growth signal</strong> (Schoenfeld 2017)</li>`;
+                html += `<li><strong>Pause reps eliminate momentum</strong> — forces the target muscle to do all the work</li>`;
+                html += `<li><strong>Tempo forces you to use appropriate weight</strong> — if you can't control the tempo, it's too heavy</li>`;
+                html += `<li><strong>2-3 sec eccentrics are the sweet spot.</strong> Slower than 4 sec doesn't add benefit and tanks your volume capacity</li>`;
+                html += `</ul>`;
                 html += verseHtml();
                 return html;
             },
@@ -3671,30 +4251,39 @@ function addUserMessage(text) {
 function suggestFollowUps(text, ctx) {
     const lower = (text || '').toLowerCase();
     if (/workout plan|routine|program|split/.test(lower)) {
-        return ['How long should I rest between sets?', 'Warm-up routine', 'How is my consistency?'];
+        return ['How long should I rest between sets?', 'Check my progressive overload', 'Calculate my macros'];
     }
-    if (/meal plan|what.*eat|food/.test(lower)) {
-        return ['How is my nutrition looking?', 'Pre/post workout meal', 'What is my protein target?'];
+    if (/meal plan|what.*eat|food|macro|calorie|protein/.test(lower)) {
+        return ['Calculate my macros', 'How is my nutrition looking?', 'Pre/post workout meal'];
     }
     if (/progress|recap|how am i doing|analyze/.test(lower)) {
-        return ['Weak point analysis', 'What should I work on next?', 'How is my consistency?'];
+        return ['Check my progressive overload', 'Weak point analysis', 'Calculate my macros'];
     }
     if (/plateau|stuck|stall/.test(lower)) {
-        return ['Weak point analysis', 'How is my recovery?', 'Cardio guide'];
+        return ['Check my progressive overload', 'Give me a PPL split', 'How is my recovery?'];
     }
     if (/1rm|max|estimated/.test(lower)) {
-        return ['Weak point analysis', 'How can I get stronger?', 'Generate a workout plan for me'];
+        return ['Check my progressive overload', 'How can I get stronger?', 'Give me a program'];
     }
     if (/streak|consistency/.test(lower)) {
         return ['What should I work on next?', 'Analyze my progress', 'Weekly recap'];
     }
     if (/warm.?up/.test(lower)) {
-        return ['Generate a workout plan for me', 'How can I improve mobility?', 'Cardio guide'];
+        return ['Give me a program', 'Tempo & rep speed guide', 'Cardio guide'];
     }
     if (/weak point|lagging/.test(lower)) {
-        return ['Generate a workout plan for me', 'How can I get stronger?', 'Analyze my progress'];
+        return ['Give me a PPL split', 'Check my progressive overload', 'Analyze my progress'];
     }
-    return ['Analyze my progress', 'Generate a workout plan for me', 'How is my nutrition looking?'];
+    if (/hurt|pain|injury|sore/.test(lower)) {
+        return ['Exercise alternatives', 'How is my recovery?', 'When should I see a doctor?'];
+    }
+    if (/equipment|home|no gym|bodyweight/.test(lower)) {
+        return ['Home workout routine', 'Bodyweight exercises', 'Give me a program'];
+    }
+    if (/overload|increase|progression/.test(lower)) {
+        return ['Give me a program', 'Calculate my macros', 'Analyze my progress'];
+    }
+    return ['Analyze my progress', 'Calculate my macros', 'Give me a PPL split'];
 }
 
 // Convert a coach-generated plan into a saveable routine
@@ -4461,14 +5050,22 @@ function _buildExerciseAnswer(exercise, pattern, ctx) {
         case 'sets_and_reps':
             html += `<h3>${name} \u2014 Sets & Reps</h3>`;
             html += `<p><strong>Recommended:</strong> ${exercise.sets} sets of ${exercise.reps} reps.</p>`;
-            html += `<table class="plan-table"><tr><th>Goal</th><th>Sets × Reps</th><th>Rest</th></tr>`;
+            // Personalize with their PR
+            if (ctx && ctx.exercisePRs) {
+                const pr = ctx.exercisePRs[exercise.name] || ctx.exercisePRs[name] || 0;
+                if (pr > 0) {
+                    const unit = wu();
+                    html += insightHtml(`Your PR for ${name} is <strong>${lbsToDisplay(pr)} ${unit}</strong>. For hypertrophy, work at ~${lbsToDisplay(Math.round(pr * 0.7 / 5) * 5)}-${lbsToDisplay(Math.round(pr * 0.8 / 5) * 5)} ${unit}. For strength, work at ~${lbsToDisplay(Math.round(pr * 0.85 / 5) * 5)} ${unit}.`);
+                }
+            }
+            html += `<table class="plan-table"><tr><th>Goal</th><th>Sets \u00d7 Reps</th><th>Rest</th></tr>`;
             if (exercise.type === 'compound') {
-                html += `<tr><td>Strength</td><td>4-5 × 3-5</td><td>3-5 min</td></tr>`;
-                html += `<tr><td>Hypertrophy</td><td>3-4 × 8-12</td><td>60-90 sec</td></tr>`;
-                html += `<tr><td>Endurance</td><td>3 × 15-20</td><td>45-60 sec</td></tr>`;
+                html += `<tr><td>Strength</td><td>4-5 \u00d7 3-5</td><td>3-5 min</td></tr>`;
+                html += `<tr><td>Hypertrophy</td><td>3-4 \u00d7 8-12</td><td>60-90 sec</td></tr>`;
+                html += `<tr><td>Endurance</td><td>3 \u00d7 15-20</td><td>45-60 sec</td></tr>`;
             } else {
-                html += `<tr><td>Hypertrophy</td><td>3-4 × 10-15</td><td>60-90 sec</td></tr>`;
-                html += `<tr><td>Endurance/pump</td><td>3 × 15-25</td><td>30-45 sec</td></tr>`;
+                html += `<tr><td>Hypertrophy</td><td>3-4 \u00d7 10-15</td><td>60-90 sec</td></tr>`;
+                html += `<tr><td>Endurance/pump</td><td>3 \u00d7 15-25</td><td>30-45 sec</td></tr>`;
             }
             html += `</table>`;
             html += insightHtml(`Schoenfeld 2017 dose-response meta: 10\u201320+ sets per muscle per week drives the most hypertrophy. Count all exercises for that muscle group, not just ${name.toLowerCase()}.`);
