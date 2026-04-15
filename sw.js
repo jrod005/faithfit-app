@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ironfaith-v97';
+const CACHE_NAME = 'ironfaith-v98';
 
 // Allow the page to tell a waiting SW to take over immediately
 self.addEventListener('message', (event) => {
@@ -15,7 +15,10 @@ const ASSETS = [
     './routines.js',
     './exercise-info.js',
     './app.js',
-    './coach.js',
+    './coach-core.js',
+    './coach-responses.js',
+    './coach-chat.js',
+    './coach-nlp.js',
     './photos.js',
     './social.js',
     './cloud-sync.js',

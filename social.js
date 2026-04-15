@@ -28,6 +28,16 @@ let currentUser = null;
 let userProfile = null;
 let socialView = 'feed';
 
+// Race a promise against a timeout. Used to defend against supabase-js
+// hangs observed on iOS home-screen PWAs — the library sometimes never
+// resolves, so every auth/session call gets a bounded wait.
+function withTimeout(promise, ms, label) {
+    return Promise.race([
+        promise,
+        new Promise((_, rej) => setTimeout(() => rej(new Error(label || 'TIMEOUT')), ms)),
+    ]);
+}
+
 // ========== BIBLE VERSES ==========
 const BIBLE_VERSES = [
     { ref: "Philippians 4:13", text: "I can do all things through Christ who strengthens me." },
@@ -125,10 +135,9 @@ async function socialSignIn() {
         const { error } = await sb.auth.signInWithPassword({ email, password: pass });
         if (error) throw new Error(error.message);
     })();
-    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('LIB_TIMEOUT')), 6000));
 
     try {
-        await Promise.race([libSignin, timeout]);
+        await withTimeout(libSignin, 6000, 'LIB_TIMEOUT');
         return; // success via library
     } catch (e) {
         console.warn('Library signin failed/timed out, falling back to direct REST:', e.message);
@@ -362,10 +371,7 @@ function ironfaithSocialBootstrap() {
     // SLOW PATH: also try the library on a 2s race
     (async () => {
         try {
-            const result = await Promise.race([
-                sb.auth.getSession(),
-                new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 2000))
-            ]);
+            const result = await withTimeout(sb.auth.getSession(), 2000);
             const session = result?.data?.session;
             if (session?.user && !currentUser) {
                 currentUser = session.user;
@@ -409,10 +415,7 @@ function ironfaithSocialBootstrap() {
             if (!currentUser) return;
             // Try lib session first
             if (sb && sb.auth && sb.auth.getSession) {
-                Promise.race([
-                    sb.auth.getSession(),
-                    new Promise((_, rej) => setTimeout(() => rej(), 1000))
-                ]).then(result => {
+                withTimeout(sb.auth.getSession(), 1000).then(result => {
                     const s = result?.data?.session;
                     if (s?.access_token) {
                         const directSess = {
@@ -858,10 +861,7 @@ async function getAccessTokenSafely() {
     // Last resort: try the library with a tight timeout
     if (sb && sb.auth && sb.auth.getSession) {
         try {
-            const result = await Promise.race([
-                sb.auth.getSession(),
-                new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT')), 1500))
-            ]);
+            const result = await withTimeout(sb.auth.getSession(), 1500);
             const s = result?.data?.session;
             if (s?.access_token) return { token: s.access_token, user: s.user };
         } catch (e) { /* fall through */ }
