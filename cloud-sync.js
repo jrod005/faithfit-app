@@ -6,8 +6,17 @@
 const CLOUD_SYNC_KEY = 'cloudSyncEnabled';
 const LAST_SYNC_KEY = 'lastCloudSync';
 const LOCAL_MODIFIED_KEY = 'localLastModified';
+const PENDING_SYNC_KEY = 'pendingCloudSync';
 let cloudSyncTimer = null;
 let cloudSyncInProgress = false;
+
+function setPendingSync(v) {
+    if (v) localStorage.setItem('faithfit_' + PENDING_SYNC_KEY, '1');
+    else localStorage.removeItem('faithfit_' + PENDING_SYNC_KEY);
+}
+function hasPendingSync() {
+    return localStorage.getItem('faithfit_' + PENDING_SYNC_KEY) === '1';
+}
 
 function isCloudSyncEnabled() {
     return DB.get(CLOUD_SYNC_KEY, false) === true;
@@ -98,16 +107,32 @@ async function pushToCloud(silent) {
             throw new Error('HTTP ' + resp.status + ' ' + body.slice(0, 100));
         }
         setLastSync(Date.now());
+        setPendingSync(false);
         updateCloudSyncStatusUI();
         if (!silent) showToast('Backed up to cloud', 'success');
     } catch (e) {
         console.error('Cloud sync push failed', e);
+        setPendingSync(true);
         updateCloudSyncStatusUI();
-        if (!silent) showToast('Backup failed: ' + (e.message || 'unknown'), 'error');
+        if (!silent) showToast('Backup failed \u2014 will retry when online', 'warn');
     } finally {
         cloudSyncInProgress = false;
     }
 }
+
+// Retry any pending push when the network recovers or the tab regains focus.
+function retryPendingCloudSync() {
+    if (!hasPendingSync()) return;
+    if (!navigator.onLine) return;
+    if (!isCloudSyncEnabled()) return;
+    if (typeof currentUser === 'undefined' || !currentUser) return;
+    if (cloudSyncInProgress) return;
+    pushToCloud(true);
+}
+window.addEventListener('online', () => { setTimeout(retryPendingCloudSync, 1500); });
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) setTimeout(retryPendingCloudSync, 1500);
+});
 
 async function pullFromCloud(silent) {
     if (typeof currentUser === 'undefined' || !currentUser) {
@@ -304,7 +329,8 @@ function updateCloudSyncStatusUI(overrideText) {
     else if (diff < 3600000) when = Math.floor(diff / 60000) + 'm ago';
     else if (diff < 86400000) when = Math.floor(diff / 3600000) + 'h ago';
     else when = Math.floor(diff / 86400000) + 'd ago';
-    el.textContent = 'Last backup: ' + when;
+    const pending = hasPendingSync() ? ' \u00b7 pending retry' : '';
+    el.textContent = 'Last backup: ' + when + pending;
 }
 
 // Poll for currentUser instead of relying on supabase-js auth state events.

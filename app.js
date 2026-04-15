@@ -3259,15 +3259,43 @@ function viewErrorLog() {
             showToast('No errors logged');
             return;
         }
+        const header = [
+            'Iron Faith error report',
+            'Generated: ' + new Date().toISOString(),
+            'SW cache: ' + (typeof CACHE_NAME === 'string' ? CACHE_NAME : 'unknown'),
+            'User-Agent: ' + navigator.userAgent,
+            'Online: ' + navigator.onLine,
+            'Standalone PWA: ' + (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true),
+            '---',
+        ].join('\n');
         const lines = log.map(e => {
             const when = new Date(e.t).toLocaleString();
-            return `[${when}] (${e.source}) ${e.msg}`;
+            return `[${when}] (${e.source}) ${e.msg}` + (e.stack ? '\n' + e.stack : '');
         }).join('\n\n');
-        // Render in a simple modal-style overlay
+        const fullDump = header + '\n' + lines;
+
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);color:#fff;z-index:99999;padding:20px;overflow:auto;font-family:monospace;font-size:11px;white-space:pre-wrap;line-height:1.4';
-        overlay.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><strong style="font-size:14px">Error Log (${log.length})</strong><div><button onclick="localStorage.removeItem('${ERROR_LOG_KEY}');this.closest('div').parentElement.parentElement.remove()" style="margin-right:8px;padding:6px 10px;background:#c00;color:#fff;border:none;border-radius:4px">Clear</button><button onclick="this.closest('div').parentElement.parentElement.remove()" style="padding:6px 10px;background:#444;color:#fff;border:none;border-radius:4px">Close</button></div></div><div>${lines.replace(/</g, '&lt;')}</div>`;
+        const copyBtn = `<button id="err-copy-btn" style="margin-right:8px;padding:6px 10px;background:#2a6;color:#fff;border:none;border-radius:4px">Copy</button>`;
+        const clearBtn = `<button id="err-clear-btn" style="margin-right:8px;padding:6px 10px;background:#c00;color:#fff;border:none;border-radius:4px">Clear</button>`;
+        const closeBtn = `<button id="err-close-btn" style="padding:6px 10px;background:#444;color:#fff;border:none;border-radius:4px">Close</button>`;
+        overlay.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;position:sticky;top:-20px;background:rgba(0,0,0,0.92);padding:10px 0"><strong style="font-size:14px">Error Log (${log.length})</strong><div>${copyBtn}${clearBtn}${closeBtn}</div></div><div id="err-body"></div>`;
         document.body.appendChild(overlay);
+        overlay.querySelector('#err-body').textContent = fullDump;
+        overlay.querySelector('#err-copy-btn').onclick = async () => {
+            try {
+                await navigator.clipboard.writeText(fullDump);
+                showToast('Error log copied', 'success');
+            } catch (e) {
+                showToast('Copy failed — long-press to select', 'warn');
+            }
+        };
+        overlay.querySelector('#err-clear-btn').onclick = () => {
+            localStorage.removeItem(ERROR_LOG_KEY);
+            overlay.remove();
+            showToast('Error log cleared');
+        };
+        overlay.querySelector('#err-close-btn').onclick = () => overlay.remove();
     } catch (e) {
         showToast('Could not read error log');
     }
@@ -3323,7 +3351,12 @@ function confirmDialog(message, opts) {
                 </div>
             </div>
         `;
+        const onKey = (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); close(false); }
+            else if (e.key === 'Enter') { e.preventDefault(); close(true); }
+        };
         const close = (val) => {
+            document.removeEventListener('keydown', onKey);
             overlay.classList.remove('show');
             setTimeout(() => overlay.remove(), 200);
             resolve(val);
@@ -3331,8 +3364,13 @@ function confirmDialog(message, opts) {
         overlay.querySelector('.confirm-cancel').onclick = () => close(false);
         overlay.querySelector('.confirm-ok').onclick = () => close(true);
         overlay.onclick = (e) => { if (e.target === overlay) close(false); };
+        document.addEventListener('keydown', onKey);
         document.body.appendChild(overlay);
-        requestAnimationFrame(() => overlay.classList.add('show'));
+        requestAnimationFrame(() => {
+            overlay.classList.add('show');
+            const okBtn = overlay.querySelector('.confirm-ok');
+            if (okBtn) okBtn.focus();
+        });
     });
 }
 
