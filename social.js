@@ -1493,11 +1493,6 @@ function buildStatsFromWorkouts(workouts) {
     };
 }
 
-// Backwards-compatible: returns stats for today's *non-empty* workouts only.
-function getTodayWorkoutStats() {
-    return buildStatsFromWorkouts(getTodayLoggedExercises());
-}
-
 // Stashed sessions list for the currently-open post modal
 let _postSessions = [];
 

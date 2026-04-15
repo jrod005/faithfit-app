@@ -803,45 +803,6 @@ function expandTokensWithSynonyms(tokens) {
     return { wordHits, groupHits };
 }
 
-function scoreCoachIntent(text) {
-    if (!text || !TOPIC_RESPONSES || !TOPIC_RESPONSES.topics) return null;
-    const lower = text.toLowerCase();
-    const tokens = tokenizeForCoach(text);
-    if (tokens.length === 0) return null;
-    const { wordHits, groupHits } = expandTokensWithSynonyms(tokens);
-
-    let bestTopic = null;
-    let bestScore = 0;
-
-    TOPIC_RESPONSES.topics.forEach(topic => {
-        let score = 0;
-        for (const kw of topic.keywords) {
-            // Strong signal: full keyword/phrase appears literally
-            try {
-                if (new RegExp(kw, 'i').test(lower)) score += 5;
-            } catch (e) { /* invalid regex — skip */ }
-            // Token-level overlap
-            const kwTokens = tokenizeForCoach(kw.replace(/[\\.*+?^${}()|[\]]/g, ' '));
-            kwTokens.forEach(kt => {
-                if (wordHits.has(kt)) score += 2;
-                const groups = COACH_SYNONYM_INDEX[kt];
-                if (groups) groups.forEach(g => { if (groupHits.has(g)) score += 1; });
-            });
-        }
-        // Slight penalty for the greeting topic so it doesn't steal questions
-        // that happen to contain "hi" inside another word.
-        if (topic.id === 'greeting' && tokens.length > 2) score -= 4;
-        if (score > bestScore) {
-            bestScore = score;
-            bestTopic = topic;
-        }
-    });
-
-    // Threshold: at least one solid signal (literal match worth 5, or 3+ token overlaps)
-    if (bestScore >= 3) return { topic: bestTopic, score: bestScore };
-    return null;
-}
-
 function rankCoachIntents(text) {
     if (!text || !TOPIC_RESPONSES || !TOPIC_RESPONSES.topics) return [];
     const lower = text.toLowerCase();

@@ -107,21 +107,9 @@ function isMetric() {
     return getUnits() === 'metric';
 }
 
-// Display weight in current unit (stored internally as lbs)
-function displayWeight(lbs) {
-    if (isMetric()) return (lbs * 0.453592).toFixed(1);
-    return lbs;
-}
-
 // Weight unit label
 function wu() {
     return isMetric() ? 'kg' : 'lbs';
-}
-
-// Convert user input to lbs for storage
-function inputToLbs(value) {
-    if (isMetric()) return value / 0.453592;
-    return value;
 }
 
 // Convert lbs to display value
@@ -1274,14 +1262,6 @@ function fireNotification(title, body) {
             new Notification(title, { body });
         }
     } catch (e) {}
-}
-
-// On launch: catch up on missed reminders if any times have already passed today
-function checkMissedNotifications() {
-    const s = getNotifSettings();
-    if (!s.enabled || !notifSupported() || Notification.permission !== 'granted') return;
-    // scheduleNotifications already filters out past times — no catch-up by design
-    // (avoid annoying the user with stale reminders)
 }
 
 // --- Visual: count-up animation ---
@@ -3219,23 +3199,6 @@ function shareProgress() {
     openShareModal();
 }
 
-function copyToClipboard(text, message) {
-    navigator.clipboard.writeText(text).then(() => {
-        showToast(message || 'Copied to clipboard!');
-    }).catch(() => {
-        // Fallback for older browsers
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        showToast(message || 'Copied to clipboard!');
-    });
-}
-
 // ========== CLIENT ERROR REPORTING ==========
 // Captures uncaught errors + unhandled promise rejections into a localStorage
 // ring buffer (last 50). Viewable via Profile → "View Error Log" or by typing
@@ -4227,140 +4190,6 @@ function updateRestTimerVisibility() {
 // =============================================
 // FEATURE: Food Search Database
 // =============================================
-
-let currentServings = 1;
-
-let _foodSearchTimer = null;
-let _apiSearchCache = {};
-
-function searchFood(query) {
-    const results = document.getElementById('food-search-results');
-    if (!query || query.length < 2 || typeof FOOD_DB === 'undefined') {
-        results.classList.add('hidden');
-        return;
-    }
-    const q = query.toLowerCase();
-    const localMatches = FOOD_DB.filter(f => f.name.toLowerCase().includes(q)).slice(0, 8);
-
-    // Always show local results immediately
-    _renderFoodResults(localMatches, []);
-
-    // Debounce API search for longer queries
-    clearTimeout(_foodSearchTimer);
-    if (q.length >= 3) {
-        _foodSearchTimer = setTimeout(() => _searchFoodAPI(q, localMatches), 400);
-    }
-}
-
-function _renderFoodResults(localMatches, apiMatches) {
-    const results = document.getElementById('food-search-results');
-    if (localMatches.length === 0 && apiMatches.length === 0) {
-        results.classList.add('hidden');
-        return;
-    }
-    let html = '';
-    localMatches.forEach((f, i) => {
-        html += `<div class="food-result" onclick="selectFood(${FOOD_DB.indexOf(f)})">
-            <span class="food-result-name">${escapeHtml(f.name)}</span>
-            <span class="food-result-info">${f.serving} &middot; ${f.calories} cal</span>
-        </div>`;
-    });
-    if (apiMatches.length > 0) {
-        if (localMatches.length > 0) html += `<div class="food-result-divider">More results</div>`;
-        apiMatches.forEach(f => {
-            html += `<div class="food-result" onclick="selectAPIFood(${f._idx})">
-                <span class="food-result-name">${escapeHtml(f.name)}</span>
-                <span class="food-result-info">${f.serving} &middot; ${f.calories} cal</span>
-            </div>`;
-        });
-    }
-    results.innerHTML = html;
-    results.classList.remove('hidden');
-}
-
-let _lastAPIResults = [];
-async function _searchFoodAPI(query, localMatches) {
-    // Check cache
-    if (_apiSearchCache[query]) {
-        _lastAPIResults = _apiSearchCache[query];
-        _renderFoodResults(localMatches, _lastAPIResults);
-        return;
-    }
-    try {
-        const resp = await fetch(
-            `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,nutriments,serving_size,quantity`,
-            { signal: AbortSignal.timeout(4000) }
-        );
-        if (!resp.ok) return;
-        const data = await resp.json();
-        if (!data.products || data.products.length === 0) return;
-
-        const localNames = new Set(localMatches.map(f => f.name.toLowerCase()));
-        const apiResults = [];
-        data.products.forEach((p, i) => {
-            const name = p.product_name;
-            if (!name || localNames.has(name.toLowerCase())) return;
-            const n = p.nutriments || {};
-            const calories = Math.round(n['energy-kcal_serving'] || n['energy-kcal_100g'] || 0);
-            if (calories === 0) return;
-            apiResults.push({
-                _idx: i,
-                name,
-                serving: p.serving_size || p.quantity || '1 serving',
-                calories,
-                protein: Math.round(n.proteins_serving || n.proteins_100g || 0),
-                carbs: Math.round(n.carbohydrates_serving || n.carbohydrates_100g || 0),
-                fat: Math.round(n.fat_serving || n.fat_100g || 0),
-            });
-        });
-        _lastAPIResults = apiResults.slice(0, 6);
-        _apiSearchCache[query] = _lastAPIResults;
-        _renderFoodResults(localMatches, _lastAPIResults);
-    } catch (e) {
-        // Silent — local results are already shown
-    }
-}
-
-function selectAPIFood(idx) {
-    const food = _lastAPIResults.find(f => f._idx === idx);
-    if (!food) return;
-    selectedFood = food;
-    currentServings = 1;
-    document.getElementById('meal-name').value = food.name;
-    document.getElementById('meal-calories').value = food.calories;
-    document.getElementById('meal-protein').value = food.protein;
-    document.getElementById('meal-carbs').value = food.carbs;
-    document.getElementById('meal-fat').value = food.fat;
-    document.getElementById('food-search-results').classList.add('hidden');
-    document.getElementById('servings-group').style.display = 'block';
-    document.getElementById('serving-count').textContent = '1';
-    document.getElementById('serving-desc').textContent = food.serving;
-}
-
-function selectFood(index) {
-    const food = FOOD_DB[index];
-    selectedFood = food;
-    currentServings = 1;
-    document.getElementById('meal-name').value = food.name;
-    document.getElementById('meal-calories').value = food.calories;
-    document.getElementById('meal-protein').value = food.protein;
-    document.getElementById('meal-carbs').value = food.carbs;
-    document.getElementById('meal-fat').value = food.fat;
-    document.getElementById('food-search-results').classList.add('hidden');
-    document.getElementById('servings-group').style.display = 'block';
-    document.getElementById('serving-count').textContent = '1';
-    document.getElementById('serving-desc').textContent = food.serving;
-}
-
-function adjustServings(delta) {
-    if (!selectedFood) return;
-    currentServings = Math.max(0.5, currentServings + delta);
-    document.getElementById('serving-count').textContent = currentServings;
-    document.getElementById('meal-calories').value = Math.round(selectedFood.calories * currentServings);
-    document.getElementById('meal-protein').value = Math.round(selectedFood.protein * currentServings);
-    document.getElementById('meal-carbs').value = Math.round(selectedFood.carbs * currentServings);
-    document.getElementById('meal-fat').value = Math.round(selectedFood.fat * currentServings);
-}
 
 // Close food search on outside click
 document.addEventListener('click', (e) => {

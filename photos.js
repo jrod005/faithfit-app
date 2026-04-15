@@ -137,21 +137,6 @@ function openLightbox(src) {
 function getProgressPhotos() {
     return _photosCache.slice(); // return copy
 }
-function saveProgressPhotos(arr) {
-    // Only used for bulk overwrite (e.g. cloud restore)
-    _photosCache = arr.slice();
-    // Write all to IDB in background
-    (async () => {
-        try {
-            const db = await _openPhotosDB();
-            const tx = db.transaction(PHOTOS_STORE, 'readwrite');
-            const store = tx.objectStore(PHOTOS_STORE);
-            store.clear();
-            arr.forEach(p => store.put(p));
-            await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
-        } catch (e) { console.error('IDB bulk save failed:', e); }
-    })();
-}
 function addProgressPhoto({ dataUrl, perspective, weightLbs, notes }) {
     const photo = {
         id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),

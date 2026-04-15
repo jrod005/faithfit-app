@@ -337,12 +337,6 @@ if (document.readyState === 'loading') {
     setTimeout(initCloudSyncAuthHook, 0);
 }
 
-// Reset the hook so it re-runs on sign-out → sign-in
-function resetCloudSyncAuthHook() {
-    _cloudHookFired = false;
-    initCloudSyncAuthHook();
-}
-
 // =============================================
 // Fresh-install restore prompt
 // On a brand-new PWA install (or fresh browser), if there is no local
