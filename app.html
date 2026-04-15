@@ -299,10 +299,6 @@
                         <span class="hub-icon">&#x1F4AA;</span>
                         <span class="hub-label">Empty Workout</span>
                     </button>
-                    <button class="hub-btn" onclick="showHubView('tools')">
-                        <span class="hub-icon">&#x1F527;</span>
-                        <span class="hub-label">Gym Tools</span>
-                    </button>
                     <button class="hub-btn" onclick="showHubView('export')">
                         <span class="hub-icon">&#x1F4E5;</span>
                         <span class="hub-label">Export Data</span>
@@ -370,62 +366,6 @@
                     <div id="builder-days"></div>
                     <button class="btn btn-secondary btn-full" onclick="builderAddDay()" style="margin-top:8px">+ Add Day</button>
                     <button class="btn btn-primary btn-full" onclick="saveBuiltRoutine()" style="margin-top:8px">Save Routine</button>
-                </div>
-            </div>
-
-            <!-- Hub: Gym Tools -->
-            <div id="hub-tools" class="hub-view hidden">
-                <div class="card">
-                    <div class="hub-view-header">
-                        <h2>Gym Tools</h2>
-                        <button class="btn btn-secondary btn-sm" onclick="hideHubView()">Back</button>
-                    </div>
-
-                    <!-- 1RM Calculator -->
-                    <div class="tool-section">
-                        <h3>1RM Calculator</h3>
-                        <p class="tool-desc">Estimate your one-rep max from any set.</p>
-                        <div class="tool-row">
-                            <div class="form-group" style="flex:1"><label>Weight</label><input type="number" id="orm-weight" placeholder="225"></div>
-                            <div class="form-group" style="flex:1"><label>Reps</label><input type="number" id="orm-reps" placeholder="5" min="1" max="30"></div>
-                        </div>
-                        <button class="btn btn-primary btn-full" onclick="calculate1RM()">Calculate</button>
-                        <div id="orm-result" class="tool-result hidden"></div>
-                    </div>
-
-                    <!-- Plate Calculator -->
-                    <div class="tool-section" style="margin-top:20px">
-                        <h3>Plate Calculator</h3>
-                        <p class="tool-desc">See which plates to load on each side.</p>
-                        <div class="tool-row">
-                            <div class="form-group" style="flex:1"><label>Target Weight</label><input type="number" id="plate-target" placeholder="225"></div>
-                            <div class="form-group" style="flex:1"><label>Bar Weight</label>
-                                <select id="plate-bar">
-                                    <option value="45">45 lbs</option>
-                                    <option value="35">35 lbs</option>
-                                    <option value="20">20 kg</option>
-                                    <option value="15">15 kg</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button class="btn btn-primary btn-full" onclick="calculatePlates()">Calculate</button>
-                        <div id="plate-result" class="tool-result hidden"></div>
-                    </div>
-
-                    <!-- Superset Timer -->
-                    <div class="tool-section" style="margin-top:20px">
-                        <h3>AMRAP Timer</h3>
-                        <p class="tool-desc">Countdown timer for timed sets or AMRAPs.</p>
-                        <div class="tool-row">
-                            <div class="form-group" style="flex:1"><label>Minutes</label><input type="number" id="amrap-min" value="1" min="0" max="60"></div>
-                            <div class="form-group" style="flex:1"><label>Seconds</label><input type="number" id="amrap-sec" value="0" min="0" max="59"></div>
-                        </div>
-                        <button class="btn btn-primary btn-full" id="amrap-start-btn" onclick="startAmrapTimer()">Start Timer</button>
-                        <div id="amrap-display" class="amrap-display hidden">
-                            <span id="amrap-time" class="amrap-time">0:00</span>
-                            <button class="btn btn-secondary btn-sm" onclick="stopAmrapTimer()">Stop</button>
-                        </div>
-                    </div>
                 </div>
             </div>
 

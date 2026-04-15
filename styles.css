@@ -4869,47 +4869,6 @@ body {
     .landing-btn-primary, .landing-btn-secondary { width: 100%; box-sizing: border-box; }
 }
 
-/* ===== Gym Tools ===== */
-.tool-section { padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
-.tool-section:last-child { border-bottom: none; }
-.tool-section h3 { margin: 0 0 4px; color: #fff; font-size: 16px; }
-.tool-desc { color: #888; font-size: 13px; margin: 0 0 12px; }
-.tool-row { display: flex; gap: 12px; margin-bottom: 10px; }
-.tool-result { margin-top: 12px; padding: 14px; background: rgba(255,255,255,0.04); border-radius: 10px; }
-.tool-result h3 { color: #4ecdc4; }
-.tool-result table { margin-top: 8px; }
-
-/* Plate calculator visual */
-.plate-visual {
-    display: flex; align-items: center; justify-content: flex-start;
-    gap: 3px; padding: 16px 8px; margin: 8px 0;
-    background: rgba(255,255,255,0.03); border-radius: 10px; overflow-x: auto;
-}
-.plate-bar-end {
-    width: 12px; height: 12px; background: #666; border-radius: 2px;
-}
-.plate-disc {
-    width: 22px; min-width: 22px; border-radius: 4px;
-    background: linear-gradient(135deg, #4ecdc4, #44a08d);
-    display: flex; align-items: center; justify-content: center;
-    color: #000; font-size: 9px; font-weight: 700;
-}
-.plate-disc:nth-child(odd) { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
-.plate-collar {
-    width: 8px; height: 18px; background: #888; border-radius: 2px; margin-left: 2px;
-}
-
-/* AMRAP Timer */
-.amrap-display {
-    display: flex; align-items: center; justify-content: center; gap: 16px;
-    padding: 20px; margin-top: 12px; background: rgba(78,205,196,0.08);
-    border: 1px solid rgba(78,205,196,0.3); border-radius: 12px;
-}
-.amrap-time {
-    font-size: 48px; font-weight: 700; color: #4ecdc4;
-    font-variant-numeric: tabular-nums;
-}
-
 /* Superset styles */
 .active-ex-actions {
     display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;
