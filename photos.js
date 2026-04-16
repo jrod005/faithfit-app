@@ -278,7 +278,7 @@ function renderProgressPhotoCard() {
     recent.forEach(p => {
         html += `
             <div class="progress-photo-thumb" onclick="openProgressPhotoDetail('${p.id}')">
-                <img src="${p.dataUrl}" alt="Progress photo">
+                <img src="${p.dataUrl}" alt="Progress photo" loading="lazy" decoding="async">
                 <div class="progress-photo-thumb-meta">
                     <span class="progress-photo-thumb-date">${formatProgressDate(p.date)}</span>
                     <span class="progress-photo-thumb-tag">${p.perspective}</span>

@@ -118,7 +118,7 @@
 
         <!-- Daily Verse Banner -->
         <div id="verse-banner" class="verse-banner">
-            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">&#x263C;</button>
+            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode" aria-label="Toggle dark/light mode">&#x263C;</button>
             <div class="verse-top-row">
                 <span class="verse-icon">&#x2727;</span>
                 <select id="bible-version" class="bible-select" onchange="setBibleVersion(this.value)">
@@ -174,6 +174,7 @@
 
         <!-- Dashboard Tab -->
         <section id="dashboard" class="tab-content active">
+            <div id="first-run-card" class="first-run-card hidden"></div>
             <div id="streak-protector" class="streak-protector hidden"></div>
             <div id="backup-health" class="backup-health hidden"></div>
             <div id="daily-insight" class="daily-insight hidden"></div>
@@ -664,7 +665,7 @@
                 <div class="barcode-modal-content">
                     <div class="barcode-modal-header">
                         <h3>Scan Barcode</h3>
-                        <button class="btn btn-secondary" onclick="closeBarcodeScanner()" style="padding:4px 12px;">&#x2715;</button>
+                        <button class="btn btn-secondary" onclick="closeBarcodeScanner()" style="padding:4px 12px;" aria-label="Close scanner">&#x2715;</button>
                     </div>
                     <div id="barcode-reader"></div>
                     <div id="barcode-status" class="barcode-status">Point your camera at a barcode</div>
@@ -730,12 +731,12 @@
         <!-- Coach Tab -->
         <section id="coach" class="tab-content">
             <div class="coach-chat-header">
-                <div class="coach-avatar-sm">&#x2605;</div>
+                <div class="coach-avatar-sm" aria-hidden="true">&#x2605;</div>
                 <div class="coach-header-text">
                     <h2>Iron Faith Coach</h2>
                     <p class="coach-status">Personalized guidance powered by your data</p>
                 </div>
-                <button class="coach-clear-btn" onclick="clearCoachChat()" title="Clear chat">&#x1F5D1;</button>
+                <button class="coach-clear-btn" onclick="clearCoachChat()" title="Clear chat" aria-label="Clear chat">&#x1F5D1;</button>
             </div>
             <p class="coach-disclaimer">Not medical advice. For sharp, persistent, or radiating pain, see a clinician. <a href="terms.html" target="_blank" rel="noopener">Terms</a></p>
 
@@ -756,16 +757,16 @@
                 <button class="quick-btn" onclick="coachAsk('How do progress photos work?')">Progress Photos</button>
             </div>
 
-            <div id="coach-messages" class="coach-messages">
+            <div id="coach-messages" class="coach-messages" role="log" aria-live="polite" aria-atomic="false">
                 <!-- Messages appear here -->
             </div>
 
             <div class="coach-input-area">
                 <input type="text" id="coach-input" placeholder="Ask your coach anything..." onkeydown="if(event.key==='Enter')sendCoachMessage()">
-                <button id="coach-photo-btn" class="btn btn-secondary coach-mic-btn" onclick="coachPickPhoto()" title="Form check (photo)">&#x1F4CE;</button>
+                <button id="coach-photo-btn" class="btn btn-secondary coach-mic-btn" onclick="coachPickPhoto()" title="Form check (photo)" aria-label="Upload form-check photo">&#x1F4CE;</button>
                 <input type="file" id="coach-photo-file" accept="image/*" style="display:none" onchange="coachHandlePhotoSelected(event)">
-                <button id="coach-mic-btn" class="btn btn-secondary coach-mic-btn" onclick="toggleCoachVoice()" title="Voice input">&#x1F3A4;</button>
-                <button class="btn btn-primary coach-send-btn" onclick="sendCoachMessage()">&#x27A4;</button>
+                <button id="coach-mic-btn" class="btn btn-secondary coach-mic-btn" onclick="toggleCoachVoice()" title="Voice input" aria-label="Voice input">&#x1F3A4;</button>
+                <button class="btn btn-primary coach-send-btn" onclick="sendCoachMessage()" aria-label="Send message">&#x27A4;</button>
             </div>
         </section>
 
@@ -1044,9 +1045,9 @@
             <div class="card">
                 <h2>About</h2>
                 <div class="about-links">
-                    <a href="privacy.html" target="_blank">Privacy Policy</a>
+                    <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
                     <span class="about-sep">&middot;</span>
-                    <a href="terms.html" target="_blank">Terms of Service</a>
+                    <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a>
                 </div>
                 <p class="about-version">Iron Faith &middot; v1.0</p>
                 <p class="about-tagline">Strengthen your body. Strengthen your spirit.</p>

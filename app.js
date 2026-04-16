@@ -2820,7 +2820,60 @@ function shareApp() {
 }
 
 // --- Dashboard ---
+// Activation nudge: shown on the dashboard until the user logs their first set.
+// Hidden permanently after any workout is saved OR the user dismisses it.
+function renderFirstRunCard() {
+    const el = document.getElementById('first-run-card');
+    if (!el) return;
+    const workouts = DB.get('workouts', []);
+    const dismissed = DB.get('firstRunDismissed', false);
+    if (workouts.length > 0 || dismissed) {
+        el.classList.add('hidden');
+        el.innerHTML = '';
+        return;
+    }
+    const suggested = (typeof suggestRoutineForUser === 'function') ? suggestRoutineForUser() : null;
+    const name = (DB.get('profile', {}) || {}).name || 'friend';
+    const primaryBtn = suggested
+        ? `<button class="btn btn-primary btn-full" onclick="firstRunStartSuggested('${suggested.id}')">Start &ldquo;${escapeHtml(suggested.name)}&rdquo;</button>`
+        : `<button class="btn btn-primary btn-full" onclick="firstRunStartEmpty()">Log Your First Set</button>`;
+    const secondLine = suggested
+        ? `<button class="btn btn-secondary btn-sm" onclick="firstRunStartEmpty()">Or log a quick set</button>`
+        : `<button class="btn btn-secondary btn-sm" onclick="switchTab('workout');setTimeout(()=>showHubView&&showHubView('explore'),100)">Browse routines first</button>`;
+    el.classList.remove('hidden');
+    el.innerHTML = `
+        <div class="first-run-inner">
+            <button class="first-run-dismiss" onclick="dismissFirstRunCard()" aria-label="Dismiss">&times;</button>
+            <div class="first-run-eyebrow">Welcome${name && name !== 'friend' ? ', ' + escapeHtml(name) : ''}</div>
+            <h3 class="first-run-title">Let&rsquo;s log your first workout</h3>
+            <p class="first-run-body">One set is all it takes. Your data unlocks personalized coaching, progress charts, and smart load suggestions.</p>
+            ${primaryBtn}
+            <div class="first-run-alt">${secondLine}</div>
+        </div>`;
+}
+
+function firstRunStartSuggested(routineId) {
+    const routine = (typeof getMyRoutines === 'function' ? getMyRoutines() : []).find(r => r.id === routineId)
+        || (typeof IRON_FAITH_ROUTINES !== 'undefined' ? IRON_FAITH_ROUTINES.find(r => r.id === routineId) : null);
+    if (!routine) { firstRunStartEmpty(); return; }
+    const day = (routine.days && routine.days[0]) || null;
+    if (!day) { firstRunStartEmpty(); return; }
+    switchTab('workout');
+    setTimeout(() => { if (typeof startActiveWorkout === 'function') startActiveWorkout(routine, day); }, 150);
+}
+
+function firstRunStartEmpty() {
+    switchTab('workout');
+    setTimeout(() => { if (typeof startEmptyWorkout === 'function') startEmptyWorkout(); }, 150);
+}
+
+function dismissFirstRunCard() {
+    DB.set('firstRunDismissed', true);
+    renderFirstRunCard();
+}
+
 function updateDashboard() {
+    renderFirstRunCard();
     const workouts = DB.get('workouts', []).filter(w => w.date === today());
     const meals = DB.get('meals', []).filter(m => m.date === today());
     const weights = DB.get('weights', []);
@@ -3227,14 +3280,25 @@ function shareProgress() {
 const ERROR_LOG_KEY = 'faithfit_error_log';
 const ERROR_LOG_MAX = 50;
 
+// Defensive scrub: redact anything that looks like a secret before persisting
+// so users can paste error dumps to support without leaking their Claude key,
+// a JWT, or an email address.
+function _scrubForErrorLog(s) {
+    if (!s) return '';
+    return String(s)
+        .replace(/sk-ant-[A-Za-z0-9_-]+/g, 'sk-ant-***REDACTED***')
+        .replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, '***JWT_REDACTED***')
+        .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '***EMAIL_REDACTED***');
+}
+
 function logClientError(source, msg, stack) {
     try {
         const log = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
         log.push({
             t: Date.now(),
             source,
-            msg: String(msg).slice(0, 500),
-            stack: stack ? String(stack).slice(0, 1000) : '',
+            msg: _scrubForErrorLog(msg).slice(0, 500),
+            stack: stack ? _scrubForErrorLog(stack).slice(0, 1000) : '',
             url: location.pathname,
         });
         // Keep only the most recent N

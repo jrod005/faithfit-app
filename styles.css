@@ -1404,6 +1404,60 @@ input::placeholder {
     text-decoration: underline;
 }
 
+.first-run-card {
+    margin-bottom: 16px;
+}
+.first-run-inner {
+    position: relative;
+    padding: 20px 18px 18px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(201,167,105,0.14), rgba(201,167,105,0.04));
+    border: 1px solid rgba(201,167,105,0.35);
+}
+.first-run-dismiss {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted, #999);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 50%;
+}
+.first-run-dismiss:hover { background: rgba(255,255,255,0.06); }
+.first-run-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gold, #c9a769);
+    margin-bottom: 4px;
+}
+.first-run-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 6px 0;
+    color: var(--text, #fff);
+}
+.first-run-body {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-secondary, #bbb);
+    margin: 0 0 14px 0;
+}
+.first-run-alt {
+    margin-top: 10px;
+    text-align: center;
+}
+.first-run-alt .btn {
+    background: transparent;
+    color: var(--text-muted, #999);
+    text-decoration: underline;
+}
+
 .coach-upsell {
     margin-top: 10px;
     padding: 10px 12px;
