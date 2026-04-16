@@ -2092,7 +2092,24 @@ document.addEventListener('click', (e) => {
 // --- Barcode Scanner ---
 let barcodeScanner = null;
 
-function openBarcodeScanner() {
+// Lazy-load the ~200KB html5-qrcode bundle on first scanner open. Cached in
+// SW + browser cache after that, so the cost is paid once per device.
+let _html5QrcodeLoader = null;
+function _loadHtml5Qrcode() {
+    if (typeof Html5Qrcode !== 'undefined') return Promise.resolve();
+    if (_html5QrcodeLoader) return _html5QrcodeLoader;
+    _html5QrcodeLoader = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+        s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => { _html5QrcodeLoader = null; reject(new Error('Scanner library failed to load')); };
+        document.head.appendChild(s);
+    });
+    return _html5QrcodeLoader;
+}
+
+async function openBarcodeScanner() {
     const modal = document.getElementById('barcode-modal');
     if (!modal) return;
     modal.style.display = 'flex';
@@ -2100,11 +2117,14 @@ function openBarcodeScanner() {
     const resultEl = document.getElementById('barcode-result');
     if (resultEl) resultEl.style.display = 'none';
 
-    // Defensive: the scanner library is loaded from a CDN. If it failed to load
-    // (offline, blocked, slow network), don't crash — show a friendly fallback.
     if (typeof Html5Qrcode === 'undefined') {
-        if (statusEl) statusEl.innerHTML = 'Scanner unavailable offline.<br><small>Connect to the internet and reopen, or enter the food manually.</small>';
-        return;
+        if (statusEl) statusEl.textContent = 'Loading scanner\u2026';
+        try {
+            await _loadHtml5Qrcode();
+        } catch (e) {
+            if (statusEl) statusEl.innerHTML = 'Scanner unavailable offline.<br><small>Connect to the internet and reopen, or enter the food manually.</small>';
+            return;
+        }
     }
 
     if (statusEl) statusEl.textContent = 'Starting camera...';
