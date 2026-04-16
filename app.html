@@ -14,6 +14,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Iron Faith">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
     <meta property="og:type" content="website">
     <meta property="og:title" content="Iron Faith &mdash; Strengthen Body &amp; Spirit">
     <meta property="og:description" content="Fitness + faith in one app. Workouts, nutrition, prayer journal, AI coach.">
@@ -44,7 +46,7 @@
                 <p class="onboarding-sub">Let's personalize your experience</p>
                 <div class="form-group"><label>Your Name</label><input type="text" id="ob-name" placeholder="Enter your name"></div>
                 <div class="form-group"><label>Gender</label><div class="unit-toggle"><button class="unit-btn active" id="ob-male" onclick="obSetGender('male')">Male</button><button class="unit-btn" id="ob-female" onclick="obSetGender('female')">Female</button></div></div>
-                <div class="form-row"><div class="form-group"><label>Age</label><input type="number" id="ob-age" placeholder="Age"></div><div class="form-group"><label>Weight (lbs)</label><input type="number" id="ob-weight" placeholder="lbs" step="0.1"></div></div>
+                <div class="form-row"><div class="form-group"><label>Age</label><input type="number" id="ob-age" placeholder="Age" min="13" required></div><div class="form-group"><label>Weight (lbs)</label><input type="number" id="ob-weight" placeholder="lbs" step="0.1"></div></div>
                 <div class="form-group"><label>Height</label><div class="form-row"><input type="number" id="ob-feet" placeholder="Feet" min="3" max="8"><input type="number" id="ob-inches" placeholder="Inches" min="0" max="11"></div></div>
                 <button class="btn btn-primary btn-full" onclick="nextOnboardingStep()">Continue</button>
             </div>
@@ -1056,6 +1058,9 @@
                     <button class="btn btn-danger" onclick="clearAllData()">Clear All Data</button>
                 </div>
                 <div class="btn-row" style="margin-top:8px">
+                    <button class="btn btn-danger" onclick="deleteMyAccount()">Delete My Account</button>
+                </div>
+                <div class="btn-row" style="margin-top:8px">
                     <button class="btn btn-secondary btn-sm" onclick="viewErrorLog()">View Error Log</button>
                 </div>
             </div>
@@ -1067,7 +1072,7 @@
                     <span class="about-sep">&middot;</span>
                     <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a>
                 </div>
-                <p class="about-version">Iron Faith &middot; v1.0</p>
+                <p class="about-version">Iron Faith &middot; v1.1</p>
                 <p class="about-tagline">Strengthen your body. Strengthen your spirit.</p>
             </div>
         </section>

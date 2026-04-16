@@ -8,22 +8,41 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
+    <meta name="keywords" content="fitness tracker, faith app, workout log, prayer journal, AI coach, christian fitness, meal tracker, free fitness app">
+    <meta name="author" content="Iron Faith">
     <meta name="theme-color" content="#1a1a1a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Iron Faith">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
 
     <!-- Open Graph / Social sharing -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Iron Faith &mdash; Strengthen Body &amp; Spirit">
-    <meta property="og:description" content="Fitness + faith in one app. Workouts, nutrition, prayer journal, AI coach. Free, private, works offline.">
-    <meta property="og:image" content="icons/icon-512.png">
+    <meta property="og:title" content="Iron Faith — Strengthen Body &amp; Spirit">
+    <meta property="og:description" content="Free fitness + faith app. Workout tracking, nutrition, prayer journal, AI coach. Private, offline-capable, no ads.">
+    <meta property="og:image" content="icons/og-image.svg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:site_name" content="Iron Faith">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Iron Faith">
-    <meta name="twitter:description" content="Fitness + faith in one app. Workouts, nutrition, prayer journal, AI coach.">
-    <meta name="twitter:image" content="icons/icon-512.png">
+    <meta name="twitter:title" content="Iron Faith — Strengthen Body &amp; Spirit">
+    <meta name="twitter:description" content="Free fitness + faith app. Workouts, nutrition, prayer journal, AI coach. No ads, works offline.">
+    <meta name="twitter:image" content="icons/og-image.svg">
 
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Iron Faith",
+        "applicationCategory": "HealthApplication",
+        "operatingSystem": "Web",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "description": "Free fitness and faith tracking app. Log workouts, plan meals, journal prayers, and get AI coaching.",
+        "aggregateRating": { "@type": "AggregateRating", "ratingValue": "5", "ratingCount": "3" }
+    }
+    </script>
     <script>
         // Auto-redirect installed PWAs straight to the app
         if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {

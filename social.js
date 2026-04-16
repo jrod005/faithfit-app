@@ -89,6 +89,15 @@ function setAuthLoading(btnSelector, loading) {
     }
 }
 
+const _authAttempts = [];
+function isAuthRateLimited() {
+    const now = Date.now();
+    while (_authAttempts.length && _authAttempts[0] < now - 60000) _authAttempts.shift();
+    if (_authAttempts.length >= 5) return true;
+    _authAttempts.push(now);
+    return false;
+}
+
 function validateEmail(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -121,6 +130,7 @@ async function socialSignUp() {
     if (!validateEmail(email)) return showFieldError('signup-email', 'Enter a valid email address');
     if (!pass) return showFieldError('signup-password', 'Password is required');
     if (pass.length < 6) return showFieldError('signup-password', 'Must be 6+ characters');
+    if (isAuthRateLimited()) return showToast('Too many attempts — please wait a minute');
 
     const btnSel = '#auth-signup .btn-primary';
     setAuthLoading(btnSel, true);
@@ -207,6 +217,7 @@ async function socialSignIn() {
     if (!email) return showFieldError('login-email', 'Email is required');
     if (!validateEmail(email)) return showFieldError('login-email', 'Enter a valid email address');
     if (!pass) return showFieldError('login-password', 'Password is required');
+    if (isAuthRateLimited()) return showToast('Too many attempts — please wait a minute');
 
     const btnSel = '#auth-login .btn-primary';
     setAuthLoading(btnSel, true);

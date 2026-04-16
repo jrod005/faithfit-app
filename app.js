@@ -3217,6 +3217,47 @@ async function clearAllData() {
     location.reload();
 }
 
+async function deleteMyAccount() {
+    let signedIn = (typeof currentUser !== 'undefined' && !!currentUser);
+    if (!signedIn) {
+        try {
+            const s = JSON.parse(localStorage.getItem('ironfaith-direct-session') || 'null');
+            signedIn = !!(s && s.user);
+        } catch (_) {}
+    }
+    if (!signedIn) {
+        showToast('You are not signed in — use "Clear All Data" to remove local data.');
+        return;
+    }
+    const ok1 = await confirmDialog(
+        'This will permanently delete your account, cloud backup, and all local data. This cannot be undone.',
+        { danger: true, okText: 'Continue' }
+    );
+    if (!ok1) return;
+    const ok2 = await confirmDialog(
+        'Final confirmation — delete everything and sign out?',
+        { danger: true, okText: 'Delete My Account' }
+    );
+    if (!ok2) return;
+    if (typeof deleteCloudDataForCurrentUser === 'function') {
+        try {
+            await deleteCloudDataForCurrentUser();
+        } catch (e) {
+            console.error('Cloud delete threw', e);
+        }
+    }
+    try { localStorage.removeItem('ironfaith-direct-session'); } catch (_) {}
+    try { localStorage.removeItem('ironfaith-auth'); } catch (_) {}
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('faithfit_')) toRemove.push(k);
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+    showToast('Account deleted. Reloading...', 'success');
+    setTimeout(() => location.reload(), 1200);
+}
+
 // --- Utilities ---
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -5684,8 +5725,10 @@ function nextOnboardingStep() {
         const name = document.getElementById('ob-name').value.trim();
         if (!name) { alert('Please enter your name.'); return; }
         const ageVal = parseInt(document.getElementById('ob-age').value);
-        if (ageVal && ageVal < 13) {
-            alert('Iron Faith is for users 13 and older. Thanks for understanding.');
+        if (!ageVal || ageVal < 13) {
+            alert(ageVal && ageVal < 13
+                ? 'Iron Faith is for users 13 and older. Thanks for understanding.'
+                : 'Please enter your age.');
             return;
         }
     }
@@ -5753,6 +5796,10 @@ function nextOnboardingStep() {
 function completeOnboarding() {
     const name = document.getElementById('ob-name').value.trim();
     const age = parseInt(document.getElementById('ob-age').value) || 0;
+    if (age > 0 && age < 13) {
+        alert('Iron Faith is for users 13 and older.');
+        return;
+    }
     const rawWeight = parseFloat(document.getElementById('ob-weight').value) || 0;
     const feet = parseInt(document.getElementById('ob-feet').value) || 0;
     const inches = parseInt(document.getElementById('ob-inches').value) || 0;

@@ -5521,3 +5521,20 @@ body {
     background: #ffffff;
     border-bottom-color: #e0e0e0;
 }
+
+/* ========== GLOBAL ERROR BANNER ========== */
+.global-error-banner {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
+    background: #dc2626; color: #fff; padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; animation: slideDown 0.3s ease-out;
+}
+.global-error-icon { font-size: 20px; flex-shrink: 0; }
+.global-error-body { flex: 1; min-width: 0; }
+.global-error-body strong { display: block; font-size: 14px; }
+.global-error-msg { opacity: 0.85; word-break: break-word; }
+.global-error-close {
+    background: none; border: none; color: #fff; font-size: 22px;
+    cursor: pointer; padding: 4px 8px; flex-shrink: 0;
+}
+@keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }

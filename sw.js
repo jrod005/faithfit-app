@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ironfaith-v114';
+const CACHE_NAME = 'ironfaith-v115';
 
 // Allow the page to tell a waiting SW to take over immediately
 self.addEventListener('message', (event) => {
@@ -29,6 +29,8 @@ const ASSETS = [
     './basic-app.js',
     './basic-styles.css',
     './manifest.json',
+    './offline.html',
+    './404.html',
     'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
 ];
 
@@ -106,6 +108,6 @@ self.addEventListener('fetch', e => {
                 }
                 return response;
             })
-            .catch(() => caches.match(e.request))
+            .catch(() => caches.match(e.request).then(r => r || (e.request.mode === 'navigate' ? caches.match('./offline.html') : undefined)))
     );
 });

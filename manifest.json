@@ -1,7 +1,7 @@
 {
     "name": "Iron Faith - Fitness & Faith Tracker",
     "short_name": "Iron Faith",
-    "description": "Strengthen body & spirit. Track workouts, nutrition, and faith.",
+    "description": "Free fitness and faith app. Track workouts, log meals, write prayers, and get AI coaching — all in one app that works offline. No ads, your data stays private.",
     "start_url": "./app.html",
     "scope": "./",
     "display": "standalone",
@@ -9,6 +9,24 @@
     "theme_color": "#1a1a1a",
     "orientation": "portrait",
     "categories": ["health", "fitness", "lifestyle"],
+    "lang": "en-US",
+    "dir": "ltr",
+    "screenshots": [
+        {
+            "src": "icons/screenshot-wide.png",
+            "sizes": "1280x720",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "Iron Faith dashboard with workout stats and daily verse"
+        },
+        {
+            "src": "icons/screenshot-narrow.png",
+            "sizes": "750x1334",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Iron Faith mobile workout tracker"
+        }
+    ],
     "icons": [
         {
             "src": "icons/icon-192.png",
@@ -42,5 +60,7 @@
             "url": "./app.html#coach",
             "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
         }
-    ]
+    ],
+    "related_applications": [],
+    "prefer_related_applications": false
 }

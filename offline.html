@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline — Iron Faith</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0e0e0e; color: #e0e0e0;
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; text-align: center; padding: 24px;
+        }
+        .wrap { max-width: 360px; }
+        .icon { font-size: 64px; margin-bottom: 16px; }
+        h1 { font-size: 22px; margin-bottom: 8px; font-weight: 600; }
+        p { font-size: 14px; color: #888; margin-bottom: 24px; line-height: 1.5; }
+        button {
+            background: #fff; color: #0e0e0e; border: none; border-radius: 10px;
+            padding: 12px 28px; font-size: 15px; font-weight: 600; cursor: pointer;
+        }
+        .verse { font-size: 13px; color: #666; margin-top: 32px; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="icon">&#x26A0;</div>
+        <h1>You're offline</h1>
+        <p>Iron Faith needs an internet connection for this page. Check your connection and try again.</p>
+        <button onclick="location.reload()">Try Again</button>
+        <p class="verse">"The LORD is my strength and my shield; my heart trusts in him." — Psalm 28:7</p>
+    </div>
+</body>
+</html>
