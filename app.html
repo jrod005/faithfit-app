@@ -225,6 +225,7 @@
                 </div>
                 <textarea id="prayer-journal-input" placeholder="What are you thankful for today? What are you praying for?" rows="3"></textarea>
                 <button class="btn btn-primary btn-full" onclick="savePrayerEntry()">Save Entry</button>
+                <input type="text" id="prayer-search" class="prayer-search hidden" placeholder="Search prayers..." oninput="renderPrayerHistory()">
                 <div id="prayer-journal-history" class="prayer-journal-history hidden"></div>
             </div>
 
@@ -279,7 +280,11 @@
             </div>
 
             <div class="card">
-                <h2>Recent Workouts</h2>
+                <div class="section-header-row">
+                    <h2>Recent Workouts</h2>
+                    <button class="btn btn-sm btn-secondary" onclick="toggleWorkoutSearch()">Search</button>
+                </div>
+                <input type="text" id="workout-search" class="workout-search hidden" placeholder="Search by exercise name..." oninput="filterWorkoutHistory()">
                 <div id="recent-workouts" class="recent-list">
                     <div class="empty-state-card">
                         <div class="empty-state-icon">&#x1F4AA;</div>
@@ -313,6 +318,10 @@
                     <button class="hub-btn hub-btn-empty" onclick="showHubView('empty')">
                         <span class="hub-icon">&#x1F4AA;</span>
                         <span class="hub-label">Empty Workout</span>
+                    </button>
+                    <button class="hub-btn" onclick="showPlateCalc()">
+                        <span class="hub-icon">&#x1F3CB;</span>
+                        <span class="hub-label">Plate Calc</span>
                     </button>
                     <button class="hub-btn" onclick="showHubView('export')">
                         <span class="hub-icon">&#x1F4E5;</span>
@@ -650,21 +659,21 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Calories</label>
-                        <input type="number" id="meal-calories" placeholder="kcal">
+                        <input type="number" id="meal-calories" placeholder="kcal" inputmode="numeric">
                     </div>
                     <div class="form-group">
                         <label>Protein (g)</label>
-                        <input type="number" id="meal-protein" placeholder="g">
+                        <input type="number" id="meal-protein" placeholder="g" inputmode="numeric">
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>Carbs (g)</label>
-                        <input type="number" id="meal-carbs" placeholder="g">
+                        <input type="number" id="meal-carbs" placeholder="g" inputmode="numeric">
                     </div>
                     <div class="form-group">
                         <label>Fat (g)</label>
-                        <input type="number" id="meal-fat" placeholder="g">
+                        <input type="number" id="meal-fat" placeholder="g" inputmode="numeric">
                     </div>
                 </div>
                 <div class="form-row" style="gap:8px;">
@@ -738,6 +747,14 @@
                         <p class="empty-state-sub">Search the food database or add a meal manually to track your calories.</p>
                     </div>
                 </div>
+            </div>
+
+            <div class="card">
+                <div class="section-header-row">
+                    <h2>Quick Add</h2>
+                    <button class="btn btn-sm btn-secondary" onclick="copyYesterdayMeals()">Copy Yesterday</button>
+                </div>
+                <div id="recent-meals-list" class="recent-meals-list"></div>
             </div>
         </section>
 

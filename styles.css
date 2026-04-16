@@ -5358,3 +5358,65 @@ body {
     text-decoration: none; transition: top 0.2s;
 }
 .skip-to-content:focus { top: 10px; }
+
+/* ========== UNDO TOAST ========== */
+.toast-undo {
+    display: flex; align-items: center; gap: 12px;
+}
+.undo-btn {
+    background: none; border: 1px solid rgba(255,255,255,0.4); color: #fff;
+    border-radius: 6px; padding: 4px 12px; font-size: 13px; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
+}
+
+/* ========== RECENT MEALS QUICK ADD ========== */
+.section-header-row {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+}
+.section-header-row h2 { margin: 0; }
+.recent-meals-list { display: flex; flex-direction: column; gap: 6px; }
+.recent-meal-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; border-radius: var(--radius-md);
+    background: var(--card-bg); border: 1px solid var(--border);
+    cursor: pointer; transition: background 0.15s;
+}
+.recent-meal-item:active { background: var(--border); }
+.recent-meal-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.recent-meal-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent-meal-macros { font-size: 12px; color: var(--text-muted); }
+.recent-meal-add {
+    font-size: 22px; font-weight: 700; color: var(--text-muted);
+    width: 32px; height: 32px; display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0;
+}
+
+/* ========== SEARCH BARS ========== */
+.workout-search, .prayer-search {
+    width: 100%; padding: 8px 12px; margin-bottom: 10px;
+    border-radius: var(--radius-md); border: 1px solid var(--border);
+    background: var(--card-bg); color: var(--text-primary);
+    font-size: 14px; font-family: inherit;
+}
+
+/* ========== COACH COPY BUTTON ========== */
+.coach-copy-btn {
+    position: absolute; top: 6px; right: 6px;
+    background: none; border: none; cursor: pointer;
+    font-size: 14px; opacity: 0; transition: opacity 0.15s;
+    padding: 4px 6px; border-radius: 4px;
+}
+.coach-msg.bot { position: relative; }
+.coach-msg.bot:hover .coach-copy-btn { opacity: 0.6; }
+.coach-copy-btn:hover { opacity: 1 !important; background: rgba(255,255,255,0.1); }
+
+/* ========== PLATE CALCULATOR ========== */
+.plate-calc-dialog { max-width: 340px; }
+
+[data-theme="light"] .recent-meal-item { background: #fafafa; border-color: #e4e4e7; }
+[data-theme="light"] .recent-meal-item:active { background: #f0f0f0; }
+[data-theme="light"] .workout-search, [data-theme="light"] .prayer-search {
+    background: #fff; border-color: #e0e0e0;
+}
+[data-theme="light"] .undo-btn { border-color: rgba(0,0,0,0.3); color: #333; }
+[data-theme="light"] .coach-copy-btn:hover { background: rgba(0,0,0,0.05); }

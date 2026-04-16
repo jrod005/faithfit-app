@@ -179,6 +179,21 @@ function renderBotMessage(html, time, animate, suggestions, planId) {
         });
     }
 
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'coach-copy-btn';
+    copyBtn.innerHTML = '&#x1F4CB;';
+    copyBtn.title = 'Copy message';
+    copyBtn.onclick = () => {
+        const plain = msg.innerText || msg.textContent || '';
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(plain).then(
+                () => { copyBtn.textContent = '\u2713'; setTimeout(() => copyBtn.innerHTML = '&#x1F4CB;', 1500); },
+                () => { if (typeof showToast === 'function') showToast('Could not copy', 'error'); }
+            );
+        }
+    };
+    msg.appendChild(copyBtn);
+
     wrap.appendChild(msg);
 
     const meta = document.createElement('div');

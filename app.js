@@ -1522,27 +1522,44 @@ function savePrayerEntry() {
 }
 
 async function deletePrayerEntry(timestamp) {
-    const ok = await confirmDialog('Delete this entry?', { danger: true, okText: 'Delete' });
-    if (!ok) return;
-    const entries = getPrayerEntries().filter(e => e.timestamp !== timestamp);
-    DB.set('prayerEntries', entries);
+    const entries = getPrayerEntries();
+    const deleted = entries.find(e => e.timestamp === timestamp);
+    const remaining = entries.filter(e => e.timestamp !== timestamp);
+    DB.set('prayerEntries', remaining);
     renderPrayerHistory();
+    if (deleted) {
+        showUndoToast('Prayer entry deleted', () => {
+            const current = getPrayerEntries();
+            current.push(deleted);
+            current.sort((a, b) => a.timestamp - b.timestamp);
+            DB.set('prayerEntries', current);
+            renderPrayerHistory();
+        });
+    }
 }
 
 function togglePrayerHistory() {
     const wrap = document.getElementById('prayer-journal-history');
+    const search = document.getElementById('prayer-search');
     if (!wrap) return;
     wrap.classList.toggle('hidden');
+    if (search) {
+        search.classList.toggle('hidden', wrap.classList.contains('hidden'));
+        if (!wrap.classList.contains('hidden')) search.value = '';
+    }
     if (!wrap.classList.contains('hidden')) renderPrayerHistory();
 }
 
 function renderPrayerHistory() {
     const wrap = document.getElementById('prayer-journal-history');
     if (!wrap || wrap.classList.contains('hidden')) return;
-    const entries = getPrayerEntries().slice().reverse();
+    const query = (document.getElementById('prayer-search')?.value || '').toLowerCase().trim();
+    let entries = getPrayerEntries().slice().reverse();
+    if (query) entries = entries.filter(e => e.text.toLowerCase().includes(query) || e.date.includes(query));
     if (entries.length === 0) {
-        wrap.innerHTML = `
-            <div class="empty-state-card">
+        wrap.innerHTML = query
+            ? `<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px;">No entries matching "${escapeHtml(query)}"</p>`
+            : `<div class="empty-state-card">
                 <div class="empty-state-icon">&#x270D;</div>
                 <p class="empty-state-title">No prayers logged yet</p>
                 <p class="empty-state-sub">Write your first prayer or gratitude above &mdash; even one line counts.</p>
@@ -2392,18 +2409,31 @@ function logMeal() {
     updateNutritionBars();
     updateDashboard();
     checkAchievements();
+    renderRecentMeals();
     if (!navigator.onLine) {
         showToast('Saved offline — will sync when you reconnect', 'info');
     }
 }
 
 function deleteMeal(timestamp) {
-    let meals = DB.get('meals', []);
-    meals = meals.filter(m => m.timestamp !== timestamp);
-    DB.set('meals', meals);
+    const meals = DB.get('meals', []);
+    const deleted = meals.find(m => m.timestamp === timestamp);
+    const remaining = meals.filter(m => m.timestamp !== timestamp);
+    DB.set('meals', remaining);
     updateMealsList();
     updateNutritionBars();
     updateDashboard();
+    if (deleted) {
+        showUndoToast('Meal deleted', () => {
+            const current = DB.get('meals', []);
+            current.push(deleted);
+            current.sort((a, b) => a.timestamp - b.timestamp);
+            DB.set('meals', current);
+            updateMealsList();
+            updateNutritionBars();
+            updateDashboard();
+        });
+    }
 }
 
 function updateMealsList() {
@@ -3168,14 +3198,25 @@ function shareHistoryWorkout(timestamp) {
 
 async function deleteWorkout(timestamp) {
     if (!timestamp) return;
-    const ok = await confirmDialog('Delete this workout? This cannot be undone.', { danger: true, okText: 'Delete' });
+    const ok = await confirmDialog('Delete this workout?', { danger: true, okText: 'Delete' });
     if (!ok) return;
-    const workouts = DB.get('workouts', []).filter(w => w.timestamp !== timestamp);
-    DB.set('workouts', workouts);
+    const workouts = DB.get('workouts', []);
+    const deleted = workouts.find(w => w.timestamp === timestamp);
+    const remaining = workouts.filter(w => w.timestamp !== timestamp);
+    DB.set('workouts', remaining);
     updateDashboard();
     if (typeof updateTodaysExercises === 'function') updateTodaysExercises();
     if (typeof updateOverloadDropdown === 'function') updateOverloadDropdown();
-    showToast('Workout deleted', 'success');
+    if (deleted) {
+        showUndoToast('Workout deleted', () => {
+            const current = DB.get('workouts', []);
+            current.push(deleted);
+            current.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+            DB.set('workouts', current);
+            updateDashboard();
+            if (typeof updateTodaysExercises === 'function') updateTodaysExercises();
+        });
+    }
 }
 
 // --- Data Management ---
@@ -3275,6 +3316,216 @@ function escapeHtml(str) {
     div.textContent = str;
     return div.innerHTML;
 }
+
+// --- Undo System ---
+let _undoState = null;
+let _undoTimer = null;
+
+function showUndoToast(message, undoFn) {
+    clearTimeout(_undoTimer);
+    const existing = document.querySelector('.toast-undo');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-info toast-undo show';
+    toast.innerHTML = `<span class="toast-msg">${message}</span><button class="undo-btn" onclick="executeUndo()">Undo</button>`;
+    document.body.appendChild(toast);
+    _undoState = undoFn;
+    _undoTimer = setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+        _undoState = null;
+    }, 5000);
+}
+
+function executeUndo() {
+    if (_undoState) {
+        _undoState();
+        _undoState = null;
+    }
+    clearTimeout(_undoTimer);
+    const toast = document.querySelector('.toast-undo');
+    if (toast) { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }
+}
+
+// --- Meal Quick-Add from History ---
+function getRecentUniqueMeals() {
+    const meals = DB.get('meals', []);
+    const seen = new Set();
+    const result = [];
+    for (let i = meals.length - 1; i >= 0 && result.length < 8; i--) {
+        const key = meals[i].name.toLowerCase();
+        if (!seen.has(key)) {
+            seen.add(key);
+            result.push(meals[i]);
+        }
+    }
+    return result;
+}
+
+function renderRecentMeals() {
+    const container = document.getElementById('recent-meals-list');
+    if (!container) return;
+    const recent = getRecentUniqueMeals();
+    if (recent.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">Log a few meals and they\'ll appear here for quick re-logging.</p>';
+        return;
+    }
+    container.innerHTML = recent.map(m => `
+        <div class="recent-meal-item" onclick="quickAddMeal('${escapeHtml(m.name).replace(/'/g, "\\'")}', ${m.calories}, ${m.protein}, ${m.carbs}, ${m.fat})">
+            <div class="recent-meal-info">
+                <span class="recent-meal-name">${escapeHtml(m.name)}</span>
+                <span class="recent-meal-macros">${m.calories} cal &middot; ${m.protein}g P</span>
+            </div>
+            <span class="recent-meal-add">+</span>
+        </div>
+    `).join('');
+}
+
+function quickAddMeal(name, cal, protein, carbs, fat) {
+    const meals = DB.get('meals', []);
+    const entry = { date: today(), name, calories: cal, protein, carbs, fat, timestamp: Date.now() };
+    meals.push(entry);
+    DB.set('meals', meals);
+    updateMealsList();
+    updateNutritionBars();
+    updateDashboard();
+    showToast(`Added ${name}`, 'success');
+}
+
+function copyYesterdayMeals() {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yStr = yesterday.toISOString().split('T')[0];
+    const yMeals = DB.get('meals', []).filter(m => m.date === yStr);
+    if (yMeals.length === 0) {
+        showToast('No meals logged yesterday');
+        return;
+    }
+    const meals = DB.get('meals', []);
+    let count = 0;
+    yMeals.forEach(m => {
+        meals.push({ ...m, date: today(), timestamp: Date.now() + count });
+        count++;
+    });
+    DB.set('meals', meals);
+    updateMealsList();
+    updateNutritionBars();
+    updateDashboard();
+    showToast(`Copied ${yMeals.length} meal${yMeals.length > 1 ? 's' : ''} from yesterday`, 'success');
+}
+
+// --- Workout History Search ---
+function toggleWorkoutSearch() {
+    const input = document.getElementById('workout-search');
+    if (!input) return;
+    input.classList.toggle('hidden');
+    if (!input.classList.contains('hidden')) {
+        input.focus();
+        input.value = '';
+    } else {
+        input.value = '';
+        updateRecentWorkouts();
+    }
+}
+
+function filterWorkoutHistory() {
+    const query = (document.getElementById('workout-search')?.value || '').toLowerCase().trim();
+    if (!query) return updateRecentWorkouts();
+
+    const workouts = DB.get('workouts', []).filter(w => w.name.toLowerCase().includes(query)).slice(-20).reverse();
+    const container = document.getElementById('recent-workouts');
+    if (workouts.length === 0) {
+        container.innerHTML = `<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px;">No workouts matching "${escapeHtml(query)}"</p>`;
+        return;
+    }
+    container.innerHTML = workouts.map(w => {
+        const totalVol = w.sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
+        const bestSet = w.sets.reduce((best, s) => s.weight > best.weight ? s : best, w.sets[0]);
+        const ts = w.timestamp || 0;
+        const safeName = escapeHtml(w.name).replace(/'/g, '&#39;');
+        return `
+            <div class="workout-item">
+                <div class="workout-item-main" onclick="showExerciseInfo('${safeName}')">
+                    <h4>${escapeHtml(w.name)}</h4>
+                    <p>${w.date} &middot; ${w.sets.length} sets &middot; Best: ${lbsToDisplay(bestSet.weight)}${wu()} x ${bestSet.reps}</p>
+                </div>
+                <div class="workout-item-actions">
+                    <span class="workout-item-vol">${parseFloat(lbsToDisplay(totalVol)).toLocaleString()} ${wu()}</span>
+                    <button class="workout-item-del" title="Delete" onclick="deleteWorkout(${ts})">&times;</button>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+// --- Plate Calculator ---
+function showPlateCalc() {
+    const units = getCurrentUnits();
+    const barWeight = units === 'metric' ? 20 : 45;
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.innerHTML = `
+        <div class="confirm-dialog plate-calc-dialog">
+            <h3 style="margin-bottom:12px">Plate Calculator</h3>
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Bar weight: ${barWeight} ${units === 'metric' ? 'kg' : 'lbs'}</p>
+            <div class="form-group">
+                <label>Target Weight (${units === 'metric' ? 'kg' : 'lbs'})</label>
+                <input type="number" id="plate-target" inputmode="numeric" placeholder="e.g. ${units === 'metric' ? '100' : '225'}" autofocus>
+            </div>
+            <div id="plate-result" style="margin:12px 0;font-size:14px;min-height:40px;"></div>
+            <div class="confirm-actions">
+                <button class="btn btn-secondary" onclick="this.closest('.confirm-overlay').remove()">Close</button>
+                <button class="btn btn-primary" onclick="calcPlates()">Calculate</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('show'));
+    document.getElementById('plate-target').addEventListener('keydown', e => {
+        if (e.key === 'Enter') calcPlates();
+    });
+}
+
+function calcPlates() {
+    const units = getCurrentUnits();
+    const barWeight = units === 'metric' ? 20 : 45;
+    const plates = units === 'metric' ? [25, 20, 15, 10, 5, 2.5, 1.25] : [45, 35, 25, 10, 5, 2.5];
+    const target = parseFloat(document.getElementById('plate-target')?.value);
+    const resultEl = document.getElementById('plate-result');
+    if (!resultEl) return;
+    if (!target || target <= barWeight) {
+        resultEl.innerHTML = target === barWeight
+            ? '<p>Just the bar!</p>'
+            : `<p style="color:var(--text-muted)">Enter a weight above ${barWeight} ${units === 'metric' ? 'kg' : 'lbs'}</p>`;
+        return;
+    }
+    let perSide = (target - barWeight) / 2;
+    const needed = [];
+    for (const plate of plates) {
+        const count = Math.floor(perSide / plate);
+        if (count > 0) {
+            needed.push(`${count} x ${plate}`);
+            perSide -= count * plate;
+        }
+    }
+    if (perSide > 0.1) {
+        resultEl.innerHTML = `<p style="color:#f87171">Can't make exactly ${target} with standard plates. Closest: ${target - perSide * 2}</p>`;
+    } else {
+        resultEl.innerHTML = `<p><strong>Each side:</strong></p><p style="font-size:18px;font-weight:700;margin:6px 0">${needed.join(' + ')}</p>`;
+    }
+}
+
+// --- Responsive Chart Resize ---
+let _resizeTimer;
+window.addEventListener('resize', () => {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(() => {
+        if (typeof drawWeightChart === 'function') drawWeightChart();
+        if (typeof drawVolumeChart === 'function') drawVolumeChart();
+        if (typeof drawStrengthChart === 'function') drawStrengthChart();
+    }, 250);
+});
 
 // --- PWA Install ---
 let deferredPrompt = null;
@@ -6450,6 +6701,7 @@ function init() {
     safeCall('updateTodaysExercises', updateTodaysExercises);
     safeCall('updateOverloadDropdown', updateOverloadDropdown);
     safeCall('updateMealsList', updateMealsList);
+    safeCall('renderRecentMeals', renderRecentMeals);
     safeCall('updateNutritionBars', updateNutritionBars);
     safeCall('drawWeightChart', drawWeightChart);
     safeCall('renderAchievements', renderAchievements);
