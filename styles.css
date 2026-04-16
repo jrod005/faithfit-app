@@ -5421,6 +5421,45 @@ body {
 [data-theme="light"] .undo-btn { border-color: rgba(0,0,0,0.3); color: #333; }
 [data-theme="light"] .coach-copy-btn:hover { background: rgba(0,0,0,0.05); }
 
+/* ========== ONBOARDING SLIDE TRANSITIONS ========== */
+.onboarding-slide {
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.onboarding-slide.slide-out {
+    opacity: 0; transform: translateX(-30px);
+    pointer-events: none;
+}
+.onboarding-slide.slide-in {
+    opacity: 0; transform: translateX(30px);
+    animation: slideInRight 0.3s ease forwards;
+}
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(30px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* ========== SWIPE TO DELETE ========== */
+.swipeable {
+    position: relative; overflow: visible;
+    transition: transform 0.2s ease;
+}
+.swipeable::after {
+    content: 'Delete';
+    position: absolute; right: -80px; top: 0; bottom: 0;
+    width: 75px; display: flex; align-items: center; justify-content: center;
+    background: #dc2626; color: #fff; font-size: 13px; font-weight: 600;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+/* ========== CHART ENTRANCE ========== */
+canvas {
+    animation: chartFadeIn 0.5s ease;
+}
+@keyframes chartFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
 /* ========== PULL TO REFRESH ========== */
 .pull-refresh-indicator {
     text-align: center; font-size: 13px; color: var(--text-muted);

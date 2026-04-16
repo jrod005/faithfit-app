@@ -2451,7 +2451,7 @@ function updateMealsList() {
     }
 
     container.innerHTML = meals.map(m => `
-        <div class="meal-item">
+        <div class="meal-item swipeable">
             <div class="meal-info">
                 <h4>${escapeHtml(m.name)}</h4>
                 <p>P: ${m.protein}g | C: ${m.carbs}g | F: ${m.fat}g</p>
@@ -2460,6 +2460,7 @@ function updateMealsList() {
             <button class="delete-btn" onclick="deleteMeal(${m.timestamp})" title="Delete">&times;</button>
         </div>
     `).join('');
+    enableSwipeDelete(container);
 }
 
 function updateNutritionBars() {
@@ -2653,14 +2654,22 @@ function updateStreak() {
 
     const streakEl = document.getElementById('streak-count');
     if (streakEl) {
+        const prevStreak = parseInt(streakEl.dataset.countCurrent || '0') || 0;
         const fire = streakFire(streak);
         const fireHtml = fire ? ` <span class="streak-fire" aria-hidden="true">${fire}</span>` : '';
         animateCount(streakEl, streak, { suffix: ` day${streak !== 1 ? 's' : ''}` });
-        // append fire after animation tick
         setTimeout(() => {
             if (streakEl.querySelector('.streak-fire')) return;
             if (fireHtml) streakEl.innerHTML = streakEl.textContent + fireHtml;
         }, 720);
+        const milestones = [7, 14, 21, 30, 50, 75, 100, 150, 200, 365];
+        if (streak > prevStreak && milestones.includes(streak)) {
+            setTimeout(() => {
+                showToast(`${streak}-day streak! Keep it going!`, 'success');
+                haptic(150);
+                if (typeof showCompletionBurst === 'function') showCompletionBurst();
+            }, 800);
+        }
     }
 }
 
@@ -3141,7 +3150,7 @@ function updateRecentWorkouts() {
         const dur = formatDuration(w.durationMs);
         const durHtml = dur ? ` &middot; <span class="workout-item-dur">&#x23F1; ${dur}</span>` : '';
         return `
-            <div class="workout-item">
+            <div class="workout-item swipeable">
                 <div class="workout-item-main info-tappable" onclick="showExerciseInfo('${safeName}')">
                     <h4>${escapeHtml(w.name)} ${prBadge} <span class="info-icon">&#9432;</span></h4>
                     <p>${w.date} &middot; ${w.sets.length} sets${durHtml} &middot; Best: ${lbsToDisplay(bestSet.weight)}${wu()} x ${bestSet.reps}</p>
@@ -3155,6 +3164,7 @@ function updateRecentWorkouts() {
             </div>
         `;
     }).join('');
+    enableSwipeDelete(container);
 }
 
 // Share a past workout session as a card. Aggregates all exercises that
@@ -3346,6 +3356,43 @@ function executeUndo() {
     clearTimeout(_undoTimer);
     const toast = document.querySelector('.toast-undo');
     if (toast) { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }
+}
+
+// --- Swipe-to-Delete ---
+function enableSwipeDelete(container) {
+    if (!container) return;
+    let startX = 0, currentEl = null, swiping = false;
+    container.addEventListener('touchstart', e => {
+        const item = e.target.closest('.swipeable');
+        if (!item) return;
+        startX = e.touches[0].clientX;
+        currentEl = item;
+        swiping = true;
+    }, { passive: true });
+    container.addEventListener('touchmove', e => {
+        if (!swiping || !currentEl) return;
+        const dx = e.touches[0].clientX - startX;
+        if (dx < -10) {
+            const offset = Math.max(dx, -100);
+            currentEl.style.transform = `translateX(${offset}px)`;
+            currentEl.style.transition = 'none';
+        }
+    }, { passive: true });
+    container.addEventListener('touchend', () => {
+        if (!currentEl) return;
+        const tx = parseFloat(currentEl.style.transform.replace(/[^-\d.]/g, '')) || 0;
+        if (tx < -60) {
+            currentEl.style.transition = 'transform 0.2s';
+            currentEl.style.transform = 'translateX(-100%)';
+            const delBtn = currentEl.querySelector('.delete-btn, .workout-item-del');
+            setTimeout(() => { if (delBtn) delBtn.click(); }, 250);
+        } else {
+            currentEl.style.transition = 'transform 0.2s';
+            currentEl.style.transform = '';
+        }
+        currentEl = null;
+        swiping = false;
+    }, { passive: true });
 }
 
 // --- Meal Quick-Add from History ---
@@ -5345,13 +5392,23 @@ function nextOnboardingStep() {
         }
     }
 
+    const prevStep = obStep;
     obStep++;
     const slides = document.querySelectorAll('.onboarding-slide');
     const dots = document.querySelectorAll('.step-dot');
-    slides.forEach(s => s.classList.remove('active'));
-    dots.forEach(d => d.classList.remove('active'));
+    const current = document.querySelector(`.onboarding-slide[data-step="${prevStep}"]`);
     const next = document.querySelector(`.onboarding-slide[data-step="${obStep}"]`);
-    if (next) next.classList.add('active');
+    if (current) {
+        current.classList.add('slide-out');
+        setTimeout(() => current.classList.remove('active', 'slide-out'), 250);
+    } else {
+        slides.forEach(s => s.classList.remove('active'));
+    }
+    dots.forEach(d => d.classList.remove('active'));
+    if (next) {
+        next.classList.add('slide-in');
+        setTimeout(() => { next.classList.add('active'); next.classList.remove('slide-in'); }, 260);
+    }
     if (dots[obStep - 1]) dots[obStep - 1].classList.add('active');
 }
 
