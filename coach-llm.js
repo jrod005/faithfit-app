@@ -139,9 +139,48 @@ function buildCoachLLMUserContext(ctx) {
     }
 
     lines.push('');
-    lines.push(`Today: ${ctx.todayWorkouts.length} set(s) logged, ${ctx.todayMeals.length} meal(s) logged.`);
+    const streak = computeCoachStreak(ctx.workouts || []);
+    lines.push(`Current training streak: ${streak} consecutive day(s).`);
+
+    const tw = ctx.todayWorkouts || [];
+    const tm = ctx.todayMeals || [];
+    lines.push(`Today: ${tw.length} set(s) logged, ${tm.length} meal(s) logged.`);
+    if (tw.length) {
+        tw.slice(0, 10).forEach(w => {
+            const top = w.sets?.length ? Math.max(...w.sets.map(s => s.weight || 0)) : 0;
+            const reps = w.sets?.length ? w.sets.map(s => s.reps).join('/') : '';
+            lines.push(`  • ${w.name}: top ${top}×${reps}`);
+        });
+    }
+    if (tm.length) {
+        const totals = tm.reduce((a, m) => ({
+            cal: a.cal + (m.calories || 0),
+            p: a.p + (m.protein || 0),
+            c: a.c + (m.carbs || 0),
+            f: a.f + (m.fat || 0),
+        }), { cal: 0, p: 0, c: 0, f: 0 });
+        lines.push(`  Today's intake so far: ${Math.round(totals.cal)} kcal, ${Math.round(totals.p)}p / ${Math.round(totals.c)}c / ${Math.round(totals.f)}f`);
+    }
 
     return lines.join('\n');
+}
+
+function computeCoachStreak(workouts) {
+    if (!workouts || !workouts.length) return 0;
+    const dates = new Set(workouts.map(w => w.date));
+    const d = new Date();
+    const toStr = x => x.toISOString().split('T')[0];
+    if (!dates.has(toStr(d))) {
+        d.setDate(d.getDate() - 1);
+        if (!dates.has(toStr(d))) return 0;
+    }
+    let streak = 1;
+    for (let i = 0; i < 365; i++) {
+        d.setDate(d.getDate() - 1);
+        if (dates.has(toStr(d))) streak++;
+        else break;
+    }
+    return streak;
 }
 
 // Pull recent user/bot exchanges from persistent history. The last entry

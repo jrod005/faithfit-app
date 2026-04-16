@@ -27,13 +27,13 @@
         {
             "name": "Start Workout",
             "short_name": "Workout",
-            "url": "./app.html#workouts",
+            "url": "./app.html#workout",
             "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
         },
         {
             "name": "Log Meal",
             "short_name": "Meal",
-            "url": "./app.html#nutrition",
+            "url": "./app.html#dashboard",
             "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
         },
         {

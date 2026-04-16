@@ -665,13 +665,21 @@ async function directSelect(path) {
             if (typeof showToast === 'function') showToast('Please sign in to continue');
             return null;
         }
-        const resp = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
-            headers: {
-                apikey: SUPABASE_ANON_KEY,
-                Authorization: 'Bearer ' + sessInfo.token,
-            },
-            cache: 'no-store',
-        });
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 10000);
+        let resp;
+        try {
+            resp = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+                headers: {
+                    apikey: SUPABASE_ANON_KEY,
+                    Authorization: 'Bearer ' + sessInfo.token,
+                },
+                cache: 'no-store',
+                signal: ctrl.signal,
+            });
+        } finally {
+            clearTimeout(timer);
+        }
         if (!resp.ok) {
             const body = await resp.text().catch(() => '');
             console.error('directSelect HTTP', resp.status, path, body);

@@ -2584,7 +2584,7 @@ function renderStreakProtector() {
                     <strong>${pending}-day streak at risk</strong>
                     <span>${hoursLeft}h left to log a workout today</span>
                 </div>
-                <button class="streak-protector-cta" onclick="switchTab('workouts')">Save it</button>
+                <button class="streak-protector-cta" onclick="switchTab('workout')">Save it</button>
                 <button class="streak-protector-close" aria-label="Dismiss" onclick="dismissStreakProtector()">&times;</button>
             </div>
         `;
@@ -6828,7 +6828,7 @@ function init() {
 
     // PWA shortcut deep-links: open to the tab named in location.hash
     const hash = (location.hash || '').replace(/^#/, '');
-    const validTabs = ['dashboard', 'workouts', 'nutrition', 'coach', 'progress', 'profile', 'social'];
+    const validTabs = ['dashboard', 'workout', 'coach', 'profile', 'social'];
     if (validTabs.includes(hash)) safeCall('switchTab', () => switchTab(hash));
 
     // Auto-fill exercise inputs from history when name changes
