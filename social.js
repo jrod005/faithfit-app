@@ -74,6 +74,21 @@ const BIBLE_VERSES = [
 
 // ========== AUTH ==========
 
+function setAuthLoading(btnSelector, loading) {
+    const btn = document.querySelector(btnSelector);
+    if (!btn) return;
+    if (loading) {
+        btn.dataset.origText = btn.textContent;
+        btn.textContent = 'Please wait...';
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+    } else {
+        btn.textContent = btn.dataset.origText || btn.textContent;
+        btn.disabled = false;
+        btn.style.opacity = '';
+    }
+}
+
 async function socialSignUp() {
     const name = document.getElementById('signup-name').value.trim();
     const email = document.getElementById('signup-email').value.trim();
@@ -81,7 +96,8 @@ async function socialSignUp() {
     if (!name || !email || !pass) return showToast('Fill in all fields');
     if (pass.length < 6) return showToast('Password must be 6+ characters');
 
-    // Direct REST signup so it works even when supabase-js is hung
+    const btnSel = '#auth-signup .btn-primary';
+    setAuthLoading(btnSel, true);
     try {
         const resp = await fetch(SUPABASE_URL + '/auth/v1/signup', {
             method: 'POST',
@@ -98,9 +114,9 @@ async function socialSignUp() {
         });
         const body = await resp.json().catch(() => ({}));
         if (!resp.ok) {
+            setAuthLoading(btnSel, false);
             return showToast(body.error_description || body.msg || ('Signup failed: HTTP ' + resp.status));
         }
-        // If a session came back (confirmations disabled), persist it and sign in
         if (body.access_token) {
             const session = {
                 access_token: body.access_token,
@@ -117,10 +133,45 @@ async function socialSignUp() {
             showToast('Account created!');
             await directProfileSetup();
         } else {
-            showToast('Account created! Check your email to confirm, then log in.');
+            showEmailVerificationPrompt(email);
         }
     } catch (e) {
         showToast('Signup failed: ' + (e.message || 'unknown'));
+    } finally {
+        setAuthLoading(btnSel, false);
+    }
+}
+
+function showEmailVerificationPrompt(email) {
+    const authEl = document.getElementById('social-auth');
+    if (!authEl) return;
+    authEl.innerHTML = `
+        <div class="card" style="text-align:center;padding:30px 22px">
+            <div style="font-size:40px;margin-bottom:10px">&#x2709;</div>
+            <h2 style="margin-bottom:8px">Check your email</h2>
+            <p style="color:var(--text-secondary);font-size:14px;margin-bottom:6px">
+                We sent a confirmation link to<br><strong>${typeof escapeHtml === 'function' ? escapeHtml(email) : email}</strong>
+            </p>
+            <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px">
+                Tap the link in the email, then come back here and log in.
+            </p>
+            <button class="btn btn-primary btn-full" onclick="renderSocialTab()">Back to Log In</button>
+            <button class="btn btn-secondary btn-full" style="margin-top:8px" onclick="resendVerificationEmail('${email.replace(/'/g, "\\'")}')">Resend email</button>
+        </div>`;
+}
+
+async function resendVerificationEmail(email) {
+    try {
+        const resp = await fetch(SUPABASE_URL + '/auth/v1/resend', {
+            method: 'POST',
+            headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'signup', email }),
+            cache: 'no-store',
+        });
+        if (resp.ok) showToast('Verification email resent!', 'success');
+        else showToast('Could not resend — try again in a minute');
+    } catch (e) {
+        showToast('Could not resend: ' + (e.message || 'unknown'));
     }
 }
 
@@ -129,22 +180,50 @@ async function socialSignIn() {
     const pass = document.getElementById('login-password').value;
     if (!email || !pass) return showToast('Fill in all fields');
 
-    // Try the library first with a short timeout; fall back to direct REST
-    // if it hangs (the library has been observed to hang on some iOS PWAs).
-    const libSignin = (async () => {
-        const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-        if (error) throw new Error(error.message);
-    })();
-
+    const btnSel = '#auth-login .btn-primary';
+    setAuthLoading(btnSel, true);
     try {
-        await withTimeout(libSignin, 6000, 'LIB_TIMEOUT');
-        return; // success via library
-    } catch (e) {
-        console.warn('Library signin failed/timed out, falling back to direct REST:', e.message);
-        // Fall through to direct
-    }
+        const libSignin = (async () => {
+            const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+            if (error) throw new Error(error.message);
+        })();
 
-    await directSignIn(email, pass);
+        try {
+            await withTimeout(libSignin, 6000, 'LIB_TIMEOUT');
+            return;
+        } catch (e) {
+            console.warn('Library signin failed/timed out, falling back to direct REST:', e.message);
+        }
+
+        await directSignIn(email, pass);
+    } finally {
+        setAuthLoading(btnSel, false);
+    }
+}
+
+async function requestPasswordReset() {
+    const email = document.getElementById('login-email').value.trim();
+    if (!email) return showToast('Enter your email first, then tap Forgot Password');
+    const btnSel = '#forgot-password-btn';
+    setAuthLoading(btnSel, true);
+    try {
+        const resp = await fetch(SUPABASE_URL + '/auth/v1/recover', {
+            method: 'POST',
+            headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+            cache: 'no-store',
+        });
+        if (resp.ok) {
+            showToast('Password reset email sent! Check your inbox.', 'success');
+        } else {
+            const body = await resp.json().catch(() => ({}));
+            showToast(body.error_description || body.msg || 'Could not send reset email');
+        }
+    } catch (e) {
+        showToast('Failed: ' + (e.message || 'unknown'));
+    } finally {
+        setAuthLoading(btnSel, false);
+    }
 }
 
 // Direct REST sign-in. Bypasses supabase-js when its auth flow hangs.

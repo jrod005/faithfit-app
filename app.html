@@ -805,6 +805,7 @@
                         <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="you@email.com"></div>
                         <div class="form-group"><label>Password</label><input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key==='Enter')socialSignIn()"></div>
                         <button class="btn btn-primary btn-full" onclick="socialSignIn()">Log In</button>
+                        <button class="btn-link" id="forgot-password-btn" onclick="requestPasswordReset()" style="margin-top:10px;display:block;text-align:center;background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;text-decoration:underline">Forgot password?</button>
                     </div>
                     <div id="auth-signup" class="hidden">
                         <div class="form-group"><label>Display Name</label><input type="text" id="signup-name" placeholder="Your name"></div>

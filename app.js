@@ -3157,20 +3157,20 @@ async function deleteWorkout(timestamp) {
 
 // --- Data Management ---
 function exportData() {
-    const data = {
-        profile: DB.get('profile', {}),
-        workouts: DB.get('workouts', []),
-        meals: DB.get('meals', []),
-        weights: DB.get('weights', []),
-        exportDate: new Date().toISOString()
-    };
+    const data = { exportDate: new Date().toISOString(), version: 2 };
+    SYNCED_KEYS.forEach(key => {
+        const val = DB.get(key, null);
+        if (val !== null) data[key] = val;
+    });
+    data.savedVerses = DB.get('savedVerses', []);
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `faithfit-backup-${today()}.json`;
+    a.download = `ironfaith-backup-${today()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    showToast('Data exported!', 'success');
 }
 
 async function clearAllData() {
@@ -3547,10 +3547,20 @@ function importData(event) {
             const ok = await confirmDialog('This will replace all your current data with the imported data. Continue?', { okText: 'Import' });
             if (!ok) return;
 
-            if (data.profile) DB.set('profile', data.profile);
-            if (data.workouts) DB.set('workouts', data.workouts);
-            if (data.meals) DB.set('meals', data.meals);
-            if (data.weights) DB.set('weights', data.weights);
+            const skip = new Set(['exportDate', 'version']);
+            for (const [key, val] of Object.entries(data)) {
+                if (skip.has(key)) continue;
+                if (SYNCED_KEYS.has(key) || key === 'savedVerses') {
+                    DB.set(key, val);
+                }
+            }
+            // Backwards compat: v1 exports only had 4 keys
+            if (!data.version) {
+                if (data.profile) DB.set('profile', data.profile);
+                if (data.workouts) DB.set('workouts', data.workouts);
+                if (data.meals) DB.set('meals', data.meals);
+                if (data.weights) DB.set('weights', data.weights);
+            }
 
             showToast('Data imported successfully!', 'success');
             setTimeout(() => location.reload(), 800);
