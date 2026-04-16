@@ -89,12 +89,38 @@ function setAuthLoading(btnSelector, loading) {
     }
 }
 
+function validateEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function showFieldError(inputId, msg) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.style.borderColor = '#f87171';
+    let err = input.parentElement.querySelector('.field-error');
+    if (!err) {
+        err = document.createElement('span');
+        err.className = 'field-error';
+        err.style.cssText = 'color:#f87171;font-size:11px;margin-top:2px;display:block';
+        input.parentElement.appendChild(err);
+    }
+    err.textContent = msg;
+    input.addEventListener('input', function clear() {
+        input.style.borderColor = '';
+        if (err) err.remove();
+        input.removeEventListener('input', clear);
+    }, { once: true });
+}
+
 async function socialSignUp() {
     const name = document.getElementById('signup-name').value.trim();
     const email = document.getElementById('signup-email').value.trim();
     const pass = document.getElementById('signup-password').value;
-    if (!name || !email || !pass) return showToast('Fill in all fields');
-    if (pass.length < 6) return showToast('Password must be 6+ characters');
+    if (!name) return showFieldError('signup-name', 'Name is required');
+    if (!email) return showFieldError('signup-email', 'Email is required');
+    if (!validateEmail(email)) return showFieldError('signup-email', 'Enter a valid email address');
+    if (!pass) return showFieldError('signup-password', 'Password is required');
+    if (pass.length < 6) return showFieldError('signup-password', 'Must be 6+ characters');
 
     const btnSel = '#auth-signup .btn-primary';
     setAuthLoading(btnSel, true);
@@ -178,7 +204,9 @@ async function resendVerificationEmail(email) {
 async function socialSignIn() {
     const email = document.getElementById('login-email').value.trim();
     const pass = document.getElementById('login-password').value;
-    if (!email || !pass) return showToast('Fill in all fields');
+    if (!email) return showFieldError('login-email', 'Email is required');
+    if (!validateEmail(email)) return showFieldError('login-email', 'Enter a valid email address');
+    if (!pass) return showFieldError('login-password', 'Password is required');
 
     const btnSel = '#auth-login .btn-primary';
     setAuthLoading(btnSel, true);

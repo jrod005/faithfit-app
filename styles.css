@@ -5348,6 +5348,27 @@ body {
     box-shadow: 0 12px 40px rgba(0,0,0,0.18);
 }
 
+/* ========== RETURNING USER BANNER ========== */
+.ob-returning-banner {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    margin-top: 18px;
+    text-align: center;
+}
+.ob-returning-icon { font-size: 32px; margin-bottom: 6px; }
+.ob-returning-banner p { margin: 0 0 6px; }
+.ob-returning-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 14px !important;
+}
+[data-theme="light"] .ob-returning-banner {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+}
+
 /* ========== COMPLETION BURST ========== */
 .burst-canvas {
     position: fixed;

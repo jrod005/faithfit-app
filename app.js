@@ -1612,6 +1612,8 @@ function drawStrengthChart() {
     ctx.clearRect(0, 0, w, h);
 
     if (!name) {
+        const card = canvas.closest('.card');
+        if (card) card.style.display = DB.get('workouts', []).length === 0 ? 'none' : '';
         ctx.fillStyle = '#64748B';
         ctx.font = '14px Inter, sans-serif';
         ctx.textAlign = 'center';
@@ -1619,6 +1621,8 @@ function drawStrengthChart() {
         if (summary) summary.innerHTML = '';
         return;
     }
+    const card2 = canvas.closest('.card');
+    if (card2) card2.style.display = '';
 
     const series = getStrengthSeries(name);
     if (series.length < 2) {
@@ -3865,6 +3869,61 @@ function checkAchievements() {
     });
 
     if (newUnlock) DB.set('achievements', unlocked);
+    checkFeedbackPrompt();
+}
+
+function checkFeedbackPrompt() {
+    if (DB.get('feedbackDismissed', false)) return;
+    const workouts = DB.get('workouts', []);
+    const uniqueDays = new Set(workouts.map(w => w.date)).size;
+    if (uniqueDays < 5) return;
+    if (DB.get('feedbackShown', false)) return;
+    DB.set('feedbackShown', true);
+    setTimeout(() => showFeedbackPrompt(), 1500);
+}
+
+function showFeedbackPrompt() {
+    const overlay = document.createElement('div');
+    overlay.className = 'devotional-overlay';
+    overlay.innerHTML = `
+        <div class="devotional-dialog" role="dialog">
+            <div class="devotional-cross" aria-hidden="true">&#x2764;</div>
+            <div class="devotional-eyebrow">You've been consistent</div>
+            <p class="devotional-verse" style="font-style:normal">You've trained ${new Set(DB.get('workouts', []).map(w => w.date)).size} days with Iron Faith. That's real commitment.</p>
+            <p class="devotional-reflection">If the app is helping you, sharing it with one friend would mean the world to us.</p>
+            <button class="btn btn-primary btn-full" onclick="shareFeedback(this)" style="margin-bottom:8px">Share Iron Faith</button>
+            <button class="btn btn-secondary btn-full" onclick="dismissFeedback(this)">Maybe later</button>
+        </div>`;
+    const close = () => { overlay.classList.remove('show'); setTimeout(() => overlay.remove(), 200); };
+    overlay.onclick = (e) => { if (e.target === overlay) { DB.set('feedbackDismissed', true); close(); } };
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('show'));
+}
+
+function shareFeedback(btn) {
+    DB.set('feedbackDismissed', true);
+    const overlay = btn.closest('.devotional-overlay');
+    if (navigator.share) {
+        navigator.share({
+            title: 'Iron Faith',
+            text: 'Fitness + faith tracker that actually works. Free, private, works offline.',
+            url: window.location.origin,
+        }).catch(() => {});
+    } else {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(window.location.origin).then(
+                () => showToast('Link copied!', 'success'),
+                () => {}
+            );
+        }
+    }
+    if (overlay) { overlay.classList.remove('show'); setTimeout(() => overlay.remove(), 200); }
+}
+
+function dismissFeedback(btn) {
+    DB.set('feedbackDismissed', true);
+    const overlay = btn.closest('.devotional-overlay');
+    if (overlay) { overlay.classList.remove('show'); setTimeout(() => overlay.remove(), 200); }
 }
 
 function renderAchievements() {
@@ -5763,7 +5822,33 @@ function showOnboarding() {
     const profile = DB.get('profile', {});
     if (!profile.name && !DB.get('onboarded', false)) {
         document.getElementById('onboarding').classList.remove('hidden');
+        detectReturningUser();
     }
+}
+
+function detectReturningUser() {
+    try {
+        const stored = localStorage.getItem('ironfaith-direct-session');
+        if (!stored) return;
+        const session = JSON.parse(stored);
+        if (!session || !session.user) return;
+        const email = session.user.email || '';
+        const name = session.user.user_metadata?.display_name || '';
+        const banner = document.createElement('div');
+        banner.className = 'ob-returning-banner';
+        banner.innerHTML = `
+            <div class="ob-returning-icon">&#x1F44B;</div>
+            <p><strong>Welcome back${name ? ', ' + escapeHtml(name) : ''}!</strong></p>
+            <p class="ob-returning-sub">Looks like you already have an account${email ? ' (' + escapeHtml(email) + ')' : ''}. Tap below to restore your data.</p>
+            <button class="btn btn-primary btn-full" onclick="onboardingRestoreFromCloud()">Restore my data</button>
+        `;
+        const slide = document.querySelector('.onboarding-slide[data-step="1"]');
+        if (slide) {
+            const restoreBtn = slide.querySelector('.btn-secondary');
+            if (restoreBtn) restoreBtn.style.display = 'none';
+            slide.appendChild(banner);
+        }
+    } catch (_) {}
 }
 
 // --- Custom Exercise Library ---
