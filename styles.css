@@ -1458,6 +1458,69 @@ input::placeholder {
     text-decoration: underline;
 }
 
+.first-workout-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 10001;
+    opacity: 0;
+    transition: opacity 220ms ease;
+}
+.first-workout-overlay.show { opacity: 1; }
+.first-workout-dialog {
+    background: #141414;
+    border: 1px solid rgba(201,167,105,0.45);
+    border-radius: 18px;
+    padding: 28px 22px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    transform: scale(0.96);
+    transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1.1);
+}
+.first-workout-overlay.show .first-workout-dialog { transform: scale(1); }
+.first-workout-icon {
+    font-size: 48px;
+    line-height: 1;
+    margin-bottom: 6px;
+}
+.first-workout-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gold, #c9a769);
+    margin-bottom: 6px;
+}
+.first-workout-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+    color: #fff;
+}
+.first-workout-verse {
+    font-size: 13px;
+    font-style: italic;
+    color: var(--text-secondary, #bbb);
+    line-height: 1.5;
+    margin: 0 0 14px 0;
+    padding: 10px 12px;
+    border-left: 2px solid var(--gold, #c9a769);
+    background: rgba(201,167,105,0.06);
+    border-radius: 6px;
+    text-align: left;
+}
+.first-workout-body {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text-secondary, #bbb);
+    margin: 0 0 18px 0;
+}
+
 .coach-upsell {
     margin-top: 10px;
     padding: 10px 12px;

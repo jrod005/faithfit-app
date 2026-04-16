@@ -6581,6 +6581,7 @@ async function finishActiveWorkout() {
     let setCount = 0;
     let topLift = { name: '', weight: 0, reps: 0 };
     const workouts = DB.get('workouts', []);
+    const hadPriorWorkouts = workouts.length > 0;
     activeWorkout.exercises.forEach(ex => {
         const validSets = ex.logged
             .filter(s => s.w && s.r)
@@ -6639,6 +6640,9 @@ async function finishActiveWorkout() {
     showToast(`Saved ${saved} exercise${saved !== 1 ? 's' : ''}!`, 'success');
 
     if (sharePrompt) {
+        if (!hadPriorWorkouts) {
+            await firstWorkoutCelebration();
+        }
         const choice = await workoutShareChoiceDialog();
         if (choice === 'card') {
             openWorkoutShareModal(lastFinishedWorkout);
@@ -6646,6 +6650,40 @@ async function finishActiveWorkout() {
             openPostModalFromWorkout(`Just finished ${sessionName || 'a session'}!`);
         }
     }
+}
+
+// Milestone moment for a brand-new user's first saved workout — a single
+// beat of recognition before the normal share-card flow. Zero dependencies,
+// fully dismissible, shown exactly once per account.
+function firstWorkoutCelebration() {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'first-workout-overlay';
+        overlay.innerHTML = `
+            <div class="first-workout-dialog" role="dialog" aria-labelledby="fw-title">
+                <div class="first-workout-icon" aria-hidden="true">&#x1F3C6;</div>
+                <div class="first-workout-eyebrow">First workout logged</div>
+                <h3 id="fw-title" class="first-workout-title">The hardest rep is rep one.</h3>
+                <p class="first-workout-verse">&ldquo;Whatever you do, work at it with all your heart, as working for the Lord.&rdquo; &mdash; Colossians 3:23</p>
+                <p class="first-workout-body">You just unlocked progress tracking, streak counting, and personalized load suggestions. Show up again tomorrow and the app starts getting smart about your training.</p>
+                <button class="btn btn-primary btn-full first-workout-ok">Let&rsquo;s keep going</button>
+            </div>`;
+        const close = () => {
+            document.removeEventListener('keydown', onKey);
+            overlay.classList.remove('show');
+            setTimeout(() => { overlay.remove(); resolve(); }, 200);
+        };
+        const onKey = (e) => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); close(); } };
+        overlay.querySelector('.first-workout-ok').onclick = close;
+        overlay.onclick = (e) => { if (e.target === overlay) close(); };
+        document.addEventListener('keydown', onKey);
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => {
+            overlay.classList.add('show');
+            const btn = overlay.querySelector('.first-workout-ok');
+            if (btn) btn.focus();
+        });
+    });
 }
 
 // Three-way prompt: Share Card / Post to Feed / Skip
