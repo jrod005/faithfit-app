@@ -588,9 +588,9 @@ button:disabled {
     --text-muted: #5a5a5a;
     --border: #222222;
     --border-light: #2a2a2a;
-    --accent: #d4a44a;
-    --accent-dim: #b8892e;
-    --accent-glow: rgba(212, 164, 74, 0.15);
+    --accent: #e0e0e0;
+    --accent-dim: #888888;
+    --accent-glow: rgba(255, 255, 255, 0.06);
     --success: #4ade80;
     --warning: #facc15;
     --danger: #f87171;
@@ -626,7 +626,7 @@ body {
 
 /* ========== VERSE BANNER ========== */
 .verse-banner {
-    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(212, 164, 74, 0.08) 100%);
+    background: var(--card-bg);
     color: var(--text-secondary);
     padding: 18px 48px 18px 20px;
     text-align: center;
@@ -662,8 +662,7 @@ body {
 
 .verse-icon {
     font-size: 16px;
-    color: var(--accent);
-    opacity: 0.8;
+    opacity: 0.5;
 }
 
 .verse-text {
@@ -678,8 +677,7 @@ body {
 .verse-ref {
     font-size: 11px;
     font-weight: 600;
-    color: var(--accent);
-    opacity: 0.7;
+    opacity: 0.5;
     letter-spacing: 0.5px;
     text-transform: uppercase;
 }
@@ -693,10 +691,7 @@ body {
 .app-header h1 {
     font-size: 32px;
     font-weight: 800;
-    background: linear-gradient(135deg, #ffffff 0%, var(--accent) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: #ffffff;
     letter-spacing: 3px;
     text-transform: uppercase;
     line-height: 1;
@@ -759,7 +754,7 @@ body {
 }
 
 .tab-btn.active {
-    color: var(--accent);
+    color: #ffffff;
 }
 
 .tab-icon {
@@ -837,7 +832,7 @@ body {
     height: 2px;
 }
 
-.stat-card.primary::after { background: linear-gradient(90deg, var(--accent), transparent); }
+.stat-card.primary::after { background: linear-gradient(90deg, #ffffff, transparent); }
 .stat-card.success::after { background: linear-gradient(90deg, var(--success), transparent); }
 .stat-card.accent::after { background: linear-gradient(90deg, var(--accent-dim), transparent); }
 .stat-card.warning::after { background: linear-gradient(90deg, var(--warning), transparent); }
@@ -2106,9 +2101,9 @@ canvas {
     --text-muted: #999999;
     --border: #e0e0e0;
     --border-light: #eaeaea;
-    --accent: #9a7028;
-    --accent-dim: #b8892e;
-    --accent-glow: rgba(154, 112, 40, 0.10);
+    --accent: #333333;
+    --accent-dim: #666666;
+    --accent-glow: rgba(0, 0, 0, 0.04);
 }
 
 [data-theme="light"] input,
@@ -2143,10 +2138,7 @@ canvas {
 }
 
 [data-theme="light"] .app-header h1 {
-    background: linear-gradient(135deg, #111111 0%, var(--accent) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: #111111;
 }
 
 
@@ -3551,8 +3543,7 @@ canvas {
 .info-tappable:hover .info-icon { opacity: 1; color: var(--text-secondary); }
 
 .prayer-journal-card {
-    border-color: rgba(212, 164, 74, 0.25);
-    background: linear-gradient(135deg, var(--card-bg) 0%, var(--accent-glow) 100%);
+    border-color: var(--border);
 }
 .prayer-journal-card textarea {
     width: 100%;
@@ -5429,19 +5420,13 @@ body {
 
 /* ========== FAITH COACH BUTTONS ========== */
 .quick-btn.faith-btn {
-    background: var(--accent-glow);
-    border-color: var(--accent);
-    color: var(--accent);
-}
-.quick-btn.faith-btn:hover {
-    background: var(--accent);
-    color: var(--bg);
+    border-color: var(--border);
 }
 [data-theme="light"] .faith-streak-card {
-    background: linear-gradient(135deg, #ffffff 0%, #fef9ef 100%);
-    border-color: #e4d5a8;
+    background: #fafafa;
+    border-color: #e4e4e7;
 }
 [data-theme="light"] .verse-banner {
-    background: linear-gradient(135deg, #ffffff 0%, #fef9ef 100%);
-    border-bottom-color: #e4d5a8;
+    background: #ffffff;
+    border-bottom-color: #e0e0e0;
 }

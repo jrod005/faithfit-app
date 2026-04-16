@@ -2673,7 +2673,13 @@ function renderBackupHealth() {
     if (workouts.length === 0) { el.classList.add('hidden'); return; }
 
     const enabled = (typeof isCloudSyncEnabled === 'function') ? isCloudSyncEnabled() : false;
-    const signedIn = (typeof currentUser !== 'undefined' && !!currentUser);
+    let signedIn = (typeof currentUser !== 'undefined' && !!currentUser);
+    if (!signedIn) {
+        try {
+            const stored = localStorage.getItem('ironfaith-direct-session');
+            if (stored) { const s = JSON.parse(stored); signedIn = !!(s && s.user); }
+        } catch (_) {}
+    }
     const last = (typeof getLastSync === 'function') ? getLastSync() : 0;
 
     let state, icon, line1, line2, action;
@@ -6762,7 +6768,7 @@ function showCompletionBurst() {
     document.body.appendChild(canvas);
     const ctx = canvas.getContext('2d');
     const particles = [];
-    const colors = ['#d4a44a', '#f0c040', '#ffffff', '#4ade80', '#facc15'];
+    const colors = ['#ffffff', '#e0e0e0', '#a0a0a0', '#4ade80', '#facc15'];
     for (let i = 0; i < 60; i++) {
         const angle = (Math.PI * 2 * i) / 60;
         const speed = 3 + Math.random() * 5;
