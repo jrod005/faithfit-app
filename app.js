@@ -781,12 +781,14 @@ function drawWeightChart() {
     ctx.clearRect(0, 0, w, h);
 
     if (weights.length < 2) {
+        canvas.closest('.card').classList.add('empty-chart');
         ctx.fillStyle = '#64748B';
         ctx.font = '14px Inter, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('Log at least 2 weights to see your chart', w / 2, h / 2);
+        ctx.fillText(weights.length === 0 ? 'Log your weight to start tracking' : 'Log one more weight to see your chart', w / 2, h / 2);
         return;
     }
+    canvas.closest('.card').classList.remove('empty-chart');
 
     const last30 = weights.slice(-30);
     const values = last30.map(w => parseFloat(lbsToDisplay(w.weight)));
@@ -1763,10 +1765,16 @@ function drawVolumeChart() {
     const totalVol = values.reduce((a, b) => a + b, 0);
     const avgVol = totalVol / values.length;
 
+    if (totalVol === 0) {
+        canvas.closest('.card').style.display = 'none';
+        return;
+    }
+    canvas.closest('.card').style.display = '';
+
     const caption = document.getElementById('volume-caption');
     if (caption) {
         if (totalVol === 0) {
-            caption.textContent = 'No workouts logged in this window yet.';
+            caption.textContent = '';
         } else {
             caption.innerHTML = `12-week avg: <b>${avgVol.toFixed(0)} ${wu()}</b> per week`;
         }
@@ -3894,6 +3902,11 @@ function renderCalendarHeatmap() {
     const container = document.getElementById('calendar-heatmap');
     if (!container) return;
     const workouts = DB.get('workouts', []);
+    if (workouts.length === 0) {
+        container.closest('.card').style.display = 'none';
+        return;
+    }
+    container.closest('.card').style.display = '';
 
     // Count workouts per day for last 90 days
     const counts = {};
@@ -3963,6 +3976,11 @@ function renderMuscleHeatmap() {
     if (!container) return;
 
     const workouts = DB.get('workouts', []);
+    if (workouts.length === 0) {
+        container.closest('.card').style.display = 'none';
+        return;
+    }
+    container.closest('.card').style.display = '';
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     const weekStr = weekAgo.toISOString().split('T')[0];
@@ -5731,6 +5749,14 @@ function completeOnboarding() {
     updateNutritionBars();
     checkAchievements();
     if (typeof renderTodaysWorkoutBanner === 'function') renderTodaysWorkoutBanner();
+
+    // Jump straight to the workout tab with suggested routine ready
+    if (suggested) {
+        switchTab('workout');
+        setTimeout(() => {
+            if (typeof startRoutine === 'function') startRoutine(suggested.id);
+        }, 400);
+    }
 }
 
 function showOnboarding() {

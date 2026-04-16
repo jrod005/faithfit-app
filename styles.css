@@ -5017,6 +5017,65 @@ body {
     line-height: 1.7;
 }
 
+/* ========== LANDING STATS BAR ========== */
+.landing-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 0 0 60px;
+    text-align: center;
+}
+.landing-stat strong {
+    display: block;
+    font-size: 22px;
+    font-weight: 800;
+    color: #ffffff;
+}
+.landing-stat span {
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+@media (max-width: 520px) {
+    .landing-stats { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+}
+
+/* ========== LANDING TESTIMONIALS ========== */
+.landing-testimonials {
+    margin: 0 0 60px;
+    text-align: center;
+}
+.landing-testimonials h2 {
+    font-size: 24px;
+    font-weight: 800;
+    margin-bottom: 24px;
+}
+.landing-testimonial-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+}
+.landing-testimonial {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 14px;
+    padding: 20px;
+    text-align: left;
+}
+.landing-testimonial p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #ccc;
+    margin: 0 0 10px;
+    font-style: italic;
+}
+.landing-testimonial-author {
+    font-size: 12px;
+    color: #666;
+    font-weight: 600;
+}
+
 .landing-final-cta {
     text-align: center;
     padding: 60px 16px;
@@ -5029,11 +5088,22 @@ body {
     font-weight: 800;
     margin: 0 0 24px;
 }
+.landing-final-sub {
+    color: #888;
+    font-size: 14px;
+    margin: -10px 0 24px;
+    line-height: 1.5;
+}
 .landing-meta {
     color: #666;
     font-size: 12px;
     margin-top: 22px;
     letter-spacing: 0.3px;
+}
+
+/* Empty chart cards — reduce visual noise for new users */
+.card.empty-chart {
+    opacity: 0.6;
 }
 
 .landing-footer {
