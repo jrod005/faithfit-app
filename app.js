@@ -42,7 +42,7 @@ const SYNCED_KEYS = new Set([
     'prayerEntries', 'goals', 'achievements', 'streakHistory', 'units',
     'experience', 'equipment', 'onboarded', 'hapticsEnabled', 'notifSettings',
     'bibleVersion', 'savedTemplates', 'challenges', 'coachHistory',
-    'measurements'
+    'measurements', 'savedVerses'
 ]);
 const DB = {
     get(key, fallback = null) {
@@ -675,6 +675,61 @@ function displayDailyVerse() {
     const version = getBibleVersion();
     document.getElementById('daily-verse').textContent = `"${text}"`;
     document.getElementById('verse-ref').textContent = `— ${verse.ref} (${version})`;
+    updateVerseSaveBtn();
+}
+
+function toggleSaveVerse() {
+    const verse = getDailyVerse();
+    const saved = DB.get('savedVerses', []);
+    const idx = saved.findIndex(v => v.ref === verse.ref);
+    if (idx >= 0) {
+        saved.splice(idx, 1);
+    } else {
+        saved.push({ ref: verse.ref, text: verse.text, savedAt: Date.now() });
+    }
+    DB.set('savedVerses', saved);
+    updateVerseSaveBtn();
+    showToast(idx >= 0 ? 'Verse removed' : 'Verse saved', 'success');
+}
+
+function updateVerseSaveBtn() {
+    const btn = document.getElementById('verse-save-btn');
+    if (!btn) return;
+    const verse = getDailyVerse();
+    const saved = DB.get('savedVerses', []);
+    const isSaved = saved.some(v => v.ref === verse.ref);
+    btn.innerHTML = isSaved ? '&#x2764;' : '&#x2661;';
+    btn.classList.toggle('saved', isSaved);
+}
+
+function getFaithStreak() {
+    const prayers = DB.get('prayerEntries', []);
+    if (!prayers.length) return 0;
+    const dates = new Set(prayers.map(p => p.date));
+    const d = new Date();
+    const toStr = x => x.toISOString().split('T')[0];
+    if (!dates.has(toStr(d))) {
+        d.setDate(d.getDate() - 1);
+        if (!dates.has(toStr(d))) return 0;
+    }
+    let streak = 1;
+    for (let i = 0; i < 365; i++) {
+        d.setDate(d.getDate() - 1);
+        if (dates.has(toStr(d))) streak++;
+        else break;
+    }
+    return streak;
+}
+
+function renderFaithStreak() {
+    const card = document.getElementById('faith-streak-card');
+    if (!card) return;
+    const prayers = DB.get('prayerEntries', []);
+    if (!prayers.length) { card.classList.add('hidden'); return; }
+    const streak = getFaithStreak();
+    card.classList.remove('hidden');
+    const countEl = document.getElementById('faith-streak-count');
+    if (countEl) countEl.textContent = `${streak} day${streak !== 1 ? 's' : ''}`;
 }
 
 // --- Tab Navigation ---
@@ -1283,6 +1338,11 @@ function animateCount(el, target, opts) {
         el.textContent = `${fmtNum(target, decimals)}${suffix}`;
         return;
     }
+    if (target > start && el.classList.contains('stat-number')) {
+        el.classList.remove('pop');
+        void el.offsetWidth;
+        el.classList.add('pop');
+    }
     const startTime = performance.now();
     const ease = (t) => 1 - Math.pow(1 - t, 3);
     function step(now) {
@@ -1453,6 +1513,7 @@ function savePrayerEntry() {
     input.value = '';
     showToast('Entry saved &#x1F64F;');
     renderPrayerHistory();
+    renderFaithStreak();
 }
 
 async function deletePrayerEntry(timestamp) {
@@ -2913,6 +2974,7 @@ function updateDashboard() {
     }
 
     updateStreak();
+    renderFaithStreak();
     renderStreakProtector();
     renderBackupHealth();
     renderDailyInsight();
@@ -6641,10 +6703,13 @@ async function finishActiveWorkout() {
     renderTodaysWorkoutBanner();
     checkAchievements();
     showToast(`Saved ${saved} exercise${saved !== 1 ? 's' : ''}!`, 'success');
+    if (saved > 0) showCompletionBurst();
 
     if (sharePrompt) {
         if (!hadPriorWorkouts) {
             await firstWorkoutCelebration();
+        } else {
+            await showWorkoutDevotional();
         }
         const choice = await workoutShareChoiceDialog();
         if (choice === 'card') {
@@ -6685,6 +6750,95 @@ function firstWorkoutCelebration() {
             overlay.classList.add('show');
             const btn = overlay.querySelector('.first-workout-ok');
             if (btn) btn.focus();
+        });
+    });
+}
+
+function showCompletionBurst() {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'burst-canvas';
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+    const particles = [];
+    const colors = ['#d4a44a', '#f0c040', '#ffffff', '#4ade80', '#facc15'];
+    for (let i = 0; i < 60; i++) {
+        const angle = (Math.PI * 2 * i) / 60;
+        const speed = 3 + Math.random() * 5;
+        particles.push({
+            x: canvas.width / 2, y: canvas.height / 2,
+            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 2,
+            r: 3 + Math.random() * 4,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            life: 1,
+        });
+    }
+    let frame = 0;
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
+        particles.forEach(p => {
+            p.x += p.vx; p.y += p.vy; p.vy += 0.12;
+            p.life -= 0.018;
+            if (p.life <= 0) return;
+            alive = true;
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        frame++;
+        if (alive && frame < 90) requestAnimationFrame(draw);
+        else canvas.remove();
+    }
+    requestAnimationFrame(draw);
+}
+
+const WORKOUT_DEVOTIONALS = [
+    { theme: 'perseverance', verse: 'Hebrews 12:1', text: 'Let us run with perseverance the race marked out for us.' },
+    { theme: 'discipline', verse: 'Hebrews 12:11', text: 'No discipline seems pleasant at the time, but painful. Later on, it produces a harvest of righteousness and peace.' },
+    { theme: 'strength', verse: 'Isaiah 40:31', text: 'Those who hope in the LORD will renew their strength. They will soar on wings like eagles.' },
+    { theme: 'commitment', verse: 'Colossians 3:23', text: 'Whatever you do, work at it with all your heart, as working for the Lord.' },
+    { theme: 'courage', verse: 'Joshua 1:9', text: 'Be strong and courageous. Do not be afraid, for the LORD your God will be with you wherever you go.' },
+    { theme: 'endurance', verse: 'Galatians 6:9', text: 'Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.' },
+    { theme: 'purpose', verse: 'Philippians 3:14', text: 'I press on toward the goal to win the prize for which God has called me heavenward in Christ Jesus.' },
+    { theme: 'faithfulness', verse: '2 Timothy 4:7', text: 'I have fought the good fight, I have finished the race, I have kept the faith.' },
+    { theme: 'power', verse: '2 Timothy 1:7', text: 'God gave us a spirit not of fear but of power and love and self-control.' },
+    { theme: 'trust', verse: 'Proverbs 3:5', text: 'Trust in the LORD with all your heart and lean not on your own understanding.' },
+    { theme: 'identity', verse: '1 Corinthians 6:19-20', text: 'Your bodies are temples of the Holy Spirit. Therefore honor God with your bodies.' },
+    { theme: 'victory', verse: 'Romans 8:37', text: 'In all these things we are more than conquerors through him who loved us.' },
+];
+
+function showWorkoutDevotional() {
+    return new Promise(resolve => {
+        const dev = WORKOUT_DEVOTIONALS[Math.floor(Math.random() * WORKOUT_DEVOTIONALS.length)];
+        const text = getTranslatedVerse(dev.verse, dev.text);
+        const overlay = document.createElement('div');
+        overlay.className = 'devotional-overlay';
+        overlay.innerHTML = `
+            <div class="devotional-dialog" role="dialog" aria-labelledby="dev-title">
+                <div class="devotional-cross" aria-hidden="true">&#x271E;</div>
+                <div class="devotional-eyebrow">Workout complete</div>
+                <p class="devotional-verse">&ldquo;${escapeHtml(text)}&rdquo;</p>
+                <p class="devotional-ref">&mdash; ${escapeHtml(dev.verse)} (${getBibleVersion()})</p>
+                <p class="devotional-reflection">You showed up. You put in the work. That takes ${dev.theme}.</p>
+                <button class="btn btn-primary btn-full devotional-ok">Amen</button>
+            </div>`;
+        const close = () => {
+            document.removeEventListener('keydown', onKey);
+            overlay.classList.remove('show');
+            setTimeout(() => { overlay.remove(); resolve(); }, 200);
+        };
+        const onKey = (e) => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); close(); } };
+        overlay.querySelector('.devotional-ok').onclick = close;
+        overlay.onclick = (e) => { if (e.target === overlay) close(); };
+        document.addEventListener('keydown', onKey);
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => {
+            overlay.classList.add('show');
+            overlay.querySelector('.devotional-ok').focus();
         });
     });
 }

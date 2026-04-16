@@ -123,6 +123,7 @@
             <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode" aria-label="Toggle dark/light mode">&#x263C;</button>
             <div class="verse-top-row">
                 <span class="verse-icon">&#x2727;</span>
+                <span class="verse-eyebrow">Today's Verse</span>
                 <select id="bible-version" class="bible-select" onchange="setBibleVersion(this.value)">
                     <option value="NIV">NIV</option>
                     <option value="KJV">KJV</option>
@@ -133,7 +134,10 @@
                 </select>
             </div>
             <p id="daily-verse" class="verse-text"></p>
-            <p id="verse-ref" class="verse-ref"></p>
+            <div class="verse-bottom-row">
+                <p id="verse-ref" class="verse-ref"></p>
+                <button class="verse-save-btn" id="verse-save-btn" onclick="toggleSaveVerse()" title="Save this verse" aria-label="Save this verse">&#x2661;</button>
+            </div>
         </div>
 
         <!-- Header -->
@@ -198,6 +202,14 @@
                     <h3>Body Weight</h3>
                     <p class="stat-number" id="current-weight">-- lbs</p>
                 </div>
+            </div>
+            <div class="faith-streak-card hidden" id="faith-streak-card">
+                <div class="faith-streak-icon">&#x1F54A;</div>
+                <div class="faith-streak-body">
+                    <span class="faith-streak-label">Faith Streak</span>
+                    <strong class="faith-streak-count" id="faith-streak-count">0 days</strong>
+                </div>
+                <span class="faith-streak-hint">prayer &amp; devotional</span>
             </div>
 
             <div id="discovery-hint" class="discovery-hint hidden"></div>
@@ -758,6 +770,8 @@
                 <button class="quick-btn" onclick="coachAsk('Warm-up routine')">Warm-Up</button>
                 <button class="quick-btn" onclick="coachAsk('Weak point analysis')">Weak Points</button>
                 <button class="quick-btn" onclick="coachAsk('How do progress photos work?')">Progress Photos</button>
+                <button class="quick-btn faith-btn" onclick="coachAsk('Find me a Bible verse about perseverance and strength for today')">&#x2727; Verse for Today</button>
+                <button class="quick-btn faith-btn" onclick="coachAsk('Give me a short devotional reflection connecting my fitness journey with faith')">&#x2727; Faith Reflection</button>
             </div>
 
             <div id="coach-messages" class="coach-messages" role="log" aria-live="polite" aria-atomic="false">

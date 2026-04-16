@@ -588,8 +588,9 @@ button:disabled {
     --text-muted: #5a5a5a;
     --border: #222222;
     --border-light: #2a2a2a;
-    --accent: #e0e0e0;
-    --accent-dim: #888888;
+    --accent: #d4a44a;
+    --accent-dim: #b8892e;
+    --accent-glow: rgba(212, 164, 74, 0.15);
     --success: #4ade80;
     --warning: #facc15;
     --danger: #f87171;
@@ -625,9 +626,9 @@ body {
 
 /* ========== VERSE BANNER ========== */
 .verse-banner {
-    background: var(--bg);
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(212, 164, 74, 0.08) 100%);
     color: var(--text-secondary);
-    padding: 14px 48px 14px 20px;
+    padding: 18px 48px 18px 20px;
     text-align: center;
     position: relative;
     border-bottom: 1px solid var(--border);
@@ -660,14 +661,15 @@ body {
 }
 
 .verse-icon {
-    font-size: 14px;
-    opacity: 0.5;
+    font-size: 16px;
+    color: var(--accent);
+    opacity: 0.8;
 }
 
 .verse-text {
-    font-size: 13px;
+    font-size: 14px;
     font-style: italic;
-    line-height: 1.5;
+    line-height: 1.6;
     margin: 6px 0 3px;
     font-weight: 300;
     opacity: 0.8;
@@ -676,7 +678,8 @@ body {
 .verse-ref {
     font-size: 11px;
     font-weight: 600;
-    opacity: 0.5;
+    color: var(--accent);
+    opacity: 0.7;
     letter-spacing: 0.5px;
     text-transform: uppercase;
 }
@@ -690,7 +693,10 @@ body {
 .app-header h1 {
     font-size: 32px;
     font-weight: 800;
-    color: #ffffff;
+    background: linear-gradient(135deg, #ffffff 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     letter-spacing: 3px;
     text-transform: uppercase;
     line-height: 1;
@@ -753,7 +759,7 @@ body {
 }
 
 .tab-btn.active {
-    color: #ffffff;
+    color: var(--accent);
 }
 
 .tab-icon {
@@ -831,7 +837,7 @@ body {
     height: 2px;
 }
 
-.stat-card.primary::after { background: linear-gradient(90deg, #ffffff, transparent); }
+.stat-card.primary::after { background: linear-gradient(90deg, var(--accent), transparent); }
 .stat-card.success::after { background: linear-gradient(90deg, var(--success), transparent); }
 .stat-card.accent::after { background: linear-gradient(90deg, var(--accent-dim), transparent); }
 .stat-card.warning::after { background: linear-gradient(90deg, var(--warning), transparent); }
@@ -845,10 +851,18 @@ body {
 }
 
 .stat-number {
-    font-size: 28px;
+    font-size: 32px;
     font-weight: 800;
-    margin-top: 6px;
+    margin-top: 8px;
     line-height: 1;
+}
+.stat-number.pop {
+    animation: stat-pop 0.5s ease;
+}
+@keyframes stat-pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.12); color: var(--accent); }
+    100% { transform: scale(1); }
 }
 
 .stat-sub {
@@ -2092,8 +2106,9 @@ canvas {
     --text-muted: #999999;
     --border: #e0e0e0;
     --border-light: #eaeaea;
-    --accent: #333333;
-    --accent-dim: #666666;
+    --accent: #9a7028;
+    --accent-dim: #b8892e;
+    --accent-glow: rgba(154, 112, 40, 0.10);
 }
 
 [data-theme="light"] input,
@@ -2128,12 +2143,12 @@ canvas {
 }
 
 [data-theme="light"] .app-header h1 {
-    color: #111111;
+    background: linear-gradient(135deg, #111111 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
-[data-theme="light"] .verse-banner {
-    border-bottom-color: #e0e0e0;
-}
 
 [data-theme="light"] .unit-btn.active {
     background: #ffffff;
@@ -3535,6 +3550,10 @@ canvas {
 }
 .info-tappable:hover .info-icon { opacity: 1; color: var(--text-secondary); }
 
+.prayer-journal-card {
+    border-color: rgba(212, 164, 74, 0.25);
+    background: linear-gradient(135deg, var(--card-bg) 0%, var(--accent-glow) 100%);
+}
 .prayer-journal-card textarea {
     width: 100%;
     background: var(--bg);
@@ -5266,4 +5285,162 @@ body {
     background: #ffffff;
     border-color: #e4e4e7;
     box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+}
+
+/* ========== COMPLETION BURST ========== */
+.burst-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    pointer-events: none;
+}
+
+/* ========== VERSE BANNER UPGRADES ========== */
+.verse-eyebrow {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-left: 6px;
+}
+.verse-bottom-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+}
+.verse-save-btn {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: color 0.2s, transform 0.2s;
+    padding: 4px 8px;
+}
+.verse-save-btn:hover { color: var(--accent); }
+.verse-save-btn.saved { color: #ef4444; }
+.verse-save-btn:active { transform: scale(1.2); }
+
+/* ========== FAITH STREAK CARD ========== */
+.faith-streak-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(135deg, var(--card-bg) 0%, var(--accent-glow) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 14px;
+}
+.faith-streak-card.hidden { display: none; }
+.faith-streak-icon { font-size: 28px; flex-shrink: 0; }
+.faith-streak-body { display: flex; flex-direction: column; }
+.faith-streak-label {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+}
+.faith-streak-count {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--accent);
+}
+.faith-streak-hint {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* ========== WORKOUT DEVOTIONAL ========== */
+.devotional-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.3s;
+    padding: 20px;
+}
+.devotional-overlay.show { opacity: 1; }
+.devotional-dialog {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px 28px;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+    transform: scale(0.9) translateY(20px);
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.devotional-overlay.show .devotional-dialog { transform: scale(1) translateY(0); }
+.devotional-cross {
+    font-size: 36px;
+    color: var(--accent);
+    margin-bottom: 4px;
+    opacity: 0.8;
+}
+.devotional-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-bottom: 16px;
+}
+.devotional-verse {
+    font-size: 16px;
+    font-style: italic;
+    line-height: 1.6;
+    color: var(--text);
+    margin: 0 0 10px;
+}
+.devotional-ref {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 0 0 16px;
+}
+.devotional-reflection {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0 0 20px;
+}
+.devotional-ok {
+    border-radius: 12px;
+}
+[data-theme="light"] .devotional-overlay { background: rgba(0,0,0,0.35); }
+[data-theme="light"] .devotional-dialog {
+    background: #ffffff;
+    border-color: #e4e4e7;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+}
+
+/* ========== FAITH COACH BUTTONS ========== */
+.quick-btn.faith-btn {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.quick-btn.faith-btn:hover {
+    background: var(--accent);
+    color: var(--bg);
+}
+[data-theme="light"] .faith-streak-card {
+    background: linear-gradient(135deg, #ffffff 0%, #fef9ef 100%);
+    border-color: #e4d5a8;
+}
+[data-theme="light"] .verse-banner {
+    background: linear-gradient(135deg, #ffffff 0%, #fef9ef 100%);
+    border-bottom-color: #e4d5a8;
 }
