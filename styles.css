@@ -5420,3 +5420,10 @@ body {
 }
 [data-theme="light"] .undo-btn { border-color: rgba(0,0,0,0.3); color: #333; }
 [data-theme="light"] .coach-copy-btn:hover { background: rgba(0,0,0,0.05); }
+
+/* ========== PULL TO REFRESH ========== */
+.pull-refresh-indicator {
+    text-align: center; font-size: 13px; color: var(--text-muted);
+    overflow: hidden; display: flex; align-items: center;
+    justify-content: center; transition: height 0.15s;
+}

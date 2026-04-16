@@ -2648,3 +2648,49 @@ function timeAgo(ms) {
     if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
     return new Date(ms).toLocaleDateString();
 }
+
+// --- Pull-to-refresh for social feed ---
+(function initPullToRefresh() {
+    let startY = 0, pulling = false, indicator = null;
+
+    function getFeedEl() { return document.getElementById('social-feed'); }
+
+    document.addEventListener('touchstart', e => {
+        const feed = getFeedEl();
+        if (!feed || feed.classList.contains('hidden')) return;
+        if (feed.scrollTop > 5) return;
+        startY = e.touches[0].clientY;
+        pulling = true;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', e => {
+        if (!pulling) return;
+        const feed = getFeedEl();
+        if (!feed || feed.classList.contains('hidden')) return;
+        const dy = e.touches[0].clientY - startY;
+        if (dy > 10 && feed.scrollTop <= 0) {
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.className = 'pull-refresh-indicator';
+                indicator.innerHTML = '&#x21BB; Release to refresh';
+                feed.prepend(indicator);
+            }
+            const progress = Math.min(dy / 100, 1);
+            indicator.style.opacity = progress;
+            indicator.style.height = Math.min(dy * 0.4, 50) + 'px';
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchend', () => {
+        if (!pulling) return;
+        pulling = false;
+        if (indicator) {
+            const h = parseFloat(indicator.style.height);
+            indicator.remove();
+            indicator = null;
+            if (h >= 40 && typeof loadFeed === 'function') {
+                loadFeed();
+            }
+        }
+    }, { passive: true });
+})();
