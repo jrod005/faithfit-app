@@ -11,22 +11,6 @@
     "categories": ["health", "fitness", "lifestyle"],
     "lang": "en-US",
     "dir": "ltr",
-    "screenshots": [
-        {
-            "src": "icons/screenshot-wide.png",
-            "sizes": "1280x720",
-            "type": "image/png",
-            "form_factor": "wide",
-            "label": "Iron Faith dashboard with workout stats and daily verse"
-        },
-        {
-            "src": "icons/screenshot-narrow.png",
-            "sizes": "750x1334",
-            "type": "image/png",
-            "form_factor": "narrow",
-            "label": "Iron Faith mobile workout tracker"
-        }
-    ],
     "icons": [
         {
             "src": "icons/icon-192.png",

@@ -20,8 +20,10 @@
     <meta property="og:title" content="Iron Faith &mdash; Strengthen Body &amp; Spirit">
     <meta property="og:description" content="Fitness + faith in one app. Workouts, nutrition, prayer journal, AI coach.">
     <meta property="og:image" content="icons/icon-512.png">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com https://*.supabase.co https://world.openfoodfacts.org https://api.anthropic.com data: blob:; img-src * data: blob:;">
 </head>
 <body>
+    <a href="#dashboard" class="skip-to-content" onclick="switchTab('dashboard')">Skip to content</a>
     <!-- Onboarding Overlay -->
     <div id="onboarding" class="onboarding-overlay hidden">
         <div class="onboarding-content">
@@ -265,11 +267,6 @@
             <div class="card">
                 <h2>Achievements</h2>
                 <div id="achievements-grid" class="achievements-grid"></div>
-            </div>
-
-            <div class="card">
-                <h2>Faith &amp; Fitness Challenges</h2>
-                <div id="challenges-container"></div>
             </div>
 
             <div class="card strength-progress-compact">
@@ -1140,12 +1137,12 @@
     <script src="routines.js"></script>
     <script src="exercise-info.js"></script>
     <script src="app.js"></script>
-    <script src="photos.js"></script>
-    <script src="coach-core.js"></script>
-    <script src="coach-responses.js"></script>
-    <script src="coach-chat.js"></script>
-    <script src="coach-nlp.js"></script>
-    <script src="coach-llm.js"></script>
+    <script src="photos.js" defer></script>
+    <script src="coach-core.js" defer></script>
+    <script src="coach-responses.js" defer></script>
+    <script src="coach-chat.js" defer></script>
+    <script src="coach-nlp.js" defer></script>
+    <script src="coach-llm.js" defer></script>
     <script src="social.js"></script>
     <script src="cloud-sync.js"></script>
 </body>
