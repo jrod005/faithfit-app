@@ -15,6 +15,31 @@ function saveCoachHistoryEntry(entry) {
     DB.set(COACH_HISTORY_KEY, list);
 }
 
+function exportCoachChat() {
+    const history = loadCoachHistoryEntries();
+    if (!history.length) { showToast('No chat history to export'); return; }
+    const lines = history.map(e => {
+        const ts = e.time ? new Date(e.time).toLocaleString() : '';
+        if (e.role === 'user') return `[${ts}] You:\n${e.text || ''}`;
+        const plain = (e.html || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n\n')
+            .replace(/<li>/gi, '• ').replace(/<\/li>/gi, '\n').replace(/<[^>]+>/g, '')
+            .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/\n{3,}/g, '\n\n').trim();
+        return `[${ts}] Coach:\n${plain}`;
+    });
+    const text = 'Iron Faith Coach — Chat Export\n' + '='.repeat(40) + '\n\n' + lines.join('\n\n---\n\n');
+    if (navigator.share) {
+        navigator.share({ title: 'Coach Chat Export', text }).catch(() => {});
+    } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(
+            () => showToast('Chat copied to clipboard', 'success'),
+            () => showToast('Could not copy', 'error')
+        );
+    } else {
+        showToast('Share not available on this device', 'error');
+    }
+}
+
 function clearCoachChat() {
     confirmDialog('Clear all chat history with Coach?', { okText: 'Clear', danger: true }).then(ok => {
         if (!ok) return;
@@ -453,6 +478,39 @@ function coachPickPhoto() {
         showToast('Form check needs your Claude API key \u2014 set it in Profile', 'warn');
         return;
     }
+    const seen = localStorage.getItem('faithfit_photoTipsSeen');
+    if (!seen) {
+        showPhotoTipsOverlay();
+        return;
+    }
+    const input = document.getElementById('coach-photo-file');
+    if (input) input.click();
+}
+
+function showPhotoTipsOverlay() {
+    const overlay = document.createElement('div');
+    overlay.className = 'photo-tips-overlay';
+    overlay.innerHTML = `
+        <div class="photo-tips-dialog">
+            <div class="photo-tips-icon">&#x1F4F7;</div>
+            <h3>Form Check Tips</h3>
+            <ul class="photo-tips-list">
+                <li><strong>Side angle</strong> — gives the best view of your spine and joint positions</li>
+                <li><strong>Full body in frame</strong> — head to feet so Coach can see everything</li>
+                <li><strong>Good lighting</strong> — avoid backlit or dark gym corners</li>
+                <li><strong>Mid-rep capture</strong> — the bottom of a squat or the lockout tells the most</li>
+                <li><strong>Fitted clothing</strong> — loose shirts hide posture cues</li>
+            </ul>
+            <button class="btn btn-primary btn-full" onclick="dismissPhotoTips(this)">Got it — choose photo</button>
+        </div>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('show'));
+}
+
+function dismissPhotoTips(btn) {
+    localStorage.setItem('faithfit_photoTipsSeen', '1');
+    const overlay = btn.closest('.photo-tips-overlay');
+    if (overlay) { overlay.classList.remove('show'); setTimeout(() => overlay.remove(), 250); }
     const input = document.getElementById('coach-photo-file');
     if (input) input.click();
 }

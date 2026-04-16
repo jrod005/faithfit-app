@@ -2308,6 +2308,9 @@ function logMeal() {
     updateNutritionBars();
     updateDashboard();
     checkAchievements();
+    if (!navigator.onLine) {
+        showToast('Saved offline — will sync when you reconnect', 'info');
+    }
 }
 
 function deleteMeal(timestamp) {

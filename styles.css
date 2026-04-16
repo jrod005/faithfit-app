@@ -299,7 +299,7 @@ button:disabled {
     overflow-y: auto;
 }
 .modal-card {
-    background: var(--card, #1a1a1a);
+    background: var(--card-bg, #1a1a1a);
     border-radius: 16px;
     padding: 20px;
     max-width: 460px;
@@ -5067,4 +5067,203 @@ body {
     font-weight: 600; letter-spacing: 0.5px;
     border-left: 2px solid #4ecdc4; margin: -4px 0 -4px 20px;
     padding-left: 10px;
+}
+
+/* ========== LIGHT THEME POLISH ========== */
+[data-theme="light"] .modal-overlay {
+    background: rgba(0,0,0,0.45);
+}
+[data-theme="light"] .modal-card {
+    box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+    border: 1px solid #e0e0e0;
+}
+[data-theme="light"] .confirm-overlay {
+    background: rgba(0,0,0,0.35);
+}
+[data-theme="light"] .confirm-dialog {
+    box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+    border-color: #e0e0e0;
+}
+[data-theme="light"] .btn-secondary {
+    background: #ffffff;
+    border-color: #d4d4d8;
+    color: #18181b;
+}
+[data-theme="light"] .btn-secondary:hover {
+    background: #f4f4f5;
+    border-color: #a1a1aa;
+}
+[data-theme="light"] .btn-danger,
+[data-theme="light"] .btn-danger:hover {
+    background: #dc2626;
+    color: #ffffff;
+}
+[data-theme="light"] .stat-card {
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+[data-theme="light"] .coach-msg.bot {
+    background: #fafafa;
+    border-color: #e4e4e7;
+}
+[data-theme="light"] .coach-msg.bot .plan-table tr:hover td {
+    background: rgba(0,0,0,0.02);
+}
+[data-theme="light"] .coach-input-area {
+    background: rgba(245,245,245,0.95);
+    border-top-color: #e4e4e7;
+}
+[data-theme="light"] .quick-btn,
+[data-theme="light"] .quick-actions button {
+    background: #ffffff;
+    border-color: #d4d4d8;
+    color: #18181b;
+}
+[data-theme="light"] .quick-btn:hover {
+    border-color: #18181b;
+    background: #f4f4f5;
+}
+[data-theme="light"] .feed-post {
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+[data-theme="light"] .post-workout-card {
+    background: #fafafa;
+    border-color: #e4e4e7;
+}
+[data-theme="light"] .post-verse {
+    background: #fffdf5;
+    border-color: #fcd34d;
+}
+[data-theme="light"] .post-stat-pill {
+    background: #ffffff;
+    border-color: #e4e4e7;
+}
+[data-theme="light"] .ob-choice {
+    background: #ffffff;
+}
+[data-theme="light"] .ob-choice.selected,
+[data-theme="light"] .ob-choice:hover {
+    border-color: #18181b;
+    background: #f4f4f5;
+}
+[data-theme="light"] .onboarding-overlay {
+    background: #ffffff;
+    color: #111111;
+}
+[data-theme="light"] .streak-protector {
+    background: linear-gradient(90deg, #fff7ed, #ffedd5);
+    border-color: #fb923c;
+}
+[data-theme="light"] .streak-protector-text strong { color: #9a3412; }
+[data-theme="light"] .streak-protector-text span { color: #c2410c; }
+[data-theme="light"] .streak-protector-cta {
+    background: #ea580c;
+    color: #ffffff;
+}
+[data-theme="light"] .prayer-entry {
+    background: #fafafa;
+    border-color: #e4e4e7;
+}
+[data-theme="light"] .report-stat {
+    background: #fafafa;
+}
+[data-theme="light"] .first-run-card {
+    background: linear-gradient(135deg, #f0fdf4 0%, #fafafa 100%);
+    border-color: #bbf7d0;
+}
+[data-theme="light"] .first-workout-overlay {
+    background: rgba(0,0,0,0.35);
+}
+[data-theme="light"] .first-workout-dialog {
+    background: #ffffff;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+}
+[data-theme="light"] .coach-disclaimer {
+    background: #fffbeb;
+    color: #92400e;
+    border-color: #fcd34d;
+}
+[data-theme="light"] .calendar-day { border-color: #e4e4e7; }
+[data-theme="light"] .delete-btn { color: #a1a1aa; }
+[data-theme="light"] .delete-btn:hover { color: #dc2626; }
+[data-theme="light"] .app-header {
+    background: rgba(245,245,245,0.92);
+    border-bottom-color: #e4e4e7;
+}
+[data-theme="light"] .coach-chat-header {
+    border-bottom-color: #e4e4e7;
+}
+[data-theme="light"] .coach-avatar-sm {
+    background: #f4f4f5;
+    color: #18181b;
+}
+[data-theme="light"] .global-error-banner {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #991b1b;
+}
+[data-theme="light"] .coach-upsell {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
+/* ========== FORM-CHECK PHOTO TIPS ========== */
+.photo-tips-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.2s;
+    padding: 20px;
+}
+.photo-tips-overlay.show { opacity: 1; }
+.photo-tips-dialog {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+    transform: scale(0.92);
+    transition: transform 0.2s;
+}
+.photo-tips-overlay.show .photo-tips-dialog { transform: scale(1); }
+.photo-tips-icon { font-size: 42px; margin-bottom: 8px; }
+.photo-tips-dialog h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 14px;
+}
+.photo-tips-list {
+    text-align: left;
+    padding-left: 18px;
+    margin: 0 0 18px;
+    list-style: none;
+}
+.photo-tips-list li {
+    position: relative;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    padding-left: 8px;
+}
+.photo-tips-list li::before {
+    content: '\2713';
+    position: absolute;
+    left: -14px;
+    color: var(--success);
+    font-weight: 700;
+}
+.photo-tips-list li strong { color: var(--text); }
+[data-theme="light"] .photo-tips-overlay { background: rgba(0,0,0,0.35); }
+[data-theme="light"] .photo-tips-dialog {
+    background: #ffffff;
+    border-color: #e4e4e7;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.18);
 }
