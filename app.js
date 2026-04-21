@@ -2485,6 +2485,7 @@ function updateNutritionBars() {
     document.getElementById('protein-bar').style.width = `${Math.min((totals.protein / proteinGoal) * 100, 100)}%`;
     document.getElementById('carbs-bar').style.width = `${Math.min((totals.carbs / 300) * 100, 100)}%`;
     document.getElementById('fat-bar').style.width = `${Math.min((totals.fat / 80) * 100, 100)}%`;
+    if (typeof drawMacroDonut === 'function') drawMacroDonut();
 }
 
 // --- Coaching System is now in coach.js ---
@@ -3054,6 +3055,7 @@ function updateDashboard() {
     renderAchievements();
     renderWeeklyReport();
     renderDiscoveryHint();
+    renderPRTracker();
 }
 
 // ========== DISCOVERY HINTS ==========
@@ -3563,6 +3565,129 @@ function calcPlates() {
     }
 }
 
+// --- PR Tracker ---
+let _prExpanded = false;
+
+function getAllPRs() {
+    const workouts = DB.get('workouts', []);
+    const prs = {};
+    workouts.forEach(w => {
+        w.sets.forEach(s => {
+            const e1rm = estimate1RM(s.weight, s.reps);
+            if (!prs[w.name] || e1rm > prs[w.name].e1rm) {
+                prs[w.name] = {
+                    e1rm,
+                    weight: s.weight,
+                    reps: s.reps,
+                    date: w.date,
+                    timestamp: w.timestamp
+                };
+            }
+        });
+    });
+    return Object.entries(prs)
+        .map(([name, data]) => ({ name, ...data }))
+        .sort((a, b) => b.e1rm - a.e1rm);
+}
+
+function renderPRTracker() {
+    const card = document.getElementById('pr-tracker-card');
+    const container = document.getElementById('pr-tracker-list');
+    if (!card || !container) return;
+    const prs = getAllPRs();
+    if (prs.length === 0) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    const show = _prExpanded ? prs : prs.slice(0, 5);
+    const btn = document.getElementById('pr-toggle-btn');
+    if (btn) btn.textContent = _prExpanded ? 'Show Less' : `Show All (${prs.length})`;
+    if (prs.length <= 5 && btn) btn.style.display = 'none';
+
+    container.innerHTML = show.map((pr, i) => {
+        const medal = i === 0 ? '&#x1F947;' : i === 1 ? '&#x1F948;' : i === 2 ? '&#x1F949;' : '';
+        return `
+        <div class="pr-item">
+            <div class="pr-rank">${medal || (i + 1)}</div>
+            <div class="pr-info">
+                <span class="pr-name">${escapeHtml(pr.name)}</span>
+                <span class="pr-detail">${lbsToDisplay(pr.weight)}${wu()} x ${pr.reps} &middot; e1RM: ${lbsToDisplay(pr.e1rm)}${wu()}</span>
+            </div>
+            <span class="pr-date">${pr.date}</span>
+        </div>`;
+    }).join('');
+}
+
+function togglePRTracker() {
+    _prExpanded = !_prExpanded;
+    renderPRTracker();
+}
+
+// --- Macro Donut Chart ---
+function drawMacroDonut() {
+    const card = document.getElementById('macro-chart-card');
+    const canvas = document.getElementById('macro-donut');
+    if (!card || !canvas) return;
+    const meals = DB.get('meals', []).filter(m => m.date === today());
+    const totals = meals.reduce((acc, m) => ({
+        protein: acc.protein + (m.protein || 0),
+        carbs: acc.carbs + (m.carbs || 0),
+        fat: acc.fat + (m.fat || 0)
+    }), { protein: 0, carbs: 0, fat: 0 });
+
+    const total = totals.protein + totals.carbs + totals.fat;
+    if (total === 0) { card.style.display = 'none'; return; }
+    card.style.display = '';
+
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = 200 * dpr;
+    canvas.height = 200 * dpr;
+    canvas.style.width = '200px';
+    canvas.style.height = '200px';
+    ctx.scale(dpr, dpr);
+
+    const cx = 100, cy = 100, r = 80, lineWidth = 22;
+    const slices = [
+        { label: 'Protein', value: totals.protein, color: '#4ade80', cal: totals.protein * 4 },
+        { label: 'Carbs', value: totals.carbs, color: '#60a5fa', cal: totals.carbs * 4 },
+        { label: 'Fat', value: totals.fat, color: '#f472b6', cal: totals.fat * 9 },
+    ];
+    const totalCal = slices.reduce((s, sl) => s + sl.cal, 0) || 1;
+
+    ctx.clearRect(0, 0, 200, 200);
+    let startAngle = -Math.PI / 2;
+    slices.forEach(sl => {
+        const sweep = (sl.cal / totalCal) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, startAngle, startAngle + sweep);
+        ctx.lineWidth = lineWidth;
+        ctx.strokeStyle = sl.color;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+        startAngle += sweep;
+    });
+
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim() || '#e0e0e0';
+    ctx.font = 'bold 22px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${total}g`, cx, cy - 8);
+    ctx.font = '12px Inter, sans-serif';
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#888';
+    ctx.fillText('total macros', cx, cy + 12);
+
+    const legend = document.getElementById('macro-legend');
+    if (legend) {
+        legend.innerHTML = slices.map(sl => {
+            const pct = Math.round((sl.cal / totalCal) * 100);
+            return `<div class="macro-legend-item">
+                <span class="macro-legend-dot" style="background:${sl.color}"></span>
+                <span class="macro-legend-label">${sl.label}</span>
+                <span class="macro-legend-val">${sl.value}g (${pct}%)</span>
+            </div>`;
+        }).join('');
+    }
+}
+
 // --- Responsive Chart Resize ---
 let _resizeTimer;
 window.addEventListener('resize', () => {
@@ -3571,6 +3696,7 @@ window.addEventListener('resize', () => {
         if (typeof drawWeightChart === 'function') drawWeightChart();
         if (typeof drawVolumeChart === 'function') drawVolumeChart();
         if (typeof drawStrengthChart === 'function') drawStrengthChart();
+        if (typeof drawMacroDonut === 'function') drawMacroDonut();
     }, 250);
 });
 
@@ -6761,6 +6887,7 @@ function init() {
     safeCall('renderRecentMeals', renderRecentMeals);
     safeCall('updateNutritionBars', updateNutritionBars);
     safeCall('drawWeightChart', drawWeightChart);
+    safeCall('renderPRTracker', renderPRTracker);
     safeCall('renderAchievements', renderAchievements);
     safeCall('renderCalendarHeatmap', renderCalendarHeatmap);
     safeCall('renderMuscleHeatmap', renderMuscleHeatmap);

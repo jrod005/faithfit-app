@@ -279,6 +279,14 @@
                 <div id="strength-pr-summary" class="strength-pr-summary"></div>
             </div>
 
+            <div class="card" id="pr-tracker-card" style="display:none">
+                <div class="section-header-row">
+                    <h2>&#x1F3C6; Personal Records</h2>
+                    <button class="btn btn-sm btn-secondary" id="pr-toggle-btn" onclick="togglePRTracker()">Show All</button>
+                </div>
+                <div id="pr-tracker-list" class="pr-tracker-list"></div>
+            </div>
+
             <div class="card">
                 <div class="section-header-row">
                     <h2>Recent Workouts</h2>
@@ -735,6 +743,14 @@
                             <div class="progress-fill fat-fill" id="fat-bar" style="width: 0%"></div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div class="card" id="macro-chart-card" style="display:none">
+                <h2>Macro Split</h2>
+                <div class="macro-chart-wrap">
+                    <canvas id="macro-donut" width="200" height="200"></canvas>
+                    <div id="macro-legend" class="macro-legend"></div>
                 </div>
             </div>
 
