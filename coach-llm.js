@@ -1,27 +1,38 @@
 // =============================================
-// Iron Faith Coach — Claude Haiku fallback
-// Routes open-ended / low-confidence queries to Claude with
-// full user context, streams the response, sanitizes HTML.
+// Iron Faith Coach — Gemini Flash (FREE)
+// Routes open-ended / low-confidence queries to Google Gemini
+// with full user context, streams the response, sanitizes HTML.
 // If no API key or the call fails, callers fall back to the
 // local keyword engine.
 // =============================================
 
-const COACH_LLM_KEY_STORAGE = 'coachApiKey';
-const COACH_LLM_MODEL = 'claude-haiku-4-5-20251001';
-const COACH_LLM_ENDPOINT = 'https://api.anthropic.com/v1/messages';
+const COACH_LLM_KEY_STORAGE = 'coachGeminiKey';
+const COACH_LLM_MODEL = 'gemini-2.0-flash';
+const COACH_LLM_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 const COACH_LLM_TIMEOUT_MS = 25000;
 const COACH_LLM_MAX_TOKENS = 900;
 
 function getCoachApiKey() {
-    try { return localStorage.getItem('faithfit_' + COACH_LLM_KEY_STORAGE) || ''; }
+    try {
+        // Check new Gemini key first, fall back to legacy Claude key for migration
+        return localStorage.getItem('faithfit_' + COACH_LLM_KEY_STORAGE)
+            || localStorage.getItem('faithfit_coachApiKey')
+            || '';
+    }
     catch (_) { return ''; }
 }
 
 function setCoachApiKey(key) {
     const trimmed = (key || '').trim();
     try {
-        if (trimmed) localStorage.setItem('faithfit_' + COACH_LLM_KEY_STORAGE, trimmed);
-        else localStorage.removeItem('faithfit_' + COACH_LLM_KEY_STORAGE);
+        if (trimmed) {
+            localStorage.setItem('faithfit_' + COACH_LLM_KEY_STORAGE, trimmed);
+            // Remove old Claude key
+            localStorage.removeItem('faithfit_coachApiKey');
+        } else {
+            localStorage.removeItem('faithfit_' + COACH_LLM_KEY_STORAGE);
+            localStorage.removeItem('faithfit_coachApiKey');
+        }
     } catch (_) {}
 }
 
@@ -29,7 +40,11 @@ function coachLLMAvailable() {
     return !!getCoachApiKey();
 }
 
-// Static instructions — cacheable across requests so repeat calls are cheap.
+function _isGeminiKey(key) {
+    return key && !key.startsWith('sk-ant-');
+}
+
+// Static instructions
 const COACH_LLM_SYSTEM_PROMPT = `You are the Iron Faith AI coach — a fitness and faith companion embedded in the Iron Faith app (PWA).
 
 ROLE
@@ -59,8 +74,6 @@ SAFETY
 - Never prescribe supplement / medication doses.
 - Respect stated experience level and equipment — don't tell a bodyweight-only user to barbell squat.`;
 
-// Dynamic context — rebuilt every turn. Kept concise; Haiku handles
-// long contexts fine but shorter = faster + cheaper.
 function buildCoachLLMUserContext(ctx) {
     const p = ctx.profile || {};
     const lines = [];
@@ -83,7 +96,6 @@ function buildCoachLLMUserContext(ctx) {
     lines.push(`Training: ${ctx.workouts.length} total sets logged, ${ctx.weekWorkouts.length} this week across ${ctx.weekDays} distinct day(s).`);
     lines.push(`Bodyweight trend: ${ctx.weightTrend}.`);
 
-    // Recent workouts — last 15
     const recent = (ctx.workouts || []).slice(-15);
     if (recent.length) {
         lines.push('');
@@ -96,7 +108,6 @@ function buildCoachLLMUserContext(ctx) {
         });
     }
 
-    // PRs — top 10
     const prs = ctx.exercisePRs || {};
     const prEntries = Object.entries(prs).sort((a, b) => b[1] - a[1]).slice(0, 10);
     if (prEntries.length) {
@@ -183,8 +194,6 @@ function computeCoachStreak(workouts) {
     return streak;
 }
 
-// Pull recent user/bot exchanges from persistent history. The last entry
-// is the user turn we're about to answer (already saved by addUserMessage).
 function buildCoachLLMMessages() {
     const history = (typeof loadCoachHistoryEntries === 'function') ? loadCoachHistoryEntries() : [];
     const tail = history.slice(-12);
@@ -243,53 +252,82 @@ function sanitizeLLMHtml(raw) {
     return clean;
 }
 
-// Call Claude. If onDelta is provided, streams; otherwise returns the
-// full sanitized HTML in one shot. Returns { html } on success,
-// { error, message } on failure, or null if no key.
-async function askCoachLLM({ text, ctx, imageDataUrl, onDelta } = {}) {
-    const apiKey = getCoachApiKey();
-    if (!apiKey) return null;
+// ===== GEMINI API =====
+function _buildGeminiUrl(streaming) {
+    const key = getCoachApiKey();
+    const action = streaming ? 'streamGenerateContent?alt=sse&' : 'generateContent?';
+    return `${COACH_LLM_ENDPOINT}/${COACH_LLM_MODEL}:${action}key=${key}`;
+}
 
-    const userContext = buildCoachLLMUserContext(ctx || (typeof getCoachContext === 'function' ? getCoachContext() : {}));
-    const systemBlocks = [
-        { type: 'text', text: COACH_LLM_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
-        { type: 'text', text: userContext },
-    ];
+function _convertToGeminiFormat(messages, systemPrompt, userContext, imageDataUrl) {
+    const body = {
+        systemInstruction: {
+            parts: [{ text: systemPrompt + '\n\n' + userContext }]
+        },
+        generationConfig: {
+            maxOutputTokens: COACH_LLM_MAX_TOKENS,
+            temperature: 0.7
+        },
+        contents: []
+    };
 
-    let messages;
     if (imageDataUrl) {
         const m = imageDataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
-        if (!m) return { error: 'bad_image' };
-        messages = [{
-            role: 'user',
-            content: [
-                { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } },
-                { type: 'text', text: text || 'Form check please — identify the movement and give 2–4 specific cues.' },
-            ],
-        }];
-    } else {
-        messages = buildCoachLLMMessages();
-        if (!messages.length || messages[messages.length - 1].role !== 'user') {
-            messages.push({ role: 'user', content: text });
+        if (m) {
+            body.contents.push({
+                role: 'user',
+                parts: [
+                    { inlineData: { mimeType: m[1], data: m[2] } },
+                    { text: messages[messages.length - 1]?.content || 'Form check please.' }
+                ]
+            });
+            return body;
         }
     }
 
+    for (const msg of messages) {
+        body.contents.push({
+            role: msg.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: msg.content }]
+        });
+    }
+    return body;
+}
+
+// ===== CLAUDE API (legacy, for users who still have sk-ant- keys) =====
+async function _callClaude(apiKey, messages, systemPrompt, userContext, onDelta, imageDataUrl) {
+    const systemBlocks = [
+        { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: userContext },
+    ];
+
+    let apiMessages;
+    if (imageDataUrl) {
+        const m = imageDataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
+        if (!m) return { error: 'bad_image' };
+        apiMessages = [{
+            role: 'user',
+            content: [
+                { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } },
+                { type: 'text', text: messages[messages.length - 1]?.content || 'Form check please.' },
+            ],
+        }];
+    } else {
+        apiMessages = messages;
+    }
+
     const body = {
-        model: COACH_LLM_MODEL,
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: COACH_LLM_MAX_TOKENS,
         system: systemBlocks,
-        messages,
+        messages: apiMessages,
     };
     if (onDelta) body.stream = true;
 
-    return await _callClaudeWithRetry(apiKey, body, onDelta);
-}
-
-async function _callClaudeWithRetry(apiKey, body, onDelta, attempt = 0) {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), COACH_LLM_TIMEOUT_MS);
     try {
-        const resp = await fetch(COACH_LLM_ENDPOINT, {
+        const resp = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
@@ -300,39 +338,88 @@ async function _callClaudeWithRetry(apiKey, body, onDelta, attempt = 0) {
             body: JSON.stringify(body),
             signal: ac.signal,
         });
-
         if (!resp.ok) {
             const errBody = await resp.text().catch(() => '');
-            // Retry once on 429 / 529 overloaded
-            if ((resp.status === 429 || resp.status === 529) && attempt === 0) {
-                clearTimeout(timer);
-                await new Promise(r => setTimeout(r, 1500));
-                return _callClaudeWithRetry(apiKey, body, onDelta, attempt + 1);
-            }
-            console.error('Coach LLM HTTP', resp.status, errBody.slice(0, 300));
             return { error: `http_${resp.status}`, message: _extractLLMError(errBody) };
         }
-
         if (body.stream) {
-            const accumulated = await _consumeStream(resp, onDelta);
+            const accumulated = await _consumeSSEStream(resp, onDelta);
             return { html: sanitizeLLMHtml(accumulated) };
         }
         const data = await resp.json();
         const raw = data?.content?.find(b => b.type === 'text')?.text || '';
         return raw ? { html: sanitizeLLMHtml(raw) } : { error: 'empty_response' };
     } catch (e) {
-        if (e.name === 'AbortError') {
-            console.warn('Coach LLM timed out');
-            return { error: 'timeout' };
-        }
-        console.error('Coach LLM network error:', e);
+        if (e.name === 'AbortError') return { error: 'timeout' };
         return { error: 'network', message: e.message };
-    } finally {
-        clearTimeout(timer);
-    }
+    } finally { clearTimeout(timer); }
 }
 
-async function _consumeStream(resp, onDelta) {
+// ===== GEMINI CALL =====
+async function _callGemini(messages, systemPrompt, userContext, onDelta, imageDataUrl) {
+    const url = _buildGeminiUrl(!!onDelta);
+    const body = _convertToGeminiFormat(messages, systemPrompt, userContext, imageDataUrl);
+
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), COACH_LLM_TIMEOUT_MS);
+    try {
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: ac.signal,
+        });
+        if (!resp.ok) {
+            const errBody = await resp.text().catch(() => '');
+            if (resp.status === 429) {
+                await new Promise(r => setTimeout(r, 1500));
+                return _callGemini(messages, systemPrompt, userContext, onDelta, imageDataUrl);
+            }
+            return { error: `http_${resp.status}`, message: _extractGeminiError(errBody) };
+        }
+
+        if (onDelta) {
+            const accumulated = await _consumeGeminiStream(resp, onDelta);
+            return { html: sanitizeLLMHtml(accumulated) };
+        }
+        const data = await resp.json();
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        return raw ? { html: sanitizeLLMHtml(raw) } : { error: 'empty_response' };
+    } catch (e) {
+        if (e.name === 'AbortError') return { error: 'timeout' };
+        return { error: 'network', message: e.message };
+    } finally { clearTimeout(timer); }
+}
+
+async function _consumeGeminiStream(resp, onDelta) {
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let accumulated = '';
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const payload = line.slice(6).trim();
+            if (!payload || payload === '[DONE]') continue;
+            try {
+                const ev = JSON.parse(payload);
+                const text = ev?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                if (text) {
+                    accumulated += text;
+                    try { onDelta && onDelta(text, accumulated); } catch (_) {}
+                }
+            } catch (_) {}
+        }
+    }
+    return accumulated;
+}
+
+async function _consumeSSEStream(resp, onDelta) {
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buf = '';
@@ -353,10 +440,15 @@ async function _consumeStream(resp, onDelta) {
                     accumulated += ev.delta.text;
                     try { onDelta && onDelta(ev.delta.text, accumulated); } catch (_) {}
                 }
-            } catch (_) { /* ignore parse errors on partial lines */ }
+            } catch (_) {}
         }
     }
     return accumulated;
+}
+
+function _extractGeminiError(body) {
+    try { return JSON.parse(body)?.error?.message || body.slice(0, 160); }
+    catch (_) { return String(body || '').slice(0, 160); }
 }
 
 function _extractLLMError(body) {
@@ -364,37 +456,72 @@ function _extractLLMError(body) {
     catch (_) { return String(body || '').slice(0, 160); }
 }
 
-// Minimal ping to validate the key. Used by the settings "Test" button.
+// ===== MAIN ENTRY POINT =====
+async function askCoachLLM({ text, ctx, imageDataUrl, onDelta } = {}) {
+    const apiKey = getCoachApiKey();
+    if (!apiKey) return null;
+
+    const userContext = buildCoachLLMUserContext(ctx || (typeof getCoachContext === 'function' ? getCoachContext() : {}));
+    const messages = imageDataUrl ? [{ role: 'user', content: text || 'Form check please.' }] : buildCoachLLMMessages();
+    if (!imageDataUrl && (!messages.length || messages[messages.length - 1].role !== 'user')) {
+        messages.push({ role: 'user', content: text });
+    }
+
+    if (_isGeminiKey(apiKey)) {
+        return await _callGemini(messages, COACH_LLM_SYSTEM_PROMPT, userContext, onDelta, imageDataUrl);
+    } else {
+        return await _callClaude(apiKey, messages, COACH_LLM_SYSTEM_PROMPT, userContext, onDelta, imageDataUrl);
+    }
+}
+
 async function testCoachApiKey(key) {
     if (!key) return { ok: false, message: 'No key entered' };
     try {
         const ac = new AbortController();
         const timer = setTimeout(() => ac.abort(), 10000);
-        const resp = await fetch(COACH_LLM_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json',
-                'x-api-key': key,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true',
-            },
-            body: JSON.stringify({
-                model: COACH_LLM_MODEL,
-                max_tokens: 4,
-                messages: [{ role: 'user', content: 'ok' }],
-            }),
-            signal: ac.signal,
-        });
-        clearTimeout(timer);
-        if (resp.ok) return { ok: true };
-        const errBody = await resp.text().catch(() => '');
-        return { ok: false, message: _extractLLMError(errBody) || ('HTTP ' + resp.status) };
+
+        if (_isGeminiKey(key)) {
+            const url = `${COACH_LLM_ENDPOINT}/${COACH_LLM_MODEL}:generateContent?key=${key}`;
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ role: 'user', parts: [{ text: 'ok' }] }],
+                    generationConfig: { maxOutputTokens: 4 }
+                }),
+                signal: ac.signal,
+            });
+            clearTimeout(timer);
+            if (resp.ok) return { ok: true };
+            const errBody = await resp.text().catch(() => '');
+            return { ok: false, message: _extractGeminiError(errBody) || ('HTTP ' + resp.status) };
+        } else {
+            const resp = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    'x-api-key': key,
+                    'anthropic-version': '2023-06-01',
+                    'anthropic-dangerous-direct-browser-access': 'true',
+                },
+                body: JSON.stringify({
+                    model: 'claude-haiku-4-5-20251001',
+                    max_tokens: 4,
+                    messages: [{ role: 'user', content: 'ok' }],
+                }),
+                signal: ac.signal,
+            });
+            clearTimeout(timer);
+            if (resp.ok) return { ok: true };
+            const errBody = await resp.text().catch(() => '');
+            return { ok: false, message: _extractLLMError(errBody) || ('HTTP ' + resp.status) };
+        }
     } catch (e) {
         return { ok: false, message: e.name === 'AbortError' ? 'Timeout' : (e.message || 'Network error') };
     }
 }
 
-// --- Settings UI wiring (Profile tab) ---
+// --- Settings UI wiring ---
 function loadCoachApiKeyUI() {
     const onBtn = document.getElementById('coach-ai-on');
     const offBtn = document.getElementById('coach-ai-off');
@@ -403,13 +530,14 @@ function loadCoachApiKeyUI() {
     const keyInput = document.getElementById('coach-ai-key');
     if (!onBtn || !offBtn || !settings) return;
     const hasKey = coachLLMAvailable();
+    const key = getCoachApiKey();
+    const isGemini = _isGeminiKey(key);
     onBtn.classList.toggle('active', hasKey);
     offBtn.classList.toggle('active', !hasKey);
     settings.classList.toggle('hidden', !hasKey);
-    if (status) status.textContent = hasKey ? 'Connected \u2014 Claude Haiku' : 'Not connected';
+    if (status) status.textContent = hasKey ? ('Connected — ' + (isGemini ? 'Gemini Flash (free)' : 'Claude Haiku (paid)')) : 'Not connected';
     if (keyInput && hasKey) {
-        const k = getCoachApiKey();
-        keyInput.placeholder = 'Key saved (' + k.slice(0, 10) + '\u2026) \u2014 paste to replace';
+        keyInput.placeholder = 'Key saved (' + key.slice(0, 10) + '\u2026) — paste to replace';
         keyInput.value = '';
     }
 }
@@ -430,10 +558,6 @@ function saveCoachApiKeyFromInput() {
     if (!input) return;
     const key = input.value.trim();
     if (!key) return (typeof showToast === 'function' ? showToast('Paste a key first', 'warn') : null);
-    if (!/^sk-ant-/.test(key)) {
-        if (typeof showToast === 'function') showToast('Key should start with sk-ant-', 'warn');
-        return;
-    }
     setCoachApiKey(key);
     input.value = '';
     loadCoachApiKeyUI();
@@ -452,7 +576,8 @@ async function testCoachApiKeyFromInput() {
     if (status) status.textContent = 'Testing\u2026';
     const result = await testCoachApiKey(key);
     if (result.ok) {
-        if (status) status.textContent = 'Key works \u2014 Claude Haiku ready';
+        const isGemini = _isGeminiKey(key);
+        if (status) status.textContent = 'Key works — ' + (isGemini ? 'Gemini Flash ready (free)' : 'Claude Haiku ready (paid)');
         if (pasted) {
             setCoachApiKey(pasted);
             if (input) input.value = '';
@@ -476,7 +601,7 @@ function clearCoachApiKeyAndHide() {
     if (onBtn) onBtn.classList.remove('active');
     if (offBtn) offBtn.classList.add('active');
     if (status) status.textContent = 'Not connected';
-    if (input) { input.value = ''; input.placeholder = 'Paste your Claude API key (sk-ant-...)'; }
+    if (input) { input.value = ''; input.placeholder = 'Paste your Gemini API key (free from aistudio.google.com)'; }
     if (typeof showToast === 'function') showToast('AI coach disabled', 'info');
 }
 
@@ -486,7 +611,6 @@ if (document.readyState === 'loading') {
     setTimeout(loadCoachApiKeyUI, 0);
 }
 
-// Resize a File to max 1024px jpeg for vision calls. Keeps payloads small.
 async function coachResizeImage(file, maxDim = 1024, quality = 0.85) {
     const dataUrl = await new Promise((res, rej) => {
         const r = new FileReader();
